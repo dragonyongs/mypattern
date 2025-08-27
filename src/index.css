@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+/* 커스텀 유틸리티 (4.0 새 문법) */
+@utility tab-4 {
+  tab-size: 4;
+}
+
+@utility flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
