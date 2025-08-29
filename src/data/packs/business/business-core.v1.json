@@ -1,6 +1,6 @@
 {
     "packId": "business-core",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "domains": [
         "business"
     ],
@@ -405,6 +405,116 @@
             "pos": "ITEM",
             "tags": [
                 "business"
+            ]
+        }
+    ],
+    "patterns": [
+        {
+            "id": "BIZ-SCHEDULE-MEETING",
+            "category": "business",
+            "level": "beginner",
+            "surface": "Can we schedule a {{ITEM}} {{TIME}}?",
+            "koSurface": "{{TIME}}에 {{ITEM}} 일정 잡을 수 있을까요?",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true,
+                    "semanticConstraint": "MEETING_TYPE"
+                },
+                {
+                    "name": "TIME",
+                    "accept": "TIME",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "BIZ-NEED-APPROVAL",
+            "category": "business",
+            "level": "beginner",
+            "surface": "I need {{ITEM}} approved {{TIME}}.",
+            "koSurface": "{{TIME}}까지 {{ITEM}} 승인이 필요합니다.",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true,
+                    "semanticConstraint": "APPROVABLE"
+                },
+                {
+                    "name": "TIME",
+                    "accept": "TIME",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "BIZ-SEND-DOCUMENT",
+            "category": "business",
+            "level": "beginner",
+            "surface": "Please send the {{ITEM}} to {{PERSON}}.",
+            "koSurface": "{{PERSON}}에게 {{ITEM}} 보내주세요.",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true,
+                    "semanticConstraint": "DOCUMENT"
+                },
+                {
+                    "name": "PERSON",
+                    "accept": "PERSON",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "BIZ-DEADLINE-INQUIRY",
+            "category": "business",
+            "level": "beginner",
+            "surface": "What's the deadline for {{ITEM}}?",
+            "koSurface": "{{ITEM}} 마감일이 언제인가요?",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "BIZ-UPDATE-STATUS",
+            "category": "business",
+            "level": "beginner",
+            "surface": "I'll update you on {{ITEM}} {{TIME}}.",
+            "koSurface": "{{TIME}}에 {{ITEM}} 현황을 업데이트해 드리겠습니다.",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true
+                },
+                {
+                    "name": "TIME",
+                    "accept": "TIME",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "BIZ-CONFIRM-ATTENDANCE",
+            "category": "business",
+            "level": "beginner",
+            "surface": "Please confirm your attendance for {{ITEM}}.",
+            "koSurface": "{{ITEM}} 참석 여부를 확인해 주세요.",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true,
+                    "semanticConstraint": "EVENT"
+                }
             ]
         }
     ]

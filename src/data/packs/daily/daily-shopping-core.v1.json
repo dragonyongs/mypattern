@@ -1,6 +1,6 @@
 {
     "packId": "daily-shopping-core",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "domains": [
         "daily"
     ],
@@ -301,7 +301,8 @@
             "id": "SHOP-DO-YOU-HAVE-ITEM",
             "category": "daily",
             "level": "beginner",
-            "surface": "Do you have ITEM?",
+            "surface": "Do you have {{ITEM}}?",
+            "koSurface": "{{ITEM}} 있나요?",
             "slots": [
                 {
                     "name": "ITEM",
@@ -314,7 +315,8 @@
             "id": "SHOP-HOW-MUCH-ITEM",
             "category": "daily",
             "level": "beginner",
-            "surface": "How much is ITEM?",
+            "surface": "How much is {{ITEM}}?",
+            "koSurface": "{{ITEM}} 얼마예요?",
             "slots": [
                 {
                     "name": "ITEM",
@@ -327,7 +329,8 @@
             "id": "SHOP-WHERE-IS-PLACE",
             "category": "daily",
             "level": "beginner",
-            "surface": "Where is PLACE?",
+            "surface": "Where is {{PLACE}}?",
+            "koSurface": "{{PLACE}} 어디에 있나요?",
             "slots": [
                 {
                     "name": "PLACE",
@@ -340,12 +343,14 @@
             "id": "SHOP-CAN-I-TRY-ITEM-ON",
             "category": "daily",
             "level": "beginner",
-            "surface": "Can I try ITEM on?",
+            "surface": "Can I try {{ITEM}} on?",
+            "koSurface": "{{ITEM}} 입어볼 수 있나요?",
             "slots": [
                 {
                     "name": "ITEM",
                     "accept": "ITEM",
-                    "required": true
+                    "required": true,
+                    "semanticConstraint": "WEARABLE"
                 }
             ]
         },
@@ -353,12 +358,14 @@
             "id": "SHOP-DO-YOU-TAKE-ITEM",
             "category": "daily",
             "level": "beginner",
-            "surface": "Do you take ITEM?",
+            "surface": "Do you take {{ITEM}}?",
+            "koSurface": "{{ITEM}} 받으시나요?",
             "slots": [
                 {
                     "name": "ITEM",
                     "accept": "ITEM",
-                    "required": true
+                    "required": true,
+                    "semanticConstraint": "PAYMENT_METHOD"
                 }
             ]
         },
@@ -366,7 +373,8 @@
             "id": "SHOP-CAN-I-RETURN-ITEM",
             "category": "daily",
             "level": "beginner",
-            "surface": "Can I return ITEM?",
+            "surface": "Can I return {{ITEM}}?",
+            "koSurface": "{{ITEM}} 반품할 수 있나요?",
             "slots": [
                 {
                     "name": "ITEM",
@@ -380,6 +388,7 @@
             "category": "daily",
             "level": "beginner",
             "surface": "Can I have a receipt?",
+            "koSurface": "영수증 받을 수 있나요?",
             "slots": []
         },
         {
@@ -387,6 +396,7 @@
             "category": "daily",
             "level": "beginner",
             "surface": "Is there a discount?",
+            "koSurface": "할인 있나요?",
             "slots": []
         }
     ]

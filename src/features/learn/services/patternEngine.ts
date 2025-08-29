@@ -13,10 +13,9 @@ import type {
 import { useLexiconStore } from "@/stores/lexiconStore";
 import { inflectVerb } from "./inflector";
 import { inflectKoreanVerb } from "./koreanInflector";
-import { applyContextualKorean } from "./contextualKoreanizer";
-import { validateSemanticFit, getSuggestedVerb } from "./semanticValidator";
-import { getNaturalVerb } from "./naturalVerbMapper";
-import { getWordCategory, canPerformAction } from "./wordCategories";
+import { getWordCategory } from "./wordCategories";
+import coreVocabulary from "@/data/core-vocabulary.json";
+
 export type GenerateParams = {
   schemaIds?: string[];
   tags?: LangTag[];
@@ -63,49 +62,54 @@ function realize(
     string,
     { word: string; pos: string; lexeme: Lexeme }
   > = {};
+  const usedWords: Lexeme[] = [];
 
+  // 1단계: 슬롯 채우기
   for (const slot of slots) {
+    console.log(
+      `🎯 슬롯 "${slot.name}" 처리 시작 (required: ${slot.required})`
+    );
     let lx: Lexeme | null = null;
 
-    // ✅ 의미적 제약 조건이 있는 경우 - 우선적으로 처리
     if (slot.semanticConstraint) {
       const words = useLexiconStore.getState().words;
       const candidateWords = words.filter((w) => {
         if (!slot.accept.includes(w.pos)) return false;
-
         const categories = getWordCategory(w.en);
         const hasConstraint = categories.includes(slot.semanticConstraint!);
-
-        console.log(
-          `🔍 단어 "${w.en}" 카테고리: [${categories.join(", ")}], 제약조건 "${
-            slot.semanticConstraint
-          }" 만족: ${hasConstraint}`
-        );
-
         return hasConstraint;
       });
 
       lx = candidateWords[0] || null;
-      console.log(
-        `🎯 ${slot.name} 제약조건(${slot.semanticConstraint}): ${candidateWords.length}개 후보 중 "${lx?.en}" 선택`
-      );
-
       if (!lx) {
         console.warn(
           `❌ ${slot.name} 제약조건 "${slot.semanticConstraint}"을 만족하는 단어가 없음`
         );
-        return null; // 제약 조건을 만족하지 않으면 패턴 생성 실패
+        return null;
       }
-    }
-    // 일반적인 경우
-    else {
+    } else {
       lx = pick(slot.accept, slot.name);
     }
 
+    // ✅ 강화된 슬롯 검증
     if (!lx || !lx.en || !lx.ko) {
-      console.warn(`⚠️ ${slot.name} 적절한 단어 없음`);
-      return null;
+      // 필수 슬롯인 경우 패턴 생성 실패
+      if (slot.required !== false) {
+        // required가 true이거나 undefined인 경우
+        console.error(
+          `❌ 필수 슬롯 "${slot.name}"에 적절한 단어가 없음 - 패턴 생성 실패`
+        );
+        return null;
+      }
+
+      // 선택적 슬롯인 경우 해당 슬롯 부분을 제거
+      console.warn(`⚠️ 선택적 슬롯 "${slot.name}" 생략`);
+      en = en.replace(new RegExp(`\\s*\\[?${slot.name}\\]?\\s*`, "g"), "");
+      ko = ko.replace(new RegExp(`\\s*\\[?${slot.name}\\]?\\s*`, "g"), "");
+      continue;
     }
+
+    usedWords.push(lx);
 
     let enWord = lx.en;
     let koWord = lx.ko;
@@ -118,14 +122,188 @@ function realize(
 
     en = en.replace(`[${slot.name}]`, enWord);
     ko = ko.replace(`[${slot.name}]`, koWord);
-
     slotValues[slot.name] = { word: koWord, pos: lx.pos, lexeme: lx };
+    console.log(`🔄 슬롯 치환: [${slot.name}] → "${enWord}" (${koWord})`);
+  }
+
+  // ✅ 2단계: 생성 후 검증 - 여기가 핵심!
+
+  // 2-1. 슬롯 미완성 검증
+  if (hasUnfilledSlots(en)) {
+    console.warn(`❌ 슬롯 미완성: ${en}`);
+    return null;
+  }
+
+  // 2-2. 의미적 호환성 검증
+  if (!validateSemanticCompatibility(usedWords, schemaId)) {
+    console.warn(`❌ 의미적 호환성 실패: ${en}`);
+    return null;
+  }
+
+  // 2-3. 문법적 기본 검증
+  if (!basicGrammarCheck(en)) {
+    console.warn(`❌ 기본 문법 오류: ${en}`);
+    return null;
   }
 
   // 영어 문법 보정
   en = en.replace(/\ba ([aeiou])/gi, "an $1");
   en = en.charAt(0).toUpperCase() + en.slice(1);
+
+  // ✅ 자연스러운 영어 표현 후처리 추가
+  en = applyNaturalEnglishRules(en);
+
+  console.log(`✅ 검증 통과: "${en}" / "${ko}"`);
   return { en, ko };
+
+  // 새로운 함수 추가
+  function applyNaturalEnglishRules(text: string): string {
+    let result = text;
+
+    // "home" 관련 자연스러운 표현
+    result = result.replace(/\bat the home\b/gi, "at home");
+    result = result.replace(/\bto the home\b/gi, "home");
+    result = result.replace(/\bgo to home\b/gi, "go home");
+    result = result.replace(/\bwent to home\b/gi, "went home");
+    result = result.replace(/\bgoing to home\b/gi, "going home");
+
+    // "school" 관련 (일부는 "the"가 필요하지 않음)
+    result = result.replace(/\bgo to the school\b/gi, "go to school");
+    result = result.replace(/\bat the school\b/gi, "at school");
+
+    // "work/office" 관련
+    result = result.replace(/\bgo to the work\b/gi, "go to work");
+    result = result.replace(/\bat the work\b/gi, "at work");
+
+    return result;
+  }
+}
+
+// ✅ 새로운 검증 함수들 추가 (realize 함수 아래에)
+
+function hasUnfilledSlots(text: string): boolean {
+  // 대괄호로 둘러싸인 대문자 슬롯 감지
+  const slotPattern = /\[[A-Z_]+\]/g;
+  const matches = text.match(slotPattern);
+
+  if (matches) {
+    console.error(`🚫 발견된 빈 슬롯들: ${matches.join(", ")} in "${text}"`);
+    return true;
+  }
+
+  // 추가 검사: 대문자로만 이루어진 단어들 (TIME, PLACE 등)
+  const upperCaseWords = text.match(/\b[A-Z]{2,}\b/g);
+  if (upperCaseWords) {
+    const suspiciousWords = upperCaseWords.filter((word) =>
+      ["TIME", "PLACE", "PERSON", "ITEM", "VERB", "OBJECT"].includes(word)
+    );
+
+    if (suspiciousWords.length > 0) {
+      console.error(
+        `🚫 의심스러운 대문자 단어들: ${suspiciousWords.join(
+          ", "
+        )} in "${text}"`
+      );
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function validateSemanticCompatibility(
+  usedWords: Lexeme[],
+  schemaId: string
+): boolean {
+  const verbs = usedWords.filter((w) => w.pos === "VERB");
+  const objects = usedWords.filter(
+    (w) => w.pos === "ITEM" || w.pos === "PLACE" || w.pos === "PERSON"
+  );
+
+  for (const verb of verbs) {
+    for (const obj of objects) {
+      if (!isValidVerbObjectCombination(verb.en, obj.en)) {
+        console.log(`🚫 부적절한 조합: ${verb.en} + ${obj.en}`);
+        return false;
+      }
+    }
+  }
+
+  // ✅ 패턴별 특별 검증
+  if (schemaId === "MEET-PERSON-PLACE") {
+    const place = usedWords.find((w) => w.pos === "PLACE");
+    if (place && !isValidMeetingPlace(place.en)) {
+      console.log(`🚫 부적절한 만남 장소: ${place.en}`);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isValidMeetingPlace(place: string): boolean {
+  const invalidMeetingPlaces = ["hospital", "bathroom", "toilet"];
+  return !invalidMeetingPlaces.includes(place.toLowerCase());
+}
+
+function isValidVerbObjectCombination(verb: string, object: string): boolean {
+  // 명확히 부적절한 조합들
+  const invalidCombinations = [
+    // 신체 부위는 이동 동사와 결합 불가
+    {
+      verbs: ["go", "goes", "went"],
+      objects: ["teeth", "hair", "eyes", "nose", "mouth"],
+    },
+    // 액체는 eat과 결합 불가
+    {
+      verbs: ["eat", "eats", "ate"],
+      objects: ["water", "coffee", "tea", "juice", "milk"],
+    },
+    // 고체 음식은 drink와 결합 불가
+    {
+      verbs: ["drink", "drinks", "drank"],
+      objects: ["bread", "sandwich", "rice", "meat", "apple"],
+    },
+    // 사람은 eat과 결합 불가
+    {
+      verbs: ["eat", "eats", "ate"],
+      objects: ["friend", "teacher", "student", "person"],
+    },
+    // 장소는 eat/drink와 결합 불가
+    {
+      verbs: ["eat", "eats", "ate", "drink", "drinks", "drank"],
+      objects: ["home", "school", "hospital", "office"],
+    },
+  ];
+
+  return !invalidCombinations.some(
+    (combo) =>
+      combo.verbs.includes(verb.toLowerCase()) &&
+      combo.objects.includes(object.toLowerCase())
+  );
+}
+
+function basicGrammarCheck(text: string): boolean {
+  // 기본적인 문법 오류 체크
+  if (
+    text.includes("goes teeth") ||
+    text.includes("eat water") ||
+    text.includes("drink bread")
+  ) {
+    return false;
+  }
+  return true;
+}
+
+// 새로운 헬퍼 함수들 추가
+function findWordInCoreVocabulary(word: string) {
+  const allWords = [
+    ...coreVocabulary.places,
+    ...coreVocabulary.items,
+    ...coreVocabulary.people,
+    ...coreVocabulary.time,
+  ];
+  return allWords.find((w) => w.en.toLowerCase() === word.toLowerCase());
 }
 
 // 사용자 입력 분석
@@ -230,9 +408,30 @@ export function generatePatterns(params: GenerateParams): Generated[] {
   const all = getSchemas();
   const templates = schemaIds?.length
     ? all.filter((s) => schemaIds.includes(s.id))
-    : all.filter((s) =>
-        finalTags.length ? finalTags.includes(s.category) : true
-      );
+    : all.filter((s) => {
+        const isProblematic = [
+          "WHAT-ARE-YOU-DOING-TIME",
+          "CAN-WE-MEET-TIME",
+          "GO-PLACE-TIME",
+        ].includes(s.id);
+
+        if (isProblematic) {
+          console.warn(`⏭️ 문제 패턴 제외: ${s.id}`);
+          return false;
+        }
+
+        // ✅ 한국어 번역 누락 패턴 제외
+        const hasValidKorean = s.koSurface && s.koSurface !== s.surface;
+        const hasDefaultTranslation =
+          getDefaultKoreanTranslation(s.surface, s.id) !== s.surface;
+
+        if (!hasValidKorean && !hasDefaultTranslation) {
+          console.warn(`⏭️ 한국어 번역 누락으로 패턴 제외: ${s.id}`);
+          return false;
+        }
+
+        return finalTags.length ? finalTags.includes(s.category) : true;
+      });
 
   console.log(`📋 사용할 패턴 템플릿: ${templates.length}개`);
 
@@ -313,4 +512,20 @@ export function generatePatterns(params: GenerateParams): Generated[] {
 
   console.log(`🏁 최종 생성된 패턴: ${out.length}개`);
   return out;
+}
+
+// 기본 한국어 번역 제공 함수
+function getDefaultKoreanTranslation(
+  surface: string,
+  schemaId: string
+): string {
+  const translations: Record<string, string> = {
+    "For here or to go?": "매장에서 드실 건가요, 포장하실 건가요?",
+    "What size would you like?": "사이즈는 어떻게 하시겠어요?",
+    "Could you make it OPTION?": "OPTION으로 만들어 주세요.",
+    "I'd like it with MILK.": "MILK를 넣어서 주세요.",
+    "Can I have a receipt?": "영수증 주세요.",
+  };
+
+  return translations[surface] || surface;
 }

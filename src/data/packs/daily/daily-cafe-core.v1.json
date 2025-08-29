@@ -1,6 +1,6 @@
 {
     "packId": "daily-cafe-core",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "domains": [
         "daily"
     ],
@@ -405,17 +405,20 @@
             "id": "CAFE-CAN-I-GET",
             "category": "daily",
             "level": "beginner",
-            "surface": "Can I get a SIZE ITEM TIME?",
+            "surface": "Can I get a {{SIZE}} {{ITEM}} {{TIME}}?",
+            "koSurface": "{{SIZE}} {{ITEM}} {{TIME}} 주문할 수 있나요?",
             "slots": [
                 {
                     "name": "SIZE",
                     "accept": "ITEM",
-                    "required": false
+                    "required": false,
+                    "semanticConstraint": "SIZE_TYPE"
                 },
                 {
                     "name": "ITEM",
                     "accept": "ITEM",
-                    "required": true
+                    "required": true,
+                    "semanticConstraint": "BEVERAGE"
                 },
                 {
                     "name": "TIME",
@@ -428,17 +431,20 @@
             "id": "CAFE-ID-LIKE",
             "category": "daily",
             "level": "beginner",
-            "surface": "I'd like a SIZE ITEM, please.",
+            "surface": "I'd like a {{SIZE}} {{ITEM}}, please.",
+            "koSurface": "{{SIZE}} {{ITEM}} 하나 주세요.",
             "slots": [
                 {
                     "name": "SIZE",
                     "accept": "ITEM",
-                    "required": false
+                    "required": false,
+                    "semanticConstraint": "SIZE_TYPE"
                 },
                 {
                     "name": "ITEM",
                     "accept": "ITEM",
-                    "required": true
+                    "required": true,
+                    "semanticConstraint": "BEVERAGE"
                 }
             ]
         },
@@ -447,6 +453,7 @@
             "category": "daily",
             "level": "beginner",
             "surface": "For here or to go?",
+            "koSurface": "매장에서 드실 건가요, 포장할 건가요?",
             "slots": []
         },
         {
@@ -454,18 +461,21 @@
             "category": "daily",
             "level": "beginner",
             "surface": "What size would you like?",
+            "koSurface": "사이즈는 어떻게 해드릴까요?",
             "slots": []
         },
         {
             "id": "CAFE-MAKE-IT-OPTION",
             "category": "daily",
             "level": "beginner",
-            "surface": "Could you make it OPTION?",
+            "surface": "Could you make it {{CUSTOMIZATION}}?",
+            "koSurface": "{{CUSTOMIZATION}}로 만들어 주실 수 있나요?",
             "slots": [
                 {
-                    "name": "OPTION",
+                    "name": "CUSTOMIZATION",
                     "accept": "ITEM",
-                    "required": true
+                    "required": true,
+                    "semanticConstraint": "CAFE_CUSTOMIZATION"
                 }
             ]
         },
@@ -473,12 +483,14 @@
             "id": "CAFE-WITH-MILK",
             "category": "daily",
             "level": "beginner",
-            "surface": "I'd like it with MILK.",
+            "surface": "I'd like it with {{MILK}}.",
+            "koSurface": "{{MILK}}로 주세요.",
             "slots": [
                 {
                     "name": "MILK",
                     "accept": "ITEM",
-                    "required": true
+                    "required": true,
+                    "semanticConstraint": "MILK_TYPE"
                 }
             ]
         },
@@ -486,12 +498,14 @@
             "id": "CAFE-EXTRA-ITEM",
             "category": "daily",
             "level": "beginner",
-            "surface": "Please add ITEM.",
+            "surface": "Please add {{ITEM}}.",
+            "koSurface": "{{ITEM}} 추가해 주세요.",
             "slots": [
                 {
                     "name": "ITEM",
                     "accept": "ITEM",
-                    "required": true
+                    "required": true,
+                    "semanticConstraint": "CAFE_ADDON"
                 }
             ]
         },
@@ -499,12 +513,14 @@
             "id": "CAFE-PAY-WITH",
             "category": "daily",
             "level": "beginner",
-            "surface": "Can I pay with ITEM?",
+            "surface": "Can I pay with {{ITEM}}?",
+            "koSurface": "{{ITEM}}로 결제할 수 있나요?",
             "slots": [
                 {
                     "name": "ITEM",
                     "accept": "ITEM",
-                    "required": true
+                    "required": true,
+                    "semanticConstraint": "PAYMENT_METHOD"
                 }
             ]
         },
@@ -513,13 +529,15 @@
             "category": "daily",
             "level": "beginner",
             "surface": "Can I have a receipt?",
+            "koSurface": "영수증 받을 수 있나요?",
             "slots": []
         },
         {
             "id": "CAFE-NO-ITEM",
             "category": "daily",
             "level": "beginner",
-            "surface": "No ITEM, please.",
+            "surface": "No {{ITEM}}, please.",
+            "koSurface": "{{ITEM}} 빼고 주세요.",
             "slots": [
                 {
                     "name": "ITEM",

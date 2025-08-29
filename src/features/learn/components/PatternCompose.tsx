@@ -799,7 +799,7 @@ export const PatternCompose: React.FC = React.memo(() => {
               ? "단어 추가 중..."
               : isGenerating
               ? "생성 중..."
-              : "스마트 생성"}
+              : "자동 생성"}
           </button>
         </div>
 
@@ -910,7 +910,7 @@ export const PatternCompose: React.FC = React.memo(() => {
           !isAddingWords &&
           !errorMessage && (
             <div className="text-center py-8 text-gray-500">
-              <p className="text-sm">위의 "스마트 생성" 버튼을 눌러보세요!</p>
+              <p className="text-sm">위의 "자동 생성" 버튼을 눌러보세요!</p>
               <p className="text-xs mt-1">
                 필요한 단어가 없으면 자동으로 추가됩니다.
               </p>

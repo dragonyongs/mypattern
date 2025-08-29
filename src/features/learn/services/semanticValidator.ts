@@ -31,15 +31,31 @@ export const PLACE_ACTIVITY_MAP: Record<
   },
 };
 
-export function validateSemanticFit(verb: string, place: string): boolean {
-  const placeData = PLACE_ACTIVITY_MAP[place.toLowerCase()];
-  if (!placeData) return true; // 알려지지 않은 장소는 허용
+export function validateSemanticFit(verb: string, target: string): boolean {
+  const coreWord = findWordInCoreVocabulary(target);
+  if (!coreWord) return true; // 알 수 없는 단어는 허용
 
-  const isInappropriate = placeData.inappropriate.includes(verb.toLowerCase());
-  if (isInappropriate) return false;
+  const incompatibleActions = coreWord.incompatibleActions || [];
+  const isIncompatible = incompatibleActions.includes(verb.toLowerCase());
 
-  const isAppropriate = placeData.appropriate.includes(verb.toLowerCase());
-  return isAppropriate;
+  if (isIncompatible) {
+    console.log(`🚫 부적절한 조합: ${verb} + ${target}`);
+    return false;
+  }
+
+  return true;
+}
+
+function findWordInCoreVocabulary(word: string) {
+  // core-vocabulary.json import 필요
+  const coreVocabulary = require("@/data/core-vocabulary.json");
+  const allWords = [
+    ...coreVocabulary.places,
+    ...coreVocabulary.items,
+    ...coreVocabulary.people,
+    ...coreVocabulary.time,
+  ];
+  return allWords.find((w: any) => w.en.toLowerCase() === word.toLowerCase());
 }
 
 export function getSuggestedVerb(place: string): string {

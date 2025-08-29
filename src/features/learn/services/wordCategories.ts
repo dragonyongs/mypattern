@@ -118,7 +118,7 @@ export const WORD_CATEGORIES = {
 
 // ✅ 단어 카테고리 확인 함수 개선
 export function getWordCategory(word: string): string[] {
-  const categories = [];
+  const categories: string[] = [];
   const lowerWord = word.toLowerCase().trim();
 
   // 정확한 매칭 우선
@@ -135,6 +135,38 @@ export function getWordCategory(word: string): string[] {
     categories.push("NON_CONSUMABLE");
   }
   if (WORD_CATEGORIES.TOOLS_ITEMS.includes(lowerWord)) {
+    categories.push("TOOL");
+  }
+
+  // 우유 종류
+  if (
+    ["oat milk", "almond milk", "soy milk", "whole milk", "skim milk"].includes(
+      lowerWord
+    )
+  ) {
+    categories.push("MILK_TYPE", "BEVERAGE", "ITEM");
+  }
+
+  // 카페 커스터마이제이션 옵션
+  if (["hot", "iced", "decaf", "extra shot", "no foam"].includes(lowerWord)) {
+    categories.push("CAFE_CUSTOMIZATION", "ITEM");
+  }
+
+  // 장소 - 관사 불필요
+  if (["home", "work", "school"].includes(lowerWord)) {
+    categories.push("LOCATION");
+    categories.push("NO_ARTICLE_NEEDED"); // 새 카테고리
+  }
+
+  // 장소 - 관사 필요
+  if (["hospital", "bank", "library", "gym"].includes(lowerWord)) {
+    categories.push("LOCATION");
+    categories.push("ARTICLE_NEEDED");
+  }
+
+  // 도구/비소모품
+  if (["book", "phone", "laptop", "pen", "bag"].includes(lowerWord)) {
+    categories.push("NON_CONSUMABLE");
     categories.push("TOOL");
   }
 

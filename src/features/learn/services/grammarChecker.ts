@@ -206,6 +206,10 @@ class BasicGrammarChecker {
       }
     });
 
+    // ✅ 의미적 검증 추가
+    const semanticErrors = this.checkSemanticValidity(trimmed);
+    errors.push(...semanticErrors);
+
     // 2) 일반 요건 제안
     const generalSuggestions = this.getGeneralSuggestions(trimmed);
 
@@ -222,6 +226,43 @@ class BasicGrammarChecker {
       suggestions: generalSuggestions,
       confidence: this.calculateConfidence(trimmed, errors, generalSuggestions),
     };
+  }
+
+  private checkSemanticValidity(text: string): GrammarError[] {
+    const semanticErrors: GrammarError[] = [];
+
+    // "go teeth", "drink teeth" 등 감지
+    const problematicPatterns = [
+      {
+        pattern: /\b(go|goes|went)\s+(teeth|hair|eyes|nose)\b/gi,
+        message: "신체 부위에는 'go'를 사용할 수 없습니다",
+      },
+      {
+        pattern: /\b(eat|eats|ate)\s+(water|coffee|tea|juice)\b/gi,
+        message: "음료는 'eat'이 아닌 'drink'를 사용하세요",
+      },
+      {
+        pattern: /\b(drink|drinks|drank)\s+(bread|rice|meat|food)\b/gi,
+        message: "고체 음식은 'drink'가 아닌 'eat'을 사용하세요",
+      },
+    ];
+
+    problematicPatterns.forEach(({ pattern, message }) => {
+      const matches = text.matchAll(pattern);
+      for (const match of matches) {
+        if (match.index !== undefined) {
+          semanticErrors.push({
+            position: match.index,
+            length: match[0].length,
+            type: "semantic",
+            message,
+            suggestions: ["적절한 동사로 바꿔보세요"],
+          });
+        }
+      }
+    });
+
+    return semanticErrors;
   }
 }
 
