@@ -1,4 +1,5 @@
-// src/shared/services/smartPatternService.ts
+// src/shared/services/smartPatternService.ts (완전한 개선 버전)
+
 import type {
   Lexeme,
   POS,
@@ -22,12 +23,34 @@ export interface SmartPatternContext {
   limit?: number;
 }
 
+// ✅ 개선된 결과 인터페이스
 export interface PatternMatchResult {
   conversationPatterns: ConversationPattern[];
   dailyPatterns: DailyPattern[];
   confidence: number;
   usedWords: string[];
   suggestions: string[];
+  // ✅ 새로운 필드들 추가
+  matchQuality: "excellent" | "good" | "fair" | "poor";
+  missingData: MissingDataInfo;
+  recommendations: RecommendationInfo;
+  warnings: string[];
+}
+
+// ✅ 부족한 데이터 정보
+export interface MissingDataInfo {
+  missingPatterns: string[];
+  missingWords: { pos: POS; examples: string[] }[];
+  lowConfidenceSlots: string[];
+  fallbacksUsed: string[];
+}
+
+// ✅ 추천 정보
+export interface RecommendationInfo {
+  suggestedPatterns: string[];
+  suggestedWords: { ko: string; en: string; pos: POS }[];
+  learningTips: string[];
+  nextSteps: string[];
 }
 
 // ✅ 인사 및 일상 대화 패턴 추가
@@ -140,6 +163,14 @@ class SmartPatternService {
   private learningStore: any;
   private isInitialized = false;
 
+  // ✅ 매칭 품질 임계값
+  private readonly QUALITY_THRESHOLDS = {
+    excellent: 0.8,
+    good: 0.6,
+    fair: 0.4,
+    poor: 0.0,
+  };
+
   initialize(lexiconStore: any, learningStore: any) {
     this.lexiconStore = lexiconStore;
     this.learningStore = learningStore;
@@ -155,20 +186,34 @@ class SmartPatternService {
     }
 
     console.log("🎯 패턴 매칭 시작:", context);
-
     await this.ensureDataLoaded();
+
     const analysis = this.analyzeUserContext(context);
     console.log("🔍 분석 결과:", analysis);
 
+    // ✅ 개선된 패턴 매칭
+    const matchingResult = await this.performAdvancedMatching(analysis);
+
     const conversationPatterns = await this.generateConversationPatterns(
+      matchingResult.patterns,
       analysis
     );
-    const dailyPatterns = await this.generateDailyPatterns(analysis);
-    const confidence = this.calculateConfidence(
+    const dailyPatterns = await this.generateDailyPatterns(
+      matchingResult.patterns,
+      analysis
+    );
+
+    const confidence = this.calculateAdvancedConfidence(
       analysis,
       conversationPatterns,
       dailyPatterns
     );
+    const matchQuality = this.determineMatchQuality(confidence, matchingResult);
+
+    // ✅ 부족한 데이터 및 추천 분석
+    const missingData = this.analyzeMissingData(analysis, matchingResult);
+    const recommendations = this.generateRecommendations(analysis, missingData);
+    const warnings = this.generateWarnings(matchQuality, missingData);
 
     return {
       conversationPatterns,
@@ -176,9 +221,14 @@ class SmartPatternService {
       confidence,
       usedWords: analysis.extractedWords,
       suggestions: analysis.suggestions,
+      matchQuality,
+      missingData,
+      recommendations,
+      warnings,
     };
   }
 
+  // ✅ 기존 메서드: 사용자 컨텍스트 분석
   private analyzeUserContext(context: SmartPatternContext) {
     const words = this.lexiconStore?.words || [];
     const userLevel =
@@ -208,13 +258,14 @@ class SmartPatternService {
     return extractedInfo;
   }
 
+  // ✅ 기존 메서드: 입력에서 정보 추출
   private extractInformationFromInput(input: string, words: any[]) {
     const places = this.extractPlaces(input, words);
     const items = this.extractByPOS(input, words, "ITEM");
     const persons = this.extractByPOS(input, words, "PERSON");
     const times = this.extractByPOS(input, words, "TIME");
-
     const intent = this.analyzeIntent(input);
+
     const extractedWords = [
       ...places.map((p) => p.en),
       ...items.map((i) => i.en),
@@ -234,6 +285,7 @@ class SmartPatternService {
     };
   }
 
+  // ✅ 기존 메서드: 의도 분석
   private analyzeIntent(input: string): string {
     const normalized = input.toLowerCase().replace(/[^\w\s가-힣]/g, "");
 
@@ -272,6 +324,7 @@ class SmartPatternService {
     return "daily_conversation";
   }
 
+  // ✅ 기존 메서드: 장소 추출
   private extractPlaces(input: string, words: any[]) {
     const places = [];
 
@@ -350,12 +403,14 @@ class SmartPatternService {
     return places;
   }
 
+  // ✅ 기존 메서드: POS별 추출
   private extractByPOS(input: string, words: any[], pos: POS) {
     return words
       .filter((w) => w.pos === pos && input.includes(w.ko))
       .map((w) => ({ ko: w.ko, en: w.en }));
   }
 
+  // ✅ 기존 메서드: 태그를 의도로 매핑
   private mapTagsToIntent(tags: LangTag[]): string {
     if (tags.includes("directions")) return "direction_request";
     if (tags.includes("daily")) return "daily_conversation";
@@ -364,9 +419,9 @@ class SmartPatternService {
     return "daily_conversation";
   }
 
+  // ✅ 기존 메서드: 제안 생성
   private generateSuggestions(input: string, intent: string): string[] {
     const suggestions = [];
-
     if (intent === "greeting_conversation") {
       suggestions.push("How are you doing today?");
       suggestions.push("Nice to meet you!");
@@ -374,40 +429,44 @@ class SmartPatternService {
       suggestions.push("I really like coffee.");
       suggestions.push("I have a book with me.");
     }
-
     return suggestions;
   }
 
-  private async generateConversationPatterns(
-    analysis: any
-  ): Promise<ConversationPattern[]> {
-    const patterns = await this.getRelevantPatternSchemas(analysis);
+  // ✅ 새로운 메서드: 개선된 매칭 로직
+  private async performAdvancedMatching(analysis: any) {
+    const allPatterns = await this.getAllAvailablePatterns();
 
-    return patterns.slice(0, 3).map((pattern) => {
-      const filledPattern = this.fillPatternSlots(pattern, analysis);
-      return this.createConversationPattern(filledPattern, analysis);
-    });
+    // 1단계: Intent 기반 필터링
+    const intentFiltered = allPatterns.filter((pattern) =>
+      this.isPatternRelevantForIntent(pattern, analysis.intent)
+    );
+
+    // 2단계: 컨텍스트 기반 스코어링
+    const scoredPatterns = intentFiltered
+      .map((pattern) => ({
+        pattern,
+        score: this.calculateAdvancedPatternScore(pattern, analysis),
+        relevanceReasons: this.getRelevanceReasons(pattern, analysis),
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    // 3단계: 품질 검사
+    const qualityChecked = scoredPatterns.map((item) => ({
+      ...item,
+      quality: this.assessPatternQuality(item.pattern, analysis),
+      dataAvailability: this.checkDataAvailability(item.pattern, analysis),
+    }));
+
+    return {
+      patterns: qualityChecked,
+      totalAvailable: allPatterns.length,
+      intentMatched: intentFiltered.length,
+      highQuality: qualityChecked.filter((p) => p.quality >= 0.7).length,
+    };
   }
 
-  private async generateDailyPatterns(analysis: any): Promise<DailyPattern[]> {
-    const patterns = await this.getRelevantPatternSchemas(analysis);
-
-    return patterns.slice(0, 5).map((pattern, index) => {
-      const filledPattern = this.fillPatternSlots(pattern, analysis);
-
-      return {
-        id: `smart_${Date.now()}_${index}`,
-        text: filledPattern.english,
-        korean: filledPattern.korean,
-        difficulty: analysis.userLevel,
-        category: pattern.category || "daily",
-        estimatedTime: 5,
-        completed: false,
-      };
-    });
-  }
-
-  private async getRelevantPatternSchemas(analysis: any) {
+  // ✅ 새로운 메서드: 모든 사용 가능한 패턴 수집
+  private async getAllAvailablePatterns(): Promise<PatternSchema[]> {
     let allPatterns: PatternSchema[] = [...GREETING_PATTERNS];
 
     // 기존 PATTERN_SCHEMAS 로드
@@ -435,6 +494,253 @@ class SmartPatternService {
     }
 
     console.log("📊 총 사용 가능한 패턴:", allPatterns.length);
+    return allPatterns;
+  }
+
+  // ✅ 새로운 메서드: 향상된 패턴 관련성 판단
+  private isPatternRelevantForIntent(
+    pattern: PatternSchema,
+    intent: string
+  ): boolean {
+    const intentPatternMap = {
+      greeting_conversation: {
+        keywords: ["GREETING", "HELLO", "NICE", "MEET"],
+        categories: ["daily"],
+        priority: "high",
+      },
+      daily_conversation: {
+        keywords: ["DAILY", "HAVE", "LIKE", "WANT", "NEED"],
+        categories: ["daily"],
+        priority: "high",
+      },
+      location_inquiry: {
+        keywords: ["WH-BE-PLACE", "WHERE", "LOCATION"],
+        categories: ["directions"],
+        priority: "high",
+      },
+      transportation_inquiry: {
+        keywords: ["BUS-TO-PLACE", "TRANSPORT", "BUS", "SUBWAY"],
+        categories: ["directions", "daily"],
+        priority: "high",
+      },
+      direction_request: {
+        keywords: ["HOW-GET-PLACE", "HOW", "WAY", "DIRECTION"],
+        categories: ["directions"],
+        priority: "high",
+      },
+      school_conversation: {
+        keywords: ["SCHOOL", "STUDENT", "CLASS", "STUDY"],
+        categories: ["school"],
+        priority: "medium",
+      },
+      order_request: {
+        keywords: ["ORDER", "WANT", "NEED", "BUY"],
+        categories: ["daily", "business"],
+        priority: "medium",
+      },
+    };
+
+    const intentInfo = intentPatternMap[intent];
+    if (!intentInfo) return false;
+
+    // 키워드 매칭
+    const keywordMatch = intentInfo.keywords.some(
+      (keyword) =>
+        pattern.id?.includes(keyword) ||
+        pattern.surface?.toUpperCase().includes(keyword)
+    );
+
+    // 카테고리 매칭
+    const categoryMatch = intentInfo.categories.includes(
+      pattern.category as LangTag
+    );
+
+    return keywordMatch || categoryMatch;
+  }
+
+  // ✅ 새로운 메서드: 향상된 패턴 스코어 계산
+  private calculateAdvancedPatternScore(
+    pattern: PatternSchema,
+    analysis: any
+  ): number {
+    let score = 0;
+
+    // 1. Intent 매칭 점수 (최대 40점)
+    score += this.calculateIntentScore(pattern, analysis.intent);
+
+    // 2. 슬롯 데이터 가용성 점수 (최대 30점)
+    score += this.calculateSlotAvailabilityScore(pattern, analysis);
+
+    // 3. 사용자 레벨 적합성 점수 (최대 20점)
+    score += this.calculateLevelScore(pattern, analysis.userLevel);
+
+    // 4. 카테고리 매칭 점수 (최대 10점)
+    score += this.calculateCategoryScore(pattern, analysis);
+
+    return score;
+  }
+
+  private calculateIntentScore(pattern: PatternSchema, intent: string): number {
+    const intentScoreMap = {
+      greeting_conversation: {
+        GREETING: 40,
+        HELLO: 35,
+        NICE: 30,
+        MEET: 30,
+      },
+      daily_conversation: {
+        DAILY: 35,
+        HAVE: 30,
+        LIKE: 30,
+        WANT: 25,
+        NEED: 25,
+      },
+      location_inquiry: {
+        "WH-BE-PLACE": 40,
+        WHERE: 35,
+        LOCATION: 30,
+      },
+      transportation_inquiry: {
+        "BUS-TO-PLACE": 40,
+        BUS: 35,
+        TRANSPORT: 30,
+        SUBWAY: 30,
+      },
+      direction_request: {
+        "HOW-GET-PLACE": 40,
+        HOW: 35,
+        DIRECTION: 30,
+        WAY: 25,
+      },
+    };
+
+    const scoreMap = intentScoreMap[intent] || {};
+
+    for (const [keyword, points] of Object.entries(scoreMap)) {
+      if (
+        pattern.id?.includes(keyword) ||
+        pattern.surface?.toUpperCase().includes(keyword)
+      ) {
+        return points;
+      }
+    }
+
+    return 0;
+  }
+
+  private calculateSlotAvailabilityScore(
+    pattern: PatternSchema,
+    analysis: any
+  ): number {
+    if (!pattern.slots || pattern.slots.length === 0) return 30; // 슬롯이 없으면 만점
+
+    let totalSlots = pattern.slots.length;
+    let availableSlots = 0;
+
+    pattern.slots.forEach((slot) => {
+      switch (slot.name) {
+        case "PLACE":
+          if (analysis.places.length > 0) availableSlots++;
+          break;
+        case "ITEM":
+          if (analysis.items.length > 0) availableSlots++;
+          break;
+        case "PERSON":
+          if (analysis.persons.length > 0) availableSlots++;
+          break;
+        case "TIME":
+          if (analysis.times.length > 0) availableSlots++;
+          break;
+        default:
+          // 기본값이 있는 슬롯은 항상 사용 가능
+          if (DEFAULT_SLOT_VALUES[slot.name]) availableSlots++;
+      }
+    });
+
+    return Math.floor((availableSlots / totalSlots) * 30);
+  }
+
+  private calculateLevelScore(
+    pattern: PatternSchema,
+    userLevel: string
+  ): number {
+    if (pattern.level === userLevel) return 20;
+    if (pattern.level === "beginner" && userLevel === "intermediate") return 15;
+    if (pattern.level === "intermediate" && userLevel === "beginner") return 10;
+    return 5;
+  }
+
+  private calculateCategoryScore(
+    pattern: PatternSchema,
+    analysis: any
+  ): number {
+    // 분석된 의도와 패턴 카테고리 매칭
+    const categoryIntentMap = {
+      daily: ["daily_conversation", "greeting_conversation"],
+      directions: [
+        "location_inquiry",
+        "transportation_inquiry",
+        "direction_request",
+      ],
+      school: ["school_conversation"],
+      business: ["order_request"],
+    };
+
+    const matchingIntents =
+      categoryIntentMap[pattern.category as LangTag] || [];
+    return matchingIntents.includes(analysis.intent) ? 10 : 0;
+  }
+
+  // ✅ 새로운 메서드: 관련성 이유 (디버깅용)
+  private getRelevanceReasons(pattern: PatternSchema, analysis: any): string[] {
+    const reasons = [];
+    if (
+      pattern.id?.includes("GREETING") &&
+      analysis.intent === "greeting_conversation"
+    ) {
+      reasons.push("인사 패턴 매칭");
+    }
+    if (pattern.category === analysis.intent.split("_")[0]) {
+      reasons.push("카테고리 매칭");
+    }
+    return reasons;
+  }
+
+  // ✅ 기존 메서드 개선: 대화 패턴 생성
+  private async generateConversationPatterns(
+    patterns: any[],
+    analysis: any
+  ): Promise<ConversationPattern[]> {
+    return patterns.slice(0, 3).map((patternItem) => {
+      const pattern = patternItem.pattern || patternItem;
+      const filledPattern = this.fillPatternSlots(pattern, analysis);
+      return this.createConversationPattern(filledPattern, analysis);
+    });
+  }
+
+  // ✅ 기존 메서드 개선: 일일 패턴 생성
+  private async generateDailyPatterns(
+    patterns: any[],
+    analysis: any
+  ): Promise<DailyPattern[]> {
+    return patterns.slice(0, 5).map((patternItem, index) => {
+      const pattern = patternItem.pattern || patternItem;
+      const filledPattern = this.fillPatternSlots(pattern, analysis);
+      return {
+        id: `smart_${Date.now()}_${index}`,
+        text: filledPattern.english,
+        korean: filledPattern.korean,
+        difficulty: analysis.userLevel,
+        category: pattern.category || "daily",
+        estimatedTime: 5,
+        completed: false,
+      };
+    });
+  }
+
+  // ✅ 기존 메서드: 관련 패턴 스키마 가져오기 (하위 호환성)
+  private async getRelevantPatternSchemas(analysis: any) {
+    const allPatterns = await this.getAllAvailablePatterns();
 
     return allPatterns
       .filter((pattern) => this.isPatternRelevant(pattern, analysis))
@@ -445,6 +751,7 @@ class SmartPatternService {
       );
   }
 
+  // ✅ 기존 메서드: 패턴 관련성 판단 (하위 호환성)
   private isPatternRelevant(pattern: PatternSchema, analysis: any): boolean {
     const intentPatternMap = {
       greeting_conversation: ["GREETING", "HELLO", "NICE", "MEET"],
@@ -457,7 +764,6 @@ class SmartPatternService {
     };
 
     const relevantKeywords = intentPatternMap[analysis.intent] || [];
-
     const isRelevantByIntent = relevantKeywords.some(
       (keyword) =>
         pattern.id?.includes(keyword) ||
@@ -481,6 +787,7 @@ class SmartPatternService {
     return false;
   }
 
+  // ✅ 기존 메서드: 패턴 점수 계산 (하위 호환성)
   private calculatePatternScore(pattern: PatternSchema, analysis: any): number {
     let score = 1;
 
@@ -515,6 +822,7 @@ class SmartPatternService {
     return score;
   }
 
+  // ✅ 기존 메서드: 패턴 슬롯 채우기
   private fillPatternSlots(pattern: PatternSchema, analysis: any) {
     let korean = pattern.koSurface || pattern.surface || "";
     let english = pattern.surface || "";
@@ -534,6 +842,7 @@ class SmartPatternService {
     };
   }
 
+  // ✅ 기존 메서드: 슬롯 대체값 가져오기
   private getSlotReplacements(pattern: PatternSchema, analysis: any) {
     const replacements: Record<string, { ko: string; en: string }> = {};
 
@@ -589,6 +898,7 @@ class SmartPatternService {
     return replacements;
   }
 
+  // ✅ 기존 메서드: 랜덤 슬롯 값 가져오기
   private getRandomSlotValue(
     slotName: string
   ): { ko: string; en: string } | null {
@@ -599,6 +909,7 @@ class SmartPatternService {
     return values[randomIndex];
   }
 
+  // ✅ 기존 메서드들: 타입 체크
   private isBeverage(item: any): boolean {
     const beverages = ["coffee", "tea", "water", "juice", "milk"];
     return beverages.includes(item.en.toLowerCase());
@@ -614,6 +925,7 @@ class SmartPatternService {
     return cookables.includes(item.en.toLowerCase());
   }
 
+  // ✅ 기존 메서드: 대화 패턴 생성
   private createConversationPattern(
     pattern: any,
     analysis: any
@@ -649,6 +961,7 @@ class SmartPatternService {
     };
   }
 
+  // ✅ 기존 메서드: 시나리오 생성
   private generateScenario(pattern: any, analysis: any): string {
     if (analysis.places.length > 0) {
       return `${pattern.category || "일상"} 상황 (${analysis.places[0].ko})`;
@@ -656,6 +969,7 @@ class SmartPatternService {
     return pattern.category || "일반 대화";
   }
 
+  // ✅ 기존 메서드: 구조 생성
   private generateStructure(english: string): string {
     return english
       .replace(/\b(where|how|what|when)\b/gi, "WH-WORD")
@@ -663,6 +977,7 @@ class SmartPatternService {
       .replace(/\bthe\b/gi, "DET");
   }
 
+  // ✅ 기존 메서드: 한국어 번역
   private getKoreanTranslation(word: string): string {
     const translations: Record<string, string> = {
       where: "어디",
@@ -683,9 +998,11 @@ class SmartPatternService {
       have: "가지다",
       like: "좋아하다",
     };
+
     return translations[word.toLowerCase()] || word;
   }
 
+  // ✅ 기존 메서드: POS 식별
   private identifyPOS(word: string): SentenceCard["pos"] {
     const questionWords = ["where", "how", "what", "when"];
     const verbs = [
@@ -709,20 +1026,264 @@ class SmartPatternService {
     return "OBJECT";
   }
 
+  // ✅ 새로운 메서드: 부족한 데이터 분석
+  private analyzeMissingData(
+    analysis: any,
+    matchingResult: any
+  ): MissingDataInfo {
+    const missingPatterns: string[] = [];
+    const missingWords: { pos: POS; examples: string[] }[] = [];
+    const lowConfidenceSlots: string[] = [];
+    const fallbacksUsed: string[] = [];
+
+    // 1. Intent에 맞는 패턴이 부족한지 확인
+    if (matchingResult.intentMatched < 3) {
+      missingPatterns.push(`${analysis.intent}에 맞는 패턴이 부족합니다.`);
+    }
+
+    // 2. 추출된 정보에 대응하는 단어가 부족한지 확인
+    if (analysis.places.length === 0 && analysis.intent.includes("location")) {
+      missingWords.push({
+        pos: "PLACE",
+        examples: ["병원", "학교", "카페", "도서관"],
+      });
+    }
+
+    if (analysis.items.length === 0 && analysis.intent.includes("daily")) {
+      missingWords.push({
+        pos: "ITEM",
+        examples: ["커피", "책", "가방", "음식"],
+      });
+    }
+
+    // 3. 낮은 신뢰도 슬롯 확인
+    matchingResult.patterns.forEach((item: any) => {
+      if (item.dataAvailability < 0.5) {
+        item.pattern.slots?.forEach((slot: SlotSpec) => {
+          if (!lowConfidenceSlots.includes(slot.name)) {
+            lowConfidenceSlots.push(slot.name);
+          }
+        });
+      }
+    });
+
+    return {
+      missingPatterns,
+      missingWords,
+      lowConfidenceSlots,
+      fallbacksUsed,
+    };
+  }
+
+  // ✅ 새로운 메서드: 추천 정보 생성
+  private generateRecommendations(
+    analysis: any,
+    missingData: MissingDataInfo
+  ): RecommendationInfo {
+    const suggestedPatterns: string[] = [];
+    const suggestedWords: { ko: string; en: string; pos: POS }[] = [];
+    const learningTips: string[] = [];
+    const nextSteps: string[] = [];
+
+    // 패턴 추천
+    if (missingData.missingPatterns.length > 0) {
+      suggestedPatterns.push(
+        `"${analysis.intent}" 의도에 맞는 더 많은 패턴을 추가해보세요.`
+      );
+    }
+
+    // 단어 추천
+    missingData.missingWords.forEach((missing) => {
+      missing.examples.forEach((example) => {
+        suggestedWords.push({
+          ko: example,
+          en: this.getEnglishTranslation(example) || example,
+          pos: missing.pos,
+        });
+      });
+    });
+
+    // 학습 팁
+    if (analysis.extractedWords.length === 0) {
+      learningTips.push(
+        "더 구체적인 단어(장소, 사물, 사람)를 포함해서 입력해보세요."
+      );
+    }
+
+    if (analysis.intent === "daily_conversation") {
+      learningTips.push(
+        "일상 대화는 'I have...', 'I like...' 같은 기본 패턴부터 시작해보세요."
+      );
+    }
+
+    // 다음 단계 제안
+    nextSteps.push("내 단어장에서 관련 단어들을 추가해보세요.");
+    nextSteps.push("비슷한 상황의 패턴들을 더 연습해보세요.");
+
+    return {
+      suggestedPatterns,
+      suggestedWords,
+      learningTips,
+      nextSteps,
+    };
+  }
+
+  // ✅ 새로운 메서드: 경고 메시지 생성
+  private generateWarnings(
+    matchQuality: string,
+    missingData: MissingDataInfo
+  ): string[] {
+    const warnings: string[] = [];
+
+    if (matchQuality === "poor") {
+      warnings.push(
+        "⚠️ 입력하신 내용에 적합한 패턴을 찾기 어려워 임의의 패턴을 제공했습니다."
+      );
+    }
+
+    if (matchQuality === "fair") {
+      warnings.push("💡 더 정확한 패턴을 위해 구체적인 단어를 추가해보세요.");
+    }
+
+    if (missingData.lowConfidenceSlots.length > 0) {
+      warnings.push(
+        `🔄 다음 항목들은 기본값으로 채웠습니다: ${missingData.lowConfidenceSlots.join(
+          ", "
+        )}`
+      );
+    }
+
+    if (missingData.missingWords.length > 0) {
+      warnings.push(
+        "📚 관련 단어가 부족합니다. 단어장에 추가하시면 더 정확한 패턴을 제공할 수 있습니다."
+      );
+    }
+
+    return warnings;
+  }
+
+  // ✅ 새로운 메서드: 매칭 품질 판단
+  private determineMatchQuality(
+    confidence: number,
+    matchingResult: any
+  ): "excellent" | "good" | "fair" | "poor" {
+    if (
+      confidence >= this.QUALITY_THRESHOLDS.excellent &&
+      matchingResult.highQuality >= 3
+    ) {
+      return "excellent";
+    }
+    if (
+      confidence >= this.QUALITY_THRESHOLDS.good &&
+      matchingResult.highQuality >= 1
+    ) {
+      return "good";
+    }
+    if (confidence >= this.QUALITY_THRESHOLDS.fair) {
+      return "fair";
+    }
+    return "poor";
+  }
+
+  // ✅ 새로운 메서드: 패턴 품질 평가
+  private assessPatternQuality(pattern: PatternSchema, analysis: any): number {
+    let quality = 0.5; // 기본 품질
+
+    // Intent 매칭 품질
+    if (this.isPatternRelevantForIntent(pattern, analysis.intent)) {
+      quality += 0.3;
+    }
+
+    // 슬롯 데이터 가용성
+    if (pattern.slots) {
+      const availableSlots = pattern.slots.filter((slot) =>
+        this.hasDataForSlot(slot.name, analysis)
+      ).length;
+      quality += (availableSlots / pattern.slots.length) * 0.2;
+    } else {
+      quality += 0.2; // 슬롯이 없으면 완벽
+    }
+
+    return Math.min(quality, 1.0);
+  }
+
+  // ✅ 새로운 메서드: 슬롯 데이터 가용성 확인
+  private checkDataAvailability(pattern: PatternSchema, analysis: any): number {
+    if (!pattern.slots || pattern.slots.length === 0) return 1.0;
+
+    const availableCount = pattern.slots.filter((slot) =>
+      this.hasDataForSlot(slot.name, analysis)
+    ).length;
+
+    return availableCount / pattern.slots.length;
+  }
+
+  private hasDataForSlot(slotName: string, analysis: any): boolean {
+    switch (slotName) {
+      case "PLACE":
+        return analysis.places.length > 0;
+      case "ITEM":
+        return analysis.items.length > 0;
+      case "PERSON":
+        return analysis.persons.length > 0;
+      case "TIME":
+        return analysis.times.length > 0;
+      default:
+        return !!DEFAULT_SLOT_VALUES[slotName];
+    }
+  }
+
+  // ✅ 새로운 메서드: 영어 번역 헬퍼
+  private getEnglishTranslation(korean: string): string | null {
+    const translations: Record<string, string> = {
+      병원: "hospital",
+      학교: "school",
+      카페: "cafe",
+      도서관: "library",
+      공원: "park",
+      커피: "coffee",
+      책: "book",
+      가방: "bag",
+      음식: "food",
+    };
+
+    return translations[korean] || null;
+  }
+
+  // ✅ 기존 메서드: 신뢰도 계산 (하위 호환성)
   private calculateConfidence(
     analysis: any,
     convPatterns: any[],
     dailyPatterns: any[]
   ): number {
     let confidence = 0.5;
-
     if (analysis.extractedWords.length > 0) confidence += 0.2;
     if (convPatterns.length > 0) confidence += 0.2;
     if (analysis.intent !== "general") confidence += 0.1;
+    return Math.min(confidence, 1.0);
+  }
+
+  // ✅ 새로운 메서드: 향상된 신뢰도 계산
+  private calculateAdvancedConfidence(
+    analysis: any,
+    convPatterns: any[],
+    dailyPatterns: any[]
+  ): number {
+    let confidence = 0.3; // 기본값
+
+    // 추출된 정보 품질
+    if (analysis.extractedWords.length > 0) confidence += 0.2;
+    if (analysis.places.length > 0) confidence += 0.1;
+    if (analysis.items.length > 0) confidence += 0.1;
+
+    // 패턴 매칭 품질
+    if (convPatterns.length >= 2) confidence += 0.15;
+    if (dailyPatterns.length >= 3) confidence += 0.15;
 
     return Math.min(confidence, 1.0);
   }
 
+  // ✅ 기존 메서드: 데이터 로드 보장
   private async ensureDataLoaded() {
     try {
       await dataPackLoader.loadCorePacks();
