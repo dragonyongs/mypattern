@@ -1,9 +1,9 @@
 // src/pages/LearnPage.tsx
+
 import React, { useMemo, useSyncExternalStore, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useLexiconStore } from "@/stores/lexiconStore";
 import { PatternCompose } from "@/features/learn/components/PatternCompose";
-import { DailyPatternsSection } from "@/features/learn/components/DailyPatternsSection";
 
 export function LearnPage() {
   const { words, ensureMinimumPack } = useLexiconStore() as any;
@@ -39,10 +39,6 @@ export function LearnPage() {
     return { ready, missing, total, posCount };
   }, [words]);
 
-  if (!hasHydrated)
-    return <div className="p-6 text-sm text-gray-500">로딩 중...</div>;
-
-  // ✅ 버튼 핸들러 명시적 정의
   const handleAddBasicWords = useCallback(() => {
     if (!ensureMinimumPack) {
       console.error("ensureMinimumPack 함수가 없습니다");
@@ -51,7 +47,6 @@ export function LearnPage() {
 
     console.log("🔄 기본 단어 자동 추가 시작...");
     const result = ensureMinimumPack(15);
-
     console.log("📊 추가 결과:", {
       added: result.added,
       before: result.totalBefore,
@@ -65,58 +60,58 @@ export function LearnPage() {
     }
   }, [ensureMinimumPack]);
 
+  if (!hasHydrated) return <div>로딩 중...</div>;
+
   if (!status.ready) {
     return (
-      <div className="p-8">
-        <div className="max-w-xl mx-auto border rounded-xl p-6 bg-white space-y-4">
-          <h2 className="text-lg font-semibold">
-            패턴 생성을 위해 단어를 추가해주세요
-          </h2>
+      <div className="p-4 space-y-4">
+        <h2 className="text-xl font-bold">
+          패턴 생성을 위해 단어를 추가해주세요
+        </h2>
 
-          <div className="bg-yellow-50 p-4 rounded border">
-            <p className="text-sm font-medium text-yellow-800">현재 상황:</p>
-            <ul className="mt-1 text-sm text-yellow-700 list-disc pl-4">
-              <li>총 {status.total}개 단어</li>
-              <li>
-                품사별:{" "}
-                {Object.entries(status.posCount || {})
-                  .map(([pos, count]) => `${pos}:${count}개`)
-                  .join(", ") || "없음"}
-              </li>
-            </ul>
-          </div>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <h3 className="font-semibold mb-2">현재 상황:</h3>
+          <p>총 {status.total}개 단어</p>
+          <p>
+            품사별:{" "}
+            {Object.entries(status.posCount || {})
+              .map(([pos, count]) => `${pos}:${count}개`)
+              .join(", ") || "없음"}
+          </p>
+        </div>
 
-          <div className="bg-blue-50 p-4 rounded border">
-            <p className="text-sm font-medium text-blue-800">필요한 단어:</p>
-            <ul className="mt-1 text-sm text-blue-700 list-disc pl-4">
-              {status.missing.map((m) => (
-                <li key={m}>{m}</li>
-              ))}
-            </ul>
-          </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <h3 className="font-semibold mb-2">필요한 단어:</h3>
+          <ul className="list-disc list-inside space-y-1">
+            {status.missing.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={handleAddBasicWords}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              기본 단어 자동 추가
-            </button>
-            <Link
-              to="/app/library"
-              className="px-4 py-2 bg-gray-100 rounded border hover:bg-gray-200"
-            >
-              단어장에서 직접 추가
-            </Link>
-          </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleAddBasicWords}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            기본 단어 자동 추가
+          </button>
+
+          <Link
+            to="/library"
+            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+          >
+            단어장에서 직접 추가
+          </Link>
         </div>
       </div>
     );
   }
+
   return (
-    <div className="space-y-6 p-4">
+    <div className="p-4">
+      {/* ✅ 통합된 PatternCompose만 사용 - DailyPatternsSection 제거 */}
       <PatternCompose />
-      <DailyPatternsSection />
     </div>
   );
 }

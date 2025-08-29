@@ -1,0 +1,143 @@
+{
+    "packId": "daily-home",
+    "version": "1.0.0",
+    "domains": [
+        "daily"
+    ],
+    "category": "daily",
+    "size": 9,
+    "lexemes": [
+        {
+            "en": "home",
+            "ko": "집",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "office",
+            "ko": "회사",
+            "pos": "PLACE",
+            "tags": [
+                "daily",
+                "business"
+            ]
+        },
+        {
+            "en": "gym",
+            "ko": "헬스장",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "movie",
+            "ko": "영화",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "coffee",
+            "ko": "커피",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "meet",
+            "ko": "만나다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "cook",
+            "ko": "요리하다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "tonight",
+            "ko": "오늘 밤",
+            "pos": "TIME",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "this weekend",
+            "ko": "이번 주말",
+            "pos": "TIME",
+            "tags": [
+                "daily"
+            ]
+        }
+    ],
+    "patterns": [
+        {
+            "id": "WHAT-ARE-YOU-DOING-TIME",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "What are you doing TIME?",
+            "slots": [
+                {
+                    "name": "TIME",
+                    "accept": "TIME",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "CAN-WE-MEET-TIME",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Can we meet TIME?",
+            "slots": [
+                {
+                    "name": "TIME",
+                    "accept": "TIME",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "IM-GOING-TO-PLACE-TIME",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "I'm going to PLACE TIME.",
+            "slots": [
+                {
+                    "name": "PLACE",
+                    "accept": "PLACE",
+                    "required": true
+                },
+                {
+                    "name": "TIME",
+                    "accept": "TIME",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "id": "I-LIKE-ITEM",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "I like ITEM.",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true
+                }
+            ]
+        }
+    ]
+}

@@ -9,6 +9,7 @@ import {
 } from "@/entities";
 import { loadFromStorage, saveToStorage } from "./storage";
 import { generateDailyQueue } from "@/shared/lib/schedule";
+import { loadPacksOnce } from "@/features/learn/services/loadPacks";
 
 interface AppState {
   sentences: Sentence[];
@@ -115,80 +116,32 @@ const AppContext = createContext<{
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // 초기 데이터 로딩
   useEffect(() => {
     const loadData = async () => {
       try {
         dispatch({ type: "SET_LOADING", payload: true });
-
         const savedData = loadFromStorage();
-
         if (savedData) {
           dispatch({ type: "LOAD_DATA", payload: savedData });
         } else {
           dispatch({ type: "SET_LOADING", payload: false });
         }
-
-        // Daily Queue 초기화
-        setTimeout(() => {
-          dispatch({ type: "REFRESH_DAILY_QUEUE" });
-        }, 100);
-      } catch (error) {
-        console.error("Failed to load app data:", error);
+        // 팩 주입은 저장소 유무와 관계없이 1회 수행
+        await loadPacksOnce();
+        dispatch({ type: "REFRESH_DAILY_QUEUE" });
+      } catch (e) {
+        console.error(e);
         dispatch({ type: "SET_ERROR", payload: "데이터 로딩에 실패했습니다." });
       }
     };
-
     loadData();
   }, []);
 
-  // 상태 변경 시 localStorage에 저장
-  useEffect(() => {
-    if (!state.loading && !state.error) {
-      const saveData = {
-        sentences: state.sentences,
-        patterns: state.patterns,
-        chunks: state.chunks,
-        settings: state.settings,
-        sessions: state.sessions,
-      };
-
-      saveToStorage(saveData);
-    }
-  }, [
-    state.sentences,
-    state.patterns,
-    state.chunks,
-    state.settings,
-    state.sessions,
-    state.loading,
-    state.error,
-  ]);
-
-  // 매일 자정에 Daily Queue 갱신
-  useEffect(() => {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-
-    const msUntilMidnight = tomorrow.getTime() - now.getTime();
-
-    const timeoutId = setTimeout(() => {
-      dispatch({ type: "REFRESH_DAILY_QUEUE" });
-
-      // 이후 24시간마다 반복
-      const intervalId = setInterval(() => {
-        dispatch({ type: "REFRESH_DAILY_QUEUE" });
-      }, 24 * 60 * 60 * 1000);
-
-      return () => clearInterval(intervalId);
-    }, msUntilMidnight);
-
-    return () => clearTimeout(timeoutId);
-  }, []);
-
-  return <AppContext value={{ state, dispatch }}>{children}</AppContext>;
+  return (
+    <AppContext.Provider value={{ state, dispatch }}>
+      {children}
+    </AppContext.Provider>
+  );
 }
 
 export function useAppState() {

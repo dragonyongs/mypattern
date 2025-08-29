@@ -1,5 +1,6 @@
 // src/features/learn/services/patternEngine.ts
-import { PATTERN_SCHEMAS } from "./patternSchemas";
+import { getSchemas } from "./patternSchemaRegistry";
+
 import type {
   PatternSchema,
   Lexeme,
@@ -16,7 +17,6 @@ import { applyContextualKorean } from "./contextualKoreanizer";
 import { validateSemanticFit, getSuggestedVerb } from "./semanticValidator";
 import { getNaturalVerb } from "./naturalVerbMapper";
 import { getWordCategory, canPerformAction } from "./wordCategories";
-
 export type GenerateParams = {
   schemaIds?: string[];
   tags?: LangTag[];
@@ -42,37 +42,23 @@ function inflectNoun(
 ): string {
   if (number === "singular") return lemma;
   if (irregularPlural) return irregularPlural;
-
-  // 기본 복수 규칙
-  if (
-    lemma.endsWith("s") ||
-    lemma.endsWith("sh") ||
-    lemma.endsWith("ch") ||
-    lemma.endsWith("x")
-  ) {
-    return lemma + "es";
-  }
-  if (lemma.endsWith("y") && !"aeiou".includes(lemma[lemma.length - 2])) {
-    return lemma.slice(0, -1) + "ies";
-  }
-  if (lemma.endsWith("f")) {
-    return lemma.slice(0, -1) + "ves";
-  }
-  if (lemma.endsWith("fe")) {
-    return lemma.slice(0, -2) + "ves";
-  }
+  if (/(s|sh|ch|x|z)$/i.test(lemma)) return lemma + "es";
+  if (/[aeiou]y$/i.test(lemma)) return lemma + "s";
+  if (/y$/i.test(lemma)) return lemma.slice(0, -1) + "ies";
+  if (/fe$/i.test(lemma)) return lemma.slice(0, -2) + "ves";
+  if (/f$/i.test(lemma)) return lemma.slice(0, -1) + "ves";
   return lemma + "s";
 }
 
 function realize(
   surface: string,
-  koSurface: string,
+  koSurface: string | undefined,
   slots: PatternSchema["slots"],
   pick: (pos: POS | POS[], name: string, constraint?: string) => Lexeme | null,
   schemaId: string
 ) {
   let en = surface;
-  let ko = koSurface;
+  let ko = koSurface || surface;
   const slotValues: Record<
     string,
     { word: string; pos: string; lexeme: Lexeme }
@@ -139,7 +125,6 @@ function realize(
   // 영어 문법 보정
   en = en.replace(/\ba ([aeiou])/gi, "an $1");
   en = en.charAt(0).toUpperCase() + en.slice(1);
-
   return { en, ko };
 }
 
@@ -241,9 +226,11 @@ export function generatePatterns(params: GenerateParams): Generated[] {
     );
   };
 
+  // 템플릿 소스 전환
+  const all = getSchemas();
   const templates = schemaIds?.length
-    ? PATTERN_SCHEMAS.filter((s) => schemaIds.includes(s.id))
-    : PATTERN_SCHEMAS.filter((s) =>
+    ? all.filter((s) => schemaIds.includes(s.id))
+    : all.filter((s) =>
         finalTags.length ? finalTags.includes(s.category) : true
       );
 

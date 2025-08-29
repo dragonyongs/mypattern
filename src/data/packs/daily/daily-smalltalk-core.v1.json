@@ -1,0 +1,116 @@
+{
+    "packId": "daily-smalltalk-core",
+    "version": "1.0.0",
+    "domains": [
+        "daily"
+    ],
+    "category": "daily",
+    "size": 30,
+    "lexemes": [
+        {
+            "en": "weekend",
+            "ko": "주말",
+            "pos": "TIME",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "today",
+            "ko": "오늘",
+            "pos": "TIME",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "weather",
+            "ko": "날씨",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "morning",
+            "ko": "아침",
+            "pos": "TIME",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "afternoon",
+            "ko": "오후",
+            "pos": "TIME",
+            "tags": [
+                "daily"
+            ]
+        }
+    ],
+    "patterns": [
+        {
+            "id": "ST-HELLO",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Hello!",
+            "slots": []
+        },
+        {
+            "id": "ST-HOWS-IT-GOING",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "How's it going?",
+            "slots": []
+        },
+        {
+            "id": "ST-HOW-ARE-YOU",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "How are you?",
+            "slots": []
+        },
+        {
+            "id": "ST-NICE-TO-MEET-YOU",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Nice to meet you.",
+            "slots": []
+        },
+        {
+            "id": "ST-HOW-WAS-YOUR-WEEKEND",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "How was your weekend?",
+            "slots": []
+        },
+        {
+            "id": "ST-NICE-WEATHER",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Nice weather today.",
+            "slots": []
+        },
+        {
+            "id": "ST-WHAT-DO-YOU-DO",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "What do you do?",
+            "slots": []
+        },
+        {
+            "id": "ST-WHERE-ARE-YOU-FROM",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Where are you from?",
+            "slots": []
+        },
+        {
+            "id": "ST-SEE-YOU",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "See you later.",
+            "slots": []
+        }
+    ]
+}

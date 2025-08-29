@@ -1,0 +1,393 @@
+{
+    "packId": "daily-shopping-core",
+    "version": "1.0.0",
+    "domains": [
+        "daily"
+    ],
+    "category": "daily",
+    "size": 50,
+    "lexemes": [
+        {
+            "en": "store",
+            "ko": "가게",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "fitting room",
+            "ko": "피팅룸",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "cashier",
+            "ko": "계산대",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "counter",
+            "ko": "카운터",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "receipt",
+            "ko": "영수증",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "refund",
+            "ko": "환불",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "exchange",
+            "ko": "교환",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "discount",
+            "ko": "할인",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "sale",
+            "ko": "세일",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "price",
+            "ko": "가격",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "size",
+            "ko": "사이즈",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "small",
+            "ko": "스몰",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "medium",
+            "ko": "미디엄",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "large",
+            "ko": "라지",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "cash",
+            "ko": "현금",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "card",
+            "ko": "카드",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "membership",
+            "ko": "멤버십",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "bag",
+            "ko": "쇼핑백",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "shirt",
+            "ko": "셔츠",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "pants",
+            "ko": "바지",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "shoes",
+            "ko": "신발",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "jacket",
+            "ko": "자켓",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "dress",
+            "ko": "원피스",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "socks",
+            "ko": "양말",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "bottle of water",
+            "ko": "생수",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "look for",
+            "ko": "찾다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "try on",
+            "ko": "입어보다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "fit",
+            "ko": "맞다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "pay",
+            "ko": "결제하다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "buy",
+            "ko": "사다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "return",
+            "ko": "반품하다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "exchange",
+            "ko": "교환하다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "open",
+            "ko": "열다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "close",
+            "ko": "닫다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "today",
+            "ko": "오늘",
+            "pos": "TIME",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "now",
+            "ko": "지금",
+            "pos": "TIME",
+            "tags": [
+                "daily"
+            ]
+        }
+    ],
+    "patterns": [
+        {
+            "id": "SHOP-DO-YOU-HAVE-ITEM",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Do you have ITEM?",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "SHOP-HOW-MUCH-ITEM",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "How much is ITEM?",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "SHOP-WHERE-IS-PLACE",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Where is PLACE?",
+            "slots": [
+                {
+                    "name": "PLACE",
+                    "accept": "PLACE",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "SHOP-CAN-I-TRY-ITEM-ON",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Can I try ITEM on?",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "SHOP-DO-YOU-TAKE-ITEM",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Do you take ITEM?",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "SHOP-CAN-I-RETURN-ITEM",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Can I return ITEM?",
+            "slots": [
+                {
+                    "name": "ITEM",
+                    "accept": "ITEM",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "id": "SHOP-CAN-I-GET-RECEIPT",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Can I have a receipt?",
+            "slots": []
+        },
+        {
+            "id": "SHOP-ANY-DISCOUNT",
+            "category": "daily",
+            "level": "beginner",
+            "surface": "Is there a discount?",
+            "slots": []
+        }
+    ]
+}

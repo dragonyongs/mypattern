@@ -1,8 +1,7 @@
 // src/features/learn/services/patternSchemas.ts
 import type { PatternSchema } from "../types/patternCore.types";
 
-export const PATTERN_SCHEMAS: PatternSchema[] = [
-  // 길찾기
+export const PATTERN_SCHEMAS_SEED: PatternSchema[] = [
   {
     id: "WH-BE-PLACE",
     category: "directions",
@@ -19,8 +18,6 @@ export const PATTERN_SCHEMAS: PatternSchema[] = [
     koSurface: "[PLACE] 어떻게 가?",
     slots: [{ name: "PLACE", accept: ["PLACE"], required: true }],
   },
-
-  // 학교/준비
   {
     id: "NEED-ITEM-TIME",
     category: "school",
@@ -32,8 +29,6 @@ export const PATTERN_SCHEMAS: PatternSchema[] = [
       { name: "TIME", accept: ["TIME"], required: true },
     ],
   },
-
-  // 일상 - 만남 계획
   {
     id: "MEET-PERSON-PLACE",
     category: "daily",
@@ -45,8 +40,6 @@ export const PATTERN_SCHEMAS: PatternSchema[] = [
       { name: "PLACE", accept: ["PLACE"], required: true },
     ],
   },
-
-  // 일상 - 이동 계획
   {
     id: "GO-PLACE-TIME",
     category: "daily",
@@ -58,8 +51,6 @@ export const PATTERN_SCHEMAS: PatternSchema[] = [
       { name: "TIME", accept: ["TIME"] },
     ],
   },
-
-  // 과거 이동
   {
     id: "PAST-WENT-PLACE",
     category: "daily",
@@ -71,8 +62,6 @@ export const PATTERN_SCHEMAS: PatternSchema[] = [
       { name: "TIME", accept: ["TIME"] },
     ],
   },
-
-  // ✅ 음료 전용 패턴
   {
     id: "DRANK-BEVERAGE",
     category: "daily",
@@ -84,13 +73,11 @@ export const PATTERN_SCHEMAS: PatternSchema[] = [
         name: "BEVERAGE",
         accept: ["ITEM"],
         required: true,
-        semanticConstraint: "BEVERAGE", // ✅ 음료만 허용
+        semanticConstraint: "BEVERAGE",
       },
       { name: "TIME", accept: ["TIME"] },
     ],
   },
-
-  // ✅ 음식 전용 패턴
   {
     id: "ATE-FOOD",
     category: "daily",
@@ -102,13 +89,11 @@ export const PATTERN_SCHEMAS: PatternSchema[] = [
         name: "FOOD",
         accept: ["ITEM", "NOUN"],
         required: true,
-        semanticConstraint: "FOOD", // ✅ 음식만 허용
+        semanticConstraint: "FOOD",
       },
       { name: "TIME", accept: ["TIME"] },
     ],
   },
-
-  // ✅ 제작/준비 패턴
   {
     id: "MADE-COOKABLE",
     category: "daily",
@@ -120,13 +105,11 @@ export const PATTERN_SCHEMAS: PatternSchema[] = [
         name: "COOKABLE",
         accept: ["ITEM", "NOUN"],
         required: true,
-        semanticConstraint: "COOKABLE", // ✅ 요리/제작 가능한 것만
+        semanticConstraint: "COOKABLE",
       },
       { name: "TIME", accept: ["TIME"] },
     ],
   },
-
-  // 소유 표현
   {
     id: "HAVE-ITEMS",
     category: "daily",
@@ -135,8 +118,6 @@ export const PATTERN_SCHEMAS: PatternSchema[] = [
     koSurface: "[ITEM] 있어.",
     slots: [{ name: "ITEM", accept: ["ITEM", "NOUN"] }],
   },
-
-  // 3인칭 단수
   {
     id: "HE-SHE-DOES",
     category: "daily",

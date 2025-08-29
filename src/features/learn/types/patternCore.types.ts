@@ -57,6 +57,7 @@ export interface Lexeme {
   register?: ("formal" | "casual" | "medical" | "animal")[];
   createdAt: string;
   updatedAt?: string;
+  source?: "user" | "global";
 }
 
 // 사용자 입력 처리를 위한 타입들

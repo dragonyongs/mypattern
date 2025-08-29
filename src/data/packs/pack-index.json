@@ -1,0 +1,44 @@
+{
+    "packs": [
+        {
+            "file": "business/business-core.v1.json",
+            "packId": "business-core",
+            "version": "1.0.0"
+        },
+        {
+            "file": "daily/daily-core.v1.json",
+            "packId": "daily-core",
+            "version": "1.0.0"
+        },
+        {
+            "file": "daily/daily-home.v1.json",
+            "packId": "daily-home",
+            "version": "1.0.0"
+        },
+        {
+            "file": "daily/daily-cafe-core.v1.json",
+            "packId": "daily-cafe-core",
+            "version": "1.0.0"
+        },
+        {
+            "file": "school/school-core.v1.json",
+            "packId": "school-core",
+            "version": "1.0.0"
+        },
+        {
+            "file": "directions/directions-core.v1.json",
+            "packId": "directions-core",
+            "version": "1.0.0"
+        },
+        {
+            "file": "daily/daily-shopping-core.v1.json",
+            "packId": "daily-shopping-core",
+            "version": "1.0.0"
+        },
+        {
+            "file": "daily/daily-smalltalk-core.v1.json",
+            "packId": "daily-smalltalk-core",
+            "version": "1.0.0"
+        }
+    ]
+}

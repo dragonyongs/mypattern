@@ -39,3 +39,8 @@ dist-ssr
 !tsconfig.app.json
 !tsconfig.json
 !tsconfig.node.json
+!src/data/packs/*.json
+!src/data/packs/business/*.json
+!src/data/packs/daily/*.json
+!src/data/packs/directions/*.json
+!src/data/packs/school/*.json

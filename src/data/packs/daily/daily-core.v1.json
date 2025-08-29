@@ -1,0 +1,422 @@
+{
+    "packId": "daily-core",
+    "version": "1.0.0",
+    "domains": [
+        "daily"
+    ],
+    "category": "daily",
+    "size": 50,
+    "lexemes": [
+        {
+            "en": "friend",
+            "ko": "친구",
+            "pos": "PERSON",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "mom",
+            "ko": "엄마",
+            "pos": "PERSON",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "dad",
+            "ko": "아빠",
+            "pos": "PERSON",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "coworker",
+            "ko": "동료",
+            "pos": "PERSON",
+            "tags": [
+                "daily",
+                "business"
+            ]
+        },
+        {
+            "en": "boss",
+            "ko": "상사",
+            "pos": "PERSON",
+            "tags": [
+                "business"
+            ]
+        },
+        {
+            "en": "neighbor",
+            "ko": "이웃",
+            "pos": "PERSON",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "teacher",
+            "ko": "선생님",
+            "pos": "PERSON",
+            "tags": [
+                "school"
+            ]
+        },
+        {
+            "en": "home",
+            "ko": "집",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "office",
+            "ko": "회사",
+            "pos": "PLACE",
+            "tags": [
+                "daily",
+                "business"
+            ]
+        },
+        {
+            "en": "school",
+            "ko": "학교",
+            "pos": "PLACE",
+            "tags": [
+                "daily",
+                "school"
+            ]
+        },
+        {
+            "en": "park",
+            "ko": "공원",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "gym",
+            "ko": "헬스장",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "supermarket",
+            "ko": "슈퍼마켓",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "bank",
+            "ko": "은행",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "hospital",
+            "ko": "병원",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "restaurant",
+            "ko": "식당",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "cafe",
+            "ko": "카페",
+            "pos": "PLACE",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "library",
+            "ko": "도서관",
+            "pos": "PLACE",
+            "tags": [
+                "daily",
+                "school"
+            ]
+        },
+        {
+            "en": "bus stop",
+            "ko": "버스정류장",
+            "pos": "PLACE",
+            "tags": [
+                "directions",
+                "daily"
+            ]
+        },
+        {
+            "en": "subway station",
+            "ko": "지하철역",
+            "pos": "PLACE",
+            "tags": [
+                "directions"
+            ]
+        },
+        {
+            "en": "coffee",
+            "ko": "커피",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "water",
+            "ko": "물",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "tea",
+            "ko": "차",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "sandwich",
+            "ko": "샌드위치",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "salad",
+            "ko": "샐러드",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "phone",
+            "ko": "휴대폰",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "laptop",
+            "ko": "노트북",
+            "pos": "ITEM",
+            "tags": [
+                "daily",
+                "business"
+            ]
+        },
+        {
+            "en": "keys",
+            "ko": "열쇠",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "wallet",
+            "ko": "지갑",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "ticket",
+            "ko": "표",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "bag",
+            "ko": "가방",
+            "pos": "ITEM",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "book",
+            "ko": "책",
+            "pos": "ITEM",
+            "tags": [
+                "daily",
+                "school"
+            ]
+        },
+        {
+            "en": "pen",
+            "ko": "펜",
+            "pos": "ITEM",
+            "tags": [
+                "school",
+                "daily"
+            ]
+        },
+        {
+            "en": "notebook",
+            "ko": "공책",
+            "pos": "ITEM",
+            "tags": [
+                "school"
+            ]
+        },
+        {
+            "en": "go",
+            "ko": "가다",
+            "pos": "VERB",
+            "tags": [
+                "daily",
+                "directions"
+            ]
+        },
+        {
+            "en": "come",
+            "ko": "오다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "have",
+            "ko": "먹다/마시다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "make",
+            "ko": "만들다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "get",
+            "ko": "받다/사다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "need",
+            "ko": "필요하다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "want",
+            "ko": "원하다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "like",
+            "ko": "좋아하다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "meet",
+            "ko": "만나다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "call",
+            "ko": "전화하다",
+            "pos": "VERB",
+            "tags": [
+                "daily",
+                "business"
+            ]
+        },
+        {
+            "en": "send",
+            "ko": "보내다",
+            "pos": "VERB",
+            "tags": [
+                "business",
+                "daily"
+            ]
+        },
+        {
+            "en": "buy",
+            "ko": "사다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "pay",
+            "ko": "지불하다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "show",
+            "ko": "보여주다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "tell",
+            "ko": "말하다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        },
+        {
+            "en": "help",
+            "ko": "돕다",
+            "pos": "VERB",
+            "tags": [
+                "daily"
+            ]
+        }
+    ]
+}
