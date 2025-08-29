@@ -12,6 +12,7 @@ import { useLexiconStore } from "@/stores/lexiconStore";
 import { inflectVerb } from "./inflector";
 import { inflectKoreanVerb } from "./koreanInflector";
 import { getWordCategory } from "./wordCategories";
+import { unifiedPatternService } from "@/shared/services/unifiedPatternService";
 
 // ===== Types =====
 export type GenerateParams = {
@@ -127,89 +128,22 @@ function realize(
 
 // ===== Public: generatePatterns =====
 export function generatePatterns(params: GenerateParams): Generated[] {
-  const { schemaIds, tags = [], limit = 20, chosenLexemeIds = [] } = params;
+  console.log("📚 통합 학습 엔진 사용");
 
-  const allSchemas = getSchemas();
-  const templates = schemaIds?.length
-    ? allSchemas.filter((s) => schemaIds.includes(s.id))
-    : allSchemas.filter((s) =>
-        tags.length ? tags.includes(s.category) : true
-      );
-
-  const words = useLexiconStore.getState().words;
-  const chosenMap = new Map(
-    chosenLexemeIds
-      .map((id) => words.find((w) => w.id === id))
-      .filter(Boolean)
-      .map((w) => [w!.id, w!])
+  // ✅ 같은 엔진 사용
+  const patterns = unifiedPatternService.generateLearningPatterns(
+    params.level || "beginner",
+    params.limit || 20
   );
 
-  const lexByPos = (pos: POS | POS[], prefer?: LangTag): Lexeme[] => {
-    const accepts = Array.isArray(pos) ? pos : [pos];
-    let list = words.filter((w) => accepts.includes(w.pos));
-    if (prefer) {
-      list = list
-        .map((w) => ({ w, score: w.tags?.includes(prefer) ? 1 : 0 }))
-        .sort((a, b) => b.score - a.score)
-        .map((x) => x.w);
-    }
-    return list;
-  };
-
-  const out: Generated[] = [];
-
-  for (const t of templates) {
-    const usedIdsLocal: string[] = [];
-
-    const pick = (
-      pos: POS | POS[],
-      name: string,
-      constraint?: string
-    ): Lexeme | null => {
-      const accepts = Array.isArray(pos) ? pos : [pos];
-      let list: Lexeme[] = [];
-
-      accepts.forEach((p) => {
-        list.push(...lexByPos(p, t.category));
-      });
-
-      // 시맨틱 제약
-      if (constraint) {
-        list = list.filter((w) => getWordCategory(w.en).includes(constraint));
-      }
-
-      // 이미 선택된 단어는 후순위
-      const seen = new Set(usedIdsLocal);
-      list = list.filter((w) => !seen.has(w.id));
-
-      // chosen 우선
-      const firstChosen = list.find((w) => chosenMap.has(w.id));
-      const selected = firstChosen ?? list ?? null;
-      if (selected) usedIdsLocal.push(selected.id);
-      return selected ?? null;
-    };
-
-    const result = realize(t.surface, t.koSurface, t.slots, pick, t.id);
-    if (result) {
-      out.push({
-        text: result.en,
-        korean: result.ko,
-        used: result.usedIds,
-        schemaId: t.id,
-        canWrite: false,
-        confidence: 1,
-      });
-      if (out.length >= limit) break;
-    }
-  }
-
-  // 중복 제거
-  const seen = new Set<string>();
-  return out
-    .filter((g) =>
-      seen.has(g.text.toLowerCase()) ? false : seen.add(g.text.toLowerCase())
-    )
-    .map((g, i) => ({ ...g, text: g.text, korean: g.korean }));
+  return patterns.map((p) => ({
+    text: p.text,
+    korean: p.korean,
+    used: p.usedWords || [],
+    schemaId: p.templateId,
+    canWrite: false,
+    confidence: p.confidence,
+  }));
 }
 
 // ===== Helpers =====

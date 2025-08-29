@@ -69,6 +69,33 @@ export const WORD_CATEGORIES = {
     "밥",
   ],
 
+  // ✅ 비즈니스 관련 카테고리 추가
+  BUSINESS_VENUE: [
+    "meeting room",
+    "conference room",
+    "boardroom",
+    "office",
+    "head office",
+  ],
+
+  BUSINESS_ACTION: [
+    "review",
+    "prepare",
+    "finalize",
+    "approve",
+    "update",
+    "check",
+  ],
+
+  BUSINESS_ITEM: [
+    "report",
+    "proposal",
+    "contract",
+    "budget",
+    "document",
+    "agenda",
+  ],
+
   // ✅ 절대 먹거나 마실 수 없는 것들
   NON_CONSUMABLES: [
     "key",
@@ -114,6 +141,17 @@ export const WORD_CATEGORIES = {
     "지갑",
     "시계",
   ],
+
+  // ✅ 동작-객체 호환성 맵
+  ACTION_COMPATIBILITY: {
+    schedule: ["meeting", "call", "appointment"], // 회의실이 아닌 회의 자체
+    reschedule: ["meeting", "call", "appointment"],
+    book: ["meeting room", "conference room", "venue"],
+    reserve: ["meeting room", "conference room", "table"],
+    confirm: ["meeting", "appointment", "booking"],
+    review: ["report", "proposal", "document"],
+    prepare: ["presentation", "report", "proposal"],
+  },
 };
 
 // ✅ 단어 카테고리 확인 함수 개선

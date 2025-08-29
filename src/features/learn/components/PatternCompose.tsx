@@ -107,109 +107,127 @@ export const PatternCompose: React.FC = React.memo(() => {
     }
   }, []);
 
-  // ✅ 스마트 패턴 생성 - ensureMinimumWords 사용
-  const handleSmartGenerate = useCallback(async () => {
-    setIsGenerating(true);
-    setErrorMessage(null);
-    setSelectedCandidates(new Set());
+  // ✅ handleSmartGenerate를 파라미터를 받도록 수정
+  const handleSmartGenerate = useCallback(
+    async (currentTags?: LangTag, currentLimit?: number) => {
+      setIsGenerating(true);
+      setErrorMessage(null);
+      setSelectedCandidates(new Set());
 
-    try {
-      console.log("🚀 패턴 생성 시작...");
+      try {
+        // ✅ 파라미터가 있으면 사용, 없으면 현재 상태 사용
+        const useTags = currentTags || tags;
+        const useLimit = currentLimit || limit;
 
-      // 먼저 기본 단어 보장
-      ensureBasicWordsAvailable();
+        console.log("🚀 패턴 생성 시작...", { useTags, useLimit });
 
-      const randomSeed = Math.floor(Math.random() * 1000);
-      let patterns = generatePatterns({
-        tags: [tags],
-        limit,
-        seed: randomSeed,
-      });
+        ensureBasicWordsAvailable();
+        const randomSeed = Math.floor(Math.random() * 1000);
 
-      console.log("1차 생성 결과:", patterns.length, "개");
+        let patterns = generatePatterns({
+          tags: [useTags], // ✅ 확실한 값 사용
+          limit: useLimit,
+          seed: randomSeed,
+        });
 
-      // 패턴이 부족하면 더 많은 단어 추가
-      if (patterns.length < 3) {
-        setIsAddingWords(true);
-        console.log("🔄 필요한 단어를 자동으로 추가하는 중...");
-
-        const result = ensureMinimumWords(15);
-        console.log("단어 추가 결과:", result);
-
-        if (result.added > 0) {
-          console.log(`✅ ${result.added}개 단어 추가 완료`);
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-
-          console.log("🔄 단어 추가 후 재생성...");
-          patterns = generatePatterns({
-            tags: [tags],
-            limit,
-            seed: randomSeed,
-          });
-          console.log("2차 생성 결과:", patterns.length, "개");
-        }
-        setIsAddingWords(false);
-      }
-
-      const patternsWithId = patterns.map((pattern, index) => {
-        const id = `candidate-${Date.now()}-${index}`;
-        const isAlreadyAdded = unifiedPatterns.some(
-          (up) =>
-            up.text.toLowerCase().trim() === pattern.text.toLowerCase().trim()
+        console.log(
+          "1차 생성 결과:",
+          patterns.length,
+          "개",
+          `(태그: ${useTags})`
         );
 
-        return {
-          ...pattern,
-          id,
-          isAdded: isAlreadyAdded,
-        };
-      });
+        if (patterns.length < 3) {
+          setIsAddingWords(true);
+          console.log("🔄 필요한 단어를 자동으로 추가하는 중...");
 
-      console.log("📝 최종 패턴들:", patternsWithId);
-      setCandidates(patternsWithId);
+          const result = ensureMinimumWords(15);
+          console.log("단어 추가 결과:", result);
 
-      if (patternsWithId.length === 0) {
-        const posCount = words.reduce((acc, w) => {
-          acc[w.pos] = (acc[w.pos] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
+          if (result.added > 0) {
+            console.log(`✅ ${result.added}개 단어 추가 완료`);
+            await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        const missingPos = [];
-        if ((posCount.VERB || 0) < 3) missingPos.push("동사");
-        if ((posCount.PLACE || 0) < 3) missingPos.push("장소");
-        if ((posCount.PERSON || 0) < 2) missingPos.push("사람");
-        if ((posCount.NOUN || 0) < 3) missingPos.push("명사");
-        if ((posCount.ITEM || 0) < 3) missingPos.push("물건");
+            console.log("🔄 단어 추가 후 재생성...");
+            patterns = generatePatterns({
+              tags: [useTags], // ✅ 확실한 값 사용
+              limit: useLimit,
+              seed: randomSeed,
+            });
+            console.log("2차 생성 결과:", patterns.length, "개");
+          }
 
-        if (missingPos.length > 0) {
-          setErrorMessage(
-            `패턴을 만들기 위해 더 많은 단어가 필요합니다: ${missingPos.join(
-              ", "
-            )}`
-          );
-        } else {
-          setErrorMessage(
-            "패턴 생성에 실패했습니다. 다른 상황을 선택하거나 Library에서 단어를 추가해보세요."
-          );
+          setIsAddingWords(false);
         }
-      } else {
-        setErrorMessage(null);
+
+        const patternsWithId = patterns.map((pattern, index) => {
+          const id = `candidate-${Date.now()}-${index}`;
+          const isAlreadyAdded = unifiedPatterns.some(
+            (up) =>
+              up.text.toLowerCase().trim() === pattern.text.toLowerCase().trim()
+          );
+
+          return {
+            ...pattern,
+            id,
+            isAdded: isAlreadyAdded,
+          };
+        });
+
+        console.log("📝 최종 패턴들:", patternsWithId);
+        setCandidates(patternsWithId);
+
+        if (patternsWithId.length === 0) {
+          const posCount = words.reduce((acc, w) => {
+            acc[w.pos] = (acc[w.pos] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+
+          const missingPos = [];
+          if ((posCount.VERB || 0) < 3) missingPos.push("동사");
+          if ((posCount.PLACE || 0) < 3) missingPos.push("장소");
+          if ((posCount.PERSON || 0) < 2) missingPos.push("사람");
+          if ((posCount.NOUN || 0) < 3) missingPos.push("명사");
+          if ((posCount.ITEM || 0) < 3) missingPos.push("물건");
+
+          if (missingPos.length > 0) {
+            setErrorMessage(
+              `패턴을 만들기 위해 더 많은 단어가 필요합니다: ${missingPos.join(
+                ", "
+              )}`
+            );
+          } else {
+            setErrorMessage(
+              "패턴 생성에 실패했습니다. 다른 상황을 선택하거나 Library에서 단어를 추가해보세요."
+            );
+          }
+        } else {
+          setErrorMessage(null);
+        }
+      } catch (error) {
+        console.error("패턴 생성 중 오류:", error);
+        setErrorMessage("패턴 생성 중 오류가 발생했습니다. 다시 시도해주세요.");
+      } finally {
+        setIsGenerating(false);
+        setIsAddingWords(false);
       }
-    } catch (error) {
-      console.error("패턴 생성 중 오류:", error);
-      setErrorMessage("패턴 생성 중 오류가 발생했습니다. 다시 시도해주세요.");
-    } finally {
-      setIsGenerating(false);
-      setIsAddingWords(false);
-    }
-  }, [
-    tags,
-    limit,
-    ensureMinimumWords,
-    ensureBasicWordsAvailable,
-    words,
-    unifiedPatterns,
-  ]);
+    },
+    [ensureMinimumWords, ensureBasicWordsAvailable, words, unifiedPatterns]
+  );
+
+  // ✅ 태그 변경 핸들러 수정
+  const handleTagsChange = useCallback(
+    (newTag: LangTag) => {
+      console.log("🏷️ 태그 변경:", tags, "→", newTag);
+      setTags(newTag);
+
+      // 기존 결과 클리어
+      setCandidates([]);
+      setSelectedCandidates(new Set());
+      setErrorMessage(null);
+    },
+    [tags]
+  );
 
   // 나머지 함수들은 기존과 동일...
   const addPatternToUnified = useCallback(
@@ -761,7 +779,7 @@ export const PatternCompose: React.FC = React.memo(() => {
             <label className="text-sm font-medium">상황 선택</label>
             <select
               value={tags}
-              onChange={(e) => setTags(e.target.value as LangTag)}
+              onChange={(e) => handleTagsChange(e.target.value as LangTag)}
               className="border rounded px-2 py-1 text-sm"
             >
               <option value="daily">일상</option>
@@ -787,20 +805,26 @@ export const PatternCompose: React.FC = React.memo(() => {
           </div>
 
           <button
-            onClick={handleSmartGenerate}
+            onClick={() => handleSmartGenerate(tags, limit)} // ✅ 현재 값을 직접 전달
             disabled={isGenerating || isAddingWords}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg inline-flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            <RefreshCw
-              size={16}
-              className={isGenerating ? "animate-spin" : ""}
-            />
+            <RefreshCw size={16} className="inline mr-2" />
             {isAddingWords
               ? "단어 추가 중..."
               : isGenerating
               ? "생성 중..."
               : "자동 생성"}
           </button>
+        </div>
+
+        {/* 현재 설정 표시 */}
+        <div className="text-xs text-gray-500 mb-4">
+          현재 설정: <span className="font-medium text-blue-600">{tags}</span> •
+          생성 수: <span className="font-medium">{limit}개</span>
+          {candidates.length > 0 && (
+            <span> • 마지막 생성: {candidates.length}개 패턴</span>
+          )}
         </div>
 
         {errorMessage && (
