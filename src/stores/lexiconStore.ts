@@ -1,25 +1,19 @@
-// src/stores/lexiconStore.ts
+// src/stores/lexiconStore.ts (완전 수정)
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { Lexeme, POS } from "@/features/learn/types/patternCore.types";
+import type {
+  Lexeme,
+  POS,
+  LangTag,
+} from "@/features/learn/types/patternCore.types";
 
-type Source = "user" | "global";
-
-// 간소화된 최소 데이터팩 (하드코딩 최소화)
-const CORE_WORDS = [
-  { en: "go", ko: "가다", pos: "VERB" as const, tags: ["daily"] },
-  { en: "come", ko: "오다", pos: "VERB" as const, tags: ["daily"] },
-  { en: "home", ko: "집", pos: "PLACE" as const, tags: ["daily"] },
-  { en: "school", ko: "학교", pos: "PLACE" as const, tags: ["school"] },
-  { en: "friend", ko: "친구", pos: "PERSON" as const, tags: ["daily"] },
-  { en: "today", ko: "오늘", pos: "TIME" as const, tags: ["daily"] },
-  { en: "phone", ko: "휴대폰", pos: "ITEM" as const, tags: ["daily"] },
-];
+type Source = "user" | "global" | "pack";
 
 interface LexiconState {
   hydrated: boolean;
   words: (Lexeme & { source: Source })[];
-  userAddedCoreWords: Set<string>; // 새로 추가
+  loadedPacks: string[];
+  isInitialized: boolean;
 
   // 기본 CRUD
   addWord: (
@@ -30,27 +24,84 @@ interface LexiconState {
 
   // 검색 및 필터
   search: (q: string) => (Lexeme & { source: Source })[];
-  findByPos: (pos: POS[]) => (Lexeme & { source: Source })[];
+  findByPos: (
+    pos: POS[],
+    categories?: LangTag[]
+  ) => (Lexeme & { source: Source })[];
 
-  // 초기화
-  seedIfEmpty: () => void;
+  // 데이터팩 관리 - seedIfEmpty 대체
+  ensureMinimumWords: (
+    count: number,
+    categories?: LangTag[]
+  ) => { added: number; totalBefore: number; totalAfter: number };
 
-  // 코어 단어 관리 (새로 추가)
-  addCoreWordToUser: (coreWordId: string) => void;
-  removeCoreWordFromUser: (coreWordId: string) => void;
+  // ✅ 새로운 초기화 함수 (seedIfEmpty 대체)
+  initializeWithBasicWords: () => void;
+  ensureBasicWordsAvailable: () => void;
 
   // 유틸리티
   exportUserWords: () => Lexeme[];
+  getWordsByCategory: (
+    categories: LangTag[]
+  ) => (Lexeme & { source: Source })[];
+
+  // ✅ upsertGlobalWords 추가 (loadPacks.ts 호환성)
+  upsertGlobalWords: (lexemes: Array<Omit<Lexeme, "id" | "createdAt">>) => void;
 }
+
+// ✅ 기본 단어 세트 (하드코딩)
+const BASIC_WORDS: Array<Omit<Lexeme, "id" | "createdAt">> = [
+  // 기본 동사
+  { en: "go", ko: "가다", pos: "VERB", tags: ["daily", "directions"] },
+  { en: "come", ko: "오다", pos: "VERB", tags: ["daily"] },
+  { en: "have", ko: "가지다/먹다", pos: "VERB", tags: ["daily"] },
+  { en: "get", ko: "받다/사다", pos: "VERB", tags: ["daily"] },
+  { en: "make", ko: "만들다", pos: "VERB", tags: ["daily"] },
+  { en: "want", ko: "원하다", pos: "VERB", tags: ["daily"] },
+  { en: "need", ko: "필요하다", pos: "VERB", tags: ["daily"] },
+  { en: "like", ko: "좋아하다", pos: "VERB", tags: ["daily"] },
+
+  // 기본 장소
+  { en: "home", ko: "집", pos: "PLACE", tags: ["daily"] },
+  { en: "school", ko: "학교", pos: "PLACE", tags: ["daily", "school"] },
+  { en: "office", ko: "회사", pos: "PLACE", tags: ["daily", "business"] },
+  { en: "store", ko: "가게", pos: "PLACE", tags: ["daily"] },
+  { en: "hospital", ko: "병원", pos: "PLACE", tags: ["daily"] },
+  { en: "bus stop", ko: "버스 정류장", pos: "PLACE", tags: ["directions"] },
+  { en: "subway station", ko: "지하철역", pos: "PLACE", tags: ["directions"] },
+  { en: "cafe", ko: "카페", pos: "PLACE", tags: ["daily"] },
+
+  // 기본 사람
+  { en: "friend", ko: "친구", pos: "PERSON", tags: ["daily"] },
+  { en: "family", ko: "가족", pos: "PERSON", tags: ["daily"] },
+  { en: "teacher", ko: "선생님", pos: "PERSON", tags: ["school"] },
+  { en: "student", ko: "학생", pos: "PERSON", tags: ["school"] },
+
+  // 기본 물건
+  { en: "food", ko: "음식", pos: "ITEM", tags: ["daily"] },
+  { en: "water", ko: "물", pos: "ITEM", tags: ["daily"] },
+  { en: "coffee", ko: "커피", pos: "ITEM", tags: ["daily"] },
+  { en: "book", ko: "책", pos: "ITEM", tags: ["daily", "school"] },
+  { en: "phone", ko: "휴대폰", pos: "ITEM", tags: ["daily"] },
+  { en: "bag", ko: "가방", pos: "ITEM", tags: ["daily"] },
+
+  // 기본 시간
+  { en: "today", ko: "오늘", pos: "TIME", tags: ["daily"] },
+  { en: "tomorrow", ko: "내일", pos: "TIME", tags: ["daily"] },
+  { en: "morning", ko: "아침", pos: "TIME", tags: ["daily"] },
+  { en: "afternoon", ko: "오후", pos: "TIME", tags: ["daily"] },
+  { en: "evening", ko: "저녁", pos: "TIME", tags: ["daily"] },
+  { en: "weekend", ko: "주말", pos: "TIME", tags: ["daily"] },
+];
 
 export const useLexiconStore = create<LexiconState>()(
   persist(
     (set, get) => ({
       hydrated: false,
       words: [],
-      userAddedCoreWords: new Set<string>(),
+      loadedPacks: [],
+      isInitialized: false,
 
-      // 기본 단어 추가
       addWord: (w) => {
         const normalizedEn = w.en.toLowerCase().trim();
         const exists = get().words.find(
@@ -66,6 +117,7 @@ export const useLexiconStore = create<LexiconState>()(
           .toString(36)
           .substr(2, 9)}`;
         const now = new Date().toISOString();
+
         const item: Lexeme & { source: Source } = {
           id,
           en: w.en.trim(),
@@ -99,43 +151,143 @@ export const useLexiconStore = create<LexiconState>()(
         );
       },
 
-      findByPos: (pos) => get().words.filter((w) => pos.includes(w.pos)),
+      findByPos: (pos, categories) => {
+        let filtered = get().words.filter((w) => pos.includes(w.pos));
 
-      // 초기 시드 데이터 로드 (간소화)
-      seedIfEmpty: () => {
-        const st = get();
-        if (!st.hydrated || st.words.length > 0) return;
+        if (categories?.length) {
+          filtered = filtered.filter((w) =>
+            w.tags.some((tag) => categories.includes(tag))
+          );
+        }
 
-        const coreWords = CORE_WORDS.map((w, index) => ({
-          id: `core_${Date.now()}_${index}`,
-          en: w.en,
-          ko: w.ko,
-          pos: w.pos,
-          tags: w.tags,
+        return filtered;
+      },
+
+      // ✅ upsertGlobalWords 구현 (loadPacks.ts 호환성)
+      upsertGlobalWords: (lexemes) => {
+        const state = get();
+        const existingKeys = new Set(
+          state.words.map((w) => `${w.en.toLowerCase()}_${w.pos}`)
+        );
+
+        const newWords: (Lexeme & { source: Source })[] = lexemes
+          .filter(
+            (lexeme) =>
+              !existingKeys.has(`${lexeme.en.toLowerCase()}_${lexeme.pos}`)
+          )
+          .map((lexeme, index) => ({
+            id: `pack_${Date.now()}_${index}`,
+            en: lexeme.en,
+            ko: lexeme.ko,
+            pos: lexeme.pos,
+            tags: lexeme.tags || [],
+            createdAt: new Date().toISOString(),
+            source: "pack" as Source,
+          }));
+
+        if (newWords.length > 0) {
+          set((state) => ({
+            words: [...state.words, ...newWords],
+          }));
+          console.log(`✅ ${newWords.length}개 글로벌 단어 추가됨`);
+        }
+      },
+
+      // ✅ seedIfEmpty 대체: 기본 단어로 초기화
+      initializeWithBasicWords: () => {
+        const state = get();
+        if (state.isInitialized) return;
+
+        console.log("🔄 기본 단어로 초기화 중...");
+
+        const existingKeys = new Set(
+          state.words.map((w) => `${w.en.toLowerCase()}_${w.pos}`)
+        );
+
+        const newWords = BASIC_WORDS.filter(
+          (word) => !existingKeys.has(`${word.en.toLowerCase()}_${word.pos}`)
+        ).map((word, index) => ({
+          id: `basic_${Date.now()}_${index}`,
+          en: word.en,
+          ko: word.ko,
+          pos: word.pos,
+          tags: word.tags,
           createdAt: new Date().toISOString(),
           source: "global" as Source,
         }));
 
-        set((state) => ({ words: [...coreWords, ...state.words] }));
-        console.log(`✅ ${coreWords.length}개 코어 단어 로드됨`);
+        if (newWords.length > 0) {
+          set((state) => ({
+            words: [...state.words, ...newWords],
+            isInitialized: true,
+          }));
+          console.log(`✅ ${newWords.length}개 기본 단어 추가됨`);
+        } else {
+          set((state) => ({ ...state, isInitialized: true }));
+        }
       },
 
-      // 코어 단어를 사용자 단어장에 추가 (참조 방식)
-      addCoreWordToUser: (coreWordId) => {
+      // ✅ 기본 단어 보장 (패턴 생성 전 호출용)
+      ensureBasicWordsAvailable: () => {
         const state = get();
-        const newSet = new Set(state.userAddedCoreWords);
-        newSet.add(coreWordId);
-        set({ userAddedCoreWords: newSet });
-        console.log(`✅ 코어 단어 추가됨: ${coreWordId}`);
+        const posCount = state.words.reduce((acc, w) => {
+          acc[w.pos] = (acc[w.pos] || 0) + 1;
+          return acc;
+        }, {} as Record<POS, number>);
+
+        // 최소 필요 단어 체크
+        const minimums = {
+          VERB: 3,
+          PLACE: 3,
+          PERSON: 2,
+          ITEM: 3,
+          TIME: 2,
+        };
+
+        let needsMore = false;
+        for (const [pos, min] of Object.entries(minimums)) {
+          if ((posCount[pos as POS] || 0) < min) {
+            needsMore = true;
+            break;
+          }
+        }
+
+        if (needsMore) {
+          console.log("📈 기본 단어 추가 필요, 자동 추가 중...");
+          get().initializeWithBasicWords();
+        }
       },
 
-      // 코어 단어를 사용자 단어장에서 제거
-      removeCoreWordFromUser: (coreWordId) => {
-        const state = get();
-        const newSet = new Set(state.userAddedCoreWords);
-        newSet.delete(coreWordId);
-        set({ userAddedCoreWords: newSet });
-        console.log(`✅ 코어 단어 제거됨: ${coreWordId}`);
+      // 최소 단어 수 보장
+      ensureMinimumWords: (count, categories) => {
+        const current = categories
+          ? get().getWordsByCategory(categories)
+          : get().words;
+
+        const totalBefore = current.length;
+
+        if (totalBefore >= count) {
+          return { added: 0, totalBefore, totalAfter: totalBefore };
+        }
+
+        // 먼저 기본 단어로 채우기 시도
+        get().initializeWithBasicWords();
+
+        const afterBasic = categories
+          ? get().getWordsByCategory(categories).length
+          : get().words.length;
+
+        return {
+          added: afterBasic - totalBefore,
+          totalBefore,
+          totalAfter: afterBasic,
+        };
+      },
+
+      getWordsByCategory: (categories) => {
+        return get().words.filter((w) =>
+          w.tags.some((tag) => categories.includes(tag))
+        );
       },
 
       exportUserWords: () => get().words.filter((w) => w.source === "user"),
@@ -144,26 +296,28 @@ export const useLexiconStore = create<LexiconState>()(
       name: "mypattern-lexicon",
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
-        words: s.words,
-        userAddedCoreWords: Array.from(s.userAddedCoreWords), // Set을 Array로 변환
+        words: s.words.filter((w) => w.source === "user"), // 사용자 단어만 저장
+        loadedPacks: s.loadedPacks,
+        isInitialized: s.isInitialized,
       }),
       onRehydrateStorage: () => (state, err) => {
         if (!err && state) {
-          // Array를 다시 Set으로 변환
-          state.userAddedCoreWords = new Set(state.userAddedCoreWords || []);
           console.log("[lexiconStore] 하이드레이션 완료", {
             words: state.words?.length,
-            userAddedCore: state.userAddedCoreWords.size,
+            loadedPacks: state.loadedPacks?.length,
+            isInitialized: state.isInitialized,
           });
+
+          // ✅ 하이드레이션 후 자동으로 기본 단어 초기화
+          setTimeout(() => {
+            if (!state.isInitialized) {
+              (state as LexiconState).initializeWithBasicWords();
+            }
+          }, 100);
         }
+
         return { hydrated: true };
       },
     }
   )
 );
-
-// 하이드레이션 보장
-const persistApi = (useLexiconStore as any).persist;
-if (persistApi?.hasHydrated?.()) {
-  useLexiconStore.setState({ hydrated: true });
-}

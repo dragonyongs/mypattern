@@ -1,5 +1,4 @@
-// src/features/learn/components/PatternCompose.tsx
-
+// src/features/learn/components/PatternCompose.tsx (수정)
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import {
   ArrowRight,
@@ -13,13 +12,15 @@ import {
   CheckCircle2,
   Pause,
   SkipForward,
+  Check,
 } from "lucide-react";
 import { useLearningStore } from "@/stores/learningStore";
 import { useLexiconStore } from "@/stores/lexiconStore";
 import { generatePatterns } from "../services/patternEngine";
 import type { LangTag } from "../types/patternCore.types";
+import { smartPatternService } from "@/shared/services/smartPatternService";
 
-// 생성된 패턴 인터페이스 확장
+// 기존 인터페이스들...
 interface GeneratedPattern {
   text: string;
   korean: string;
@@ -30,7 +31,6 @@ interface GeneratedPattern {
   isAdded?: boolean;
 }
 
-// 통합 패턴 인터페이스
 interface UnifiedPattern {
   id: string;
   text: string;
@@ -38,11 +38,10 @@ interface UnifiedPattern {
   schemaId: string;
   priority?: number;
   isCore: boolean;
-  isCompleted?: boolean;
+  isCompleted: boolean;
   addedAt: string;
 }
 
-// 학습 세션 인터페이스
 interface LearningSession {
   patterns: UnifiedPattern[];
   currentIndex: number;
@@ -52,18 +51,19 @@ interface LearningSession {
 
 export const PatternCompose: React.FC = React.memo(() => {
   const store = useLearningStore();
-  const { seedIfEmpty, ensureMinimumPack, words } = useLexiconStore();
+  const lexiconStore = useLexiconStore();
+  const { ensureBasicWordsAvailable, ensureMinimumWords, words } =
+    useLexiconStore();
 
-  // 상태 관리
+  // ✅ seedIfEmpty 제거, ensureBasicWordsAvailable로 대체
   const [tags, setTags] = useState<LangTag>("daily");
   const [limit, setLimit] = useState(10);
   const [candidates, setCandidates] = useState<GeneratedPattern[]>([]);
   const [unifiedPatterns, setUnifiedPatterns] = useState<UnifiedPattern[]>([
-    // 초기 핵심 패턴 1개
     {
       id: "core-1",
-      text: "I'm going to the store weekend.",
-      korean: "주말 가게 갈 거야.",
+      text: "I'm going to the store this weekend.",
+      korean: "이번 주말에 가게 갈 거야.",
       schemaId: "GO-PLACE-TIME",
       priority: 1,
       isCore: true,
@@ -71,14 +71,13 @@ export const PatternCompose: React.FC = React.memo(() => {
       addedAt: new Date().toISOString(),
     },
   ]);
+
   const [selectedCandidates, setSelectedCandidates] = useState<Set<number>>(
     new Set()
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAddingWords, setIsAddingWords] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // ✅ 학습 세션 상태 추가
   const [learningSession, setLearningSession] = useState<LearningSession>({
     patterns: [],
     currentIndex: 0,
@@ -86,14 +85,21 @@ export const PatternCompose: React.FC = React.memo(() => {
     showModal: false,
   });
 
-  React.useEffect(() => {
-    seedIfEmpty();
-  }, [seedIfEmpty]);
+  useEffect(() => {
+    // ✅ 통합 서비스 초기화
+    smartPatternService.initialize(lexiconStore, store);
+    ensureBasicWordsAvailable();
+  }, [lexiconStore, store, ensureBasicWordsAvailable]);
 
-  // ✅ TTS 기능 구현
+  // ✅ seedIfEmpty 대신 ensureBasicWordsAvailable 사용
+  useEffect(() => {
+    ensureBasicWordsAvailable();
+  }, [ensureBasicWordsAvailable]);
+
+  // TTS 기능
   const playTTS = useCallback((text: string) => {
     if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel(); // 이전 재생 취소
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.8;
       utterance.volume = 1;
@@ -101,7 +107,7 @@ export const PatternCompose: React.FC = React.memo(() => {
     }
   }, []);
 
-  // ✅ 스마트 패턴 생성 (재생성 가능하도록 개선)
+  // ✅ 스마트 패턴 생성 - ensureMinimumWords 사용
   const handleSmartGenerate = useCallback(async () => {
     setIsGenerating(true);
     setErrorMessage(null);
@@ -110,21 +116,24 @@ export const PatternCompose: React.FC = React.memo(() => {
     try {
       console.log("🚀 패턴 생성 시작...");
 
-      // ✅ 매번 새로운 패턴 생성을 위해 랜덤성 추가
+      // 먼저 기본 단어 보장
+      ensureBasicWordsAvailable();
+
       const randomSeed = Math.floor(Math.random() * 1000);
       let patterns = generatePatterns({
         tags: [tags],
         limit,
-        seed: randomSeed, // 랜덤 시드 추가 (generatePatterns 함수에서 지원한다면)
+        seed: randomSeed,
       });
 
       console.log("1차 생성 결과:", patterns.length, "개");
 
-      if (patterns.length < 3 && ensureMinimumPack) {
+      // 패턴이 부족하면 더 많은 단어 추가
+      if (patterns.length < 3) {
         setIsAddingWords(true);
         console.log("🔄 필요한 단어를 자동으로 추가하는 중...");
 
-        const result = ensureMinimumPack(15);
+        const result = ensureMinimumWords(15);
         console.log("단어 추가 결과:", result);
 
         if (result.added > 0) {
@@ -139,11 +148,9 @@ export const PatternCompose: React.FC = React.memo(() => {
           });
           console.log("2차 생성 결과:", patterns.length, "개");
         }
-
         setIsAddingWords(false);
       }
 
-      // ✅ 패턴에 임시 ID 추가 및 기존 추가 상태 확인
       const patternsWithId = patterns.map((pattern, index) => {
         const id = `candidate-${Date.now()}-${index}`;
         const isAlreadyAdded = unifiedPatterns.some(
@@ -161,7 +168,6 @@ export const PatternCompose: React.FC = React.memo(() => {
       console.log("📝 최종 패턴들:", patternsWithId);
       setCandidates(patternsWithId);
 
-      // 오류 메시지 처리
       if (patternsWithId.length === 0) {
         const posCount = words.reduce((acc, w) => {
           acc[w.pos] = (acc[w.pos] || 0) + 1;
@@ -196,12 +202,18 @@ export const PatternCompose: React.FC = React.memo(() => {
       setIsGenerating(false);
       setIsAddingWords(false);
     }
-  }, [tags, limit, ensureMinimumPack, words, unifiedPatterns]);
+  }, [
+    tags,
+    limit,
+    ensureMinimumWords,
+    ensureBasicWordsAvailable,
+    words,
+    unifiedPatterns,
+  ]);
 
-  // ✅ 통합된 패턴 추가 함수
+  // 나머지 함수들은 기존과 동일...
   const addPatternToUnified = useCallback(
     (pattern: GeneratedPattern, isCore: boolean = false) => {
-      // 중복 체크
       const exists = unifiedPatterns.some(
         (up) =>
           up.text.toLowerCase().trim() === pattern.text.toLowerCase().trim()
@@ -228,8 +240,6 @@ export const PatternCompose: React.FC = React.memo(() => {
       };
 
       setUnifiedPatterns((prev) => [...prev, newPattern]);
-
-      // ✅ 후보 패턴의 추가 상태 업데이트
       setCandidates((prev) =>
         prev.map((c) =>
           c.text.toLowerCase().trim() === pattern.text.toLowerCase().trim()
@@ -238,7 +248,6 @@ export const PatternCompose: React.FC = React.memo(() => {
         )
       );
 
-      // learningStore에 추가 (모달 열지 않음)
       store.acceptSuggestionToQueue({
         text: pattern.text,
         korean: pattern.korean,
@@ -249,18 +258,16 @@ export const PatternCompose: React.FC = React.memo(() => {
     [unifiedPatterns, store]
   );
 
-  // ✅ 선택된 패턴들 추가
   const addSelectedPatterns = useCallback(() => {
     const selectedPatterns = Array.from(selectedCandidates)
       .map((index) => candidates[index])
       .filter(Boolean)
-      .filter((p) => !p.isAdded); // 이미 추가된 패턴 제외
+      .filter((p) => !p.isAdded);
 
     selectedPatterns.forEach((pattern) => addPatternToUnified(pattern, false));
     setSelectedCandidates(new Set());
   }, [selectedCandidates, candidates, addPatternToUnified]);
 
-  // ✅ 상위 N개 패턴 추가
   const addTopPatterns = useCallback(
     (count: number) => {
       const availablePatterns = candidates.filter((p) => !p.isAdded);
@@ -270,11 +277,10 @@ export const PatternCompose: React.FC = React.memo(() => {
     [candidates, addPatternToUnified]
   );
 
-  // ✅ 체크박스 기능 구현
   const togglePatternSelection = useCallback(
     (index: number) => {
       const pattern = candidates[index];
-      if (pattern.isAdded) return; // 이미 추가된 패턴은 선택 불가
+      if (pattern.isAdded) return;
 
       setSelectedCandidates((prev) => {
         const newSet = new Set(prev);
@@ -289,13 +295,11 @@ export const PatternCompose: React.FC = React.memo(() => {
     [candidates]
   );
 
-  // ✅ 통합 패턴에서 제거
   const removeFromUnified = useCallback(
     (id: string) => {
       const removedPattern = unifiedPatterns.find((p) => p.id === id);
       setUnifiedPatterns((prev) => prev.filter((p) => p.id !== id));
 
-      // 후보 패턴 상태도 업데이트
       if (removedPattern) {
         setCandidates((prev) =>
           prev.map((c) =>
@@ -310,7 +314,7 @@ export const PatternCompose: React.FC = React.memo(() => {
     [unifiedPatterns]
   );
 
-  // ✅ 개별 패턴 학습 시작 (모달 열기)
+  // 개별 패턴 학습 시작
   const startIndividualLearning = useCallback(
     (pattern: UnifiedPattern) => {
       setLearningSession({
@@ -324,11 +328,9 @@ export const PatternCompose: React.FC = React.memo(() => {
     [playTTS]
   );
 
-  // ✅ 전체 패턴 학습 시작 (순차적)
+  // 전체 패턴 학습 시작
   const startLearningSession = useCallback(() => {
-    const learningPatterns = unifiedPatterns.filter(
-      (p) => !p.isCore || !p.isCompleted
-    );
+    const learningPatterns = unifiedPatterns.filter((p) => !p.isCompleted);
     if (learningPatterns.length > 0) {
       setLearningSession({
         patterns: learningPatterns,
@@ -340,8 +342,50 @@ export const PatternCompose: React.FC = React.memo(() => {
     }
   }, [unifiedPatterns, playTTS]);
 
-  // ✅ 학습 세션 다음 패턴
-  const nextLearningPattern = useCallback(() => {
+  // 현재 학습 중인 패턴 완료 처리
+  const markCurrentPatternCompleted = useCallback(() => {
+    if (learningSession.patterns.length > 0) {
+      const currentPattern =
+        learningSession.patterns[learningSession.currentIndex];
+
+      setUnifiedPatterns((prev) =>
+        prev.map((p) =>
+          p.id === currentPattern.id ? { ...p, isCompleted: true } : p
+        )
+      );
+
+      setLearningSession((prev) => ({
+        ...prev,
+        patterns: prev.patterns.map((p) =>
+          p.id === currentPattern.id ? { ...p, isCompleted: true } : p
+        ),
+      }));
+    }
+  }, [learningSession]);
+
+  // 학습 완료 후 다음 패턴으로 자동 진행
+  const completeAndContinue = useCallback(() => {
+    markCurrentPatternCompleted();
+    const nextIndex = learningSession.currentIndex + 1;
+
+    if (nextIndex < learningSession.patterns.length) {
+      setLearningSession((prev) => ({
+        ...prev,
+        currentIndex: nextIndex,
+      }));
+      playTTS(learningSession.patterns[nextIndex].text);
+    } else {
+      window.speechSynthesis.cancel();
+      setLearningSession((prev) => ({
+        ...prev,
+        isActive: false,
+        showModal: false,
+      }));
+    }
+  }, [learningSession, playTTS, markCurrentPatternCompleted]);
+
+  // 다음 패턴으로 넘어가기
+  const skipToNextPattern = useCallback(() => {
     const nextIndex = learningSession.currentIndex + 1;
     if (nextIndex < learningSession.patterns.length) {
       setLearningSession((prev) => ({
@@ -350,7 +394,7 @@ export const PatternCompose: React.FC = React.memo(() => {
       }));
       playTTS(learningSession.patterns[nextIndex].text);
     } else {
-      // 학습 완료
+      window.speechSynthesis.cancel();
       setLearningSession((prev) => ({
         ...prev,
         isActive: false,
@@ -359,7 +403,7 @@ export const PatternCompose: React.FC = React.memo(() => {
     }
   }, [learningSession, playTTS]);
 
-  // ✅ 학습 모달 닫기
+  // 학습 모달 닫기
   const closeLearningModal = useCallback(() => {
     window.speechSynthesis.cancel();
     setLearningSession((prev) => ({
@@ -369,27 +413,27 @@ export const PatternCompose: React.FC = React.memo(() => {
     }));
   }, []);
 
-  // ✅ 핵심 패턴 완료 토글
+  // 패턴 완료 상태 토글
   const toggleCompletion = useCallback((id: string) => {
     setUnifiedPatterns((prev) =>
       prev.map((p) => (p.id === id ? { ...p, isCompleted: !p.isCompleted } : p))
     );
   }, []);
 
-  // ✅ 구분된 패턴들
+  // 구분된 패턴들
   const corePatterns = unifiedPatterns
     .filter((p) => p.isCore)
     .sort((a, b) => (a.priority || 0) - (b.priority || 0));
-  const learningPatterns = unifiedPatterns.filter((p) => !p.isCore);
-  const completedCoreCount = corePatterns.filter((p) => p.isCompleted).length;
 
-  // ✅ 선택 가능한 패턴과 추가 가능한 패턴 계산
+  const learningPatterns = unifiedPatterns.filter((p) => !p.isCore);
+  const completedCount = unifiedPatterns.filter((p) => p.isCompleted).length;
+  const incompleteCount = unifiedPatterns.filter((p) => !p.isCompleted).length;
   const selectablePatterns = candidates.filter((p) => !p.isAdded);
   const availableForTopAdd = selectablePatterns.length >= 3;
 
   return (
     <div className="space-y-6">
-      {/* ✅ 학습 모달 */}
+      {/* ✅ 개선된 학습 모달 - 완료 후 자동 진행 */}
       {learningSession.showModal && learningSession.patterns.length > 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4">
@@ -398,6 +442,8 @@ export const PatternCompose: React.FC = React.memo(() => {
                 {learningSession.currentIndex + 1} /{" "}
                 {learningSession.patterns.length}
               </div>
+
+              {/* 현재 패턴 표시 */}
               <div className="text-2xl font-bold mb-4 text-center">
                 {learningSession.patterns[learningSession.currentIndex].text}
               </div>
@@ -405,7 +451,16 @@ export const PatternCompose: React.FC = React.memo(() => {
                 {learningSession.patterns[learningSession.currentIndex].korean}
               </div>
 
-              <div className="flex justify-center gap-4">
+              {/* 완료 표시 (현재 패턴이 이미 완료된 경우) */}
+              {learningSession.patterns[learningSession.currentIndex]
+                .isCompleted && (
+                <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm mb-4 inline-block">
+                  ✅ 완료됨
+                </div>
+              )}
+
+              <div className="flex justify-center gap-2 flex-wrap">
+                {/* TTS 버튼 */}
                 <button
                   onClick={() =>
                     playTTS(
@@ -413,43 +468,76 @@ export const PatternCompose: React.FC = React.memo(() => {
                         .text
                     )
                   }
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg inline-flex items-center gap-2"
+                  className="px-3 py-2 bg-green-600 text-white rounded-lg inline-flex items-center gap-2"
                 >
                   <Volume2 size={16} />
                   다시 듣기
                 </button>
 
-                {learningSession.currentIndex + 1 <
-                learningSession.patterns.length ? (
-                  <button
-                    onClick={nextLearningPattern}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg inline-flex items-center gap-2"
-                  >
-                    <SkipForward size={16} />
-                    다음 패턴
-                  </button>
-                ) : (
-                  <button
-                    onClick={closeLearningModal}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg"
-                  >
-                    학습 완료
-                  </button>
-                )}
+                {/* ✅ 학습 완료 버튼 - 완료 후 자동으로 다음 진행 */}
+                <button
+                  onClick={completeAndContinue}
+                  className="px-3 py-2 bg-purple-600 text-white rounded-lg inline-flex items-center gap-2"
+                >
+                  <Check size={16} />
+                  {learningSession.currentIndex + 1 <
+                  learningSession.patterns.length
+                    ? "완료 & 다음"
+                    : "학습 완료"}
+                </button>
 
+                {/* ✅ 다음 패턴 버튼 - 완료하지 않고 넘어가기 */}
+                {learningSession.patterns.length > 1 &&
+                  learningSession.currentIndex + 1 <
+                    learningSession.patterns.length && (
+                    <button
+                      onClick={skipToNextPattern}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg inline-flex items-center gap-2"
+                    >
+                      <SkipForward size={16} />
+                      다음 패턴
+                    </button>
+                  )}
+
+                {/* 닫기 버튼 */}
                 <button
                   onClick={closeLearningModal}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg"
+                  className="px-3 py-2 bg-gray-600 text-white rounded-lg"
                 >
                   닫기
                 </button>
+              </div>
+
+              {/* 진행률 표시 */}
+              <div className="mt-4">
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${
+                        ((learningSession.currentIndex + 1) /
+                          learningSession.patterns.length) *
+                        100
+                      }%`,
+                    }}
+                  ></div>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  진행률:{" "}
+                  {Math.round(
+                    ((learningSession.currentIndex + 1) /
+                      learningSession.patterns.length) *
+                      100
+                  )}
+                  %
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ✅ 통합된 패턴 관리 섹션 */}
+      {/* 기존 패턴 관리 섹션들... */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg text-blue-800">
@@ -460,7 +548,7 @@ export const PatternCompose: React.FC = React.memo(() => {
           </h3>
 
           <div className="text-xs text-blue-600">
-            핵심 완료: {completedCoreCount}/{corePatterns.length}
+            완료: {completedCount}/{unifiedPatterns.length}
           </div>
         </div>
 
@@ -510,7 +598,6 @@ export const PatternCompose: React.FC = React.memo(() => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* ✅ TTS 버튼 추가 */}
                   <button
                     onClick={() => playTTS(pattern.text)}
                     className="p-2 text-green-600 hover:bg-green-100 rounded"
@@ -518,7 +605,6 @@ export const PatternCompose: React.FC = React.memo(() => {
                     <Volume2 size={16} />
                   </button>
 
-                  {/* ✅ 학습 시작 버튼 */}
                   <button
                     onClick={() => startIndividualLearning(pattern)}
                     className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
@@ -532,9 +618,17 @@ export const PatternCompose: React.FC = React.memo(() => {
 
                   <button
                     onClick={() => toggleCompletion(pattern.id)}
-                    className="p-1 text-blue-500 hover:bg-blue-100 rounded text-xs"
+                    className={`p-1 rounded text-xs transition-colors ${
+                      pattern.isCompleted
+                        ? "text-green-600 hover:bg-green-100"
+                        : "text-gray-400 hover:bg-gray-100"
+                    }`}
                   >
-                    {pattern.isCompleted ? "✅" : "⭕"}
+                    {pattern.isCompleted ? (
+                      <CheckCircle2 size={16} />
+                    ) : (
+                      <CheckSquare size={16} />
+                    )}
                   </button>
 
                   <button
@@ -551,23 +645,46 @@ export const PatternCompose: React.FC = React.memo(() => {
             {learningPatterns.map((pattern) => (
               <div
                 key={pattern.id}
-                className="flex items-center justify-between p-3 border rounded-lg bg-blue-50 border-blue-200"
+                className={`flex items-center justify-between p-4 border rounded-lg transition-all ${
+                  pattern.isCompleted
+                    ? "bg-green-50 border-green-200"
+                    : "bg-blue-50 border-blue-200"
+                }`}
               >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <PlayCircle size={16} className="text-blue-600" />
-                    <span className="font-medium">{pattern.text}</span>
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                      pattern.isCompleted
+                        ? "bg-green-500 text-white"
+                        : "bg-blue-500 text-white"
+                    }`}
+                  >
+                    <PlayCircle size={12} />
                   </div>
-                  <div className="text-sm text-gray-600 ml-6">
-                    {pattern.korean}
-                  </div>
-                  <div className="text-xs text-blue-600 font-medium ml-6">
-                    연습 패턴
+                  <div className="flex-1">
+                    <div
+                      className={`font-medium ${
+                        pattern.isCompleted ? "line-through text-gray-500" : ""
+                      }`}
+                    >
+                      {pattern.text}
+                    </div>
+                    <div
+                      className={`text-sm ${
+                        pattern.isCompleted
+                          ? "line-through text-gray-400"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      {pattern.korean}
+                    </div>
+                    <div className="text-xs text-blue-600 font-medium">
+                      연습 패턴
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* ✅ TTS 버튼 추가 */}
                   <button
                     onClick={() => playTTS(pattern.text)}
                     className="p-2 text-green-600 hover:bg-green-100 rounded"
@@ -575,17 +692,35 @@ export const PatternCompose: React.FC = React.memo(() => {
                     <Volume2 size={16} />
                   </button>
 
-                  {/* ✅ 학습 시작 버튼 추가 */}
                   <button
                     onClick={() => startIndividualLearning(pattern)}
-                    className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                    className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                      pattern.isCompleted
+                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                        : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                    }`}
                   >
-                    학습하기
+                    {pattern.isCompleted ? "복습하기" : "학습하기"}
+                  </button>
+
+                  <button
+                    onClick={() => toggleCompletion(pattern.id)}
+                    className={`p-1 rounded text-xs transition-colors ${
+                      pattern.isCompleted
+                        ? "text-green-600 hover:bg-green-100"
+                        : "text-gray-400 hover:bg-gray-100"
+                    }`}
+                  >
+                    {pattern.isCompleted ? (
+                      <CheckCircle2 size={16} />
+                    ) : (
+                      <CheckSquare size={16} />
+                    )}
                   </button>
 
                   <button
                     onClick={() => removeFromUnified(pattern.id)}
-                    className="p-2 text-red-600 hover:bg-red-100 rounded text-xs"
+                    className="p-1 text-red-500 hover:bg-red-100 rounded"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -594,19 +729,14 @@ export const PatternCompose: React.FC = React.memo(() => {
             ))}
 
             {/* 전체 학습 시작 버튼 */}
-            {learningPatterns.length > 0 && (
+            {incompleteCount > 0 && (
               <div className="pt-4 border-t">
                 <button
                   onClick={startLearningSession}
                   className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg inline-flex items-center justify-center gap-2 font-medium hover:bg-blue-700"
                 >
                   <PlayCircle size={20} />
-                  패턴 학습 시작하기 (
-                  {
-                    unifiedPatterns.filter((p) => !p.isCore || !p.isCompleted)
-                      .length
-                  }
-                  개)
+                  패턴 학습 시작하기 ({incompleteCount}개)
                 </button>
               </div>
             )}
@@ -622,9 +752,8 @@ export const PatternCompose: React.FC = React.memo(() => {
         )}
       </div>
 
-      {/* 패턴 생성 섹션 */}
+      {/* 패턴 생성 섹션 - 기존과 동일 */}
       <div className="bg-white border rounded-xl p-4 space-y-4">
-        {/* 헤더 */}
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-lg">🎯 패턴 생성기</h3>
 
@@ -643,7 +772,7 @@ export const PatternCompose: React.FC = React.memo(() => {
           </div>
         </div>
 
-        {/* 생성 컨트롤 */}
+        {/* 나머지 패턴 생성 UI는 기존과 동일하므로 생략... */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm">
             <label>생성 수</label>
@@ -674,7 +803,6 @@ export const PatternCompose: React.FC = React.memo(() => {
           </button>
         </div>
 
-        {/* 오류/진행 상황 메시지 */}
         {errorMessage && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
             <h4 className="font-medium text-red-800">패턴 생성 실패</h4>
@@ -688,7 +816,6 @@ export const PatternCompose: React.FC = React.memo(() => {
           </div>
         )}
 
-        {/* 생성된 패턴 목록 */}
         {candidates.length > 0 && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -711,7 +838,6 @@ export const PatternCompose: React.FC = React.memo(() => {
                       </div>
                     </div>
 
-                    {/* ✅ 체크박스 (추가되지 않은 패턴만 선택 가능) */}
                     <button
                       onClick={() => togglePatternSelection(i)}
                       disabled={pattern.isAdded}
@@ -727,7 +853,6 @@ export const PatternCompose: React.FC = React.memo(() => {
                     </button>
                   </div>
 
-                  {/* ✅ 추가/추가됨 버튼 */}
                   <div className="flex gap-2">
                     {pattern.isAdded ? (
                       <div className="px-3 py-1 bg-green-100 text-green-700 rounded text-xs inline-flex items-center gap-1">
@@ -748,7 +873,6 @@ export const PatternCompose: React.FC = React.memo(() => {
               ))}
             </div>
 
-            {/* ✅ 일괄 추가 버튼들 (추가 가능한 패턴이 있을 때만 표시) */}
             {selectablePatterns.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-4 border-t">
                 {selectedCandidates.size > 0 && (
@@ -781,7 +905,6 @@ export const PatternCompose: React.FC = React.memo(() => {
           </>
         )}
 
-        {/* 빈 상태 메시지 */}
         {candidates.length === 0 &&
           !isGenerating &&
           !isAddingWords &&

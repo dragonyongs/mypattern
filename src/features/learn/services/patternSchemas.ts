@@ -1,7 +1,7 @@
 // src/features/learn/services/patternSchemas.ts
 import type { PatternSchema } from "../types/patternCore.types";
 
-export const PATTERN_SCHEMAS_SEED: PatternSchema[] = [
+export const PATTERN_SCHEMAS: PatternSchema[] = [
   {
     id: "WH-BE-PLACE",
     category: "directions",

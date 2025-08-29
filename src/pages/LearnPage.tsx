@@ -1,18 +1,34 @@
-// src/pages/LearnPage.tsx
-
-import React, { useMemo, useSyncExternalStore, useCallback } from "react";
+// src/pages/LearnPage.tsx (수정)
+import React, {
+  useMemo,
+  useSyncExternalStore,
+  useCallback,
+  useEffect,
+} from "react";
 import { Link } from "react-router-dom";
 import { useLexiconStore } from "@/stores/lexiconStore";
+import { useLearningStore } from "@/stores/learningStore";
 import { PatternCompose } from "@/features/learn/components/PatternCompose";
+import { smartPatternService } from "@/shared/services/smartPatternService";
 
 export function LearnPage() {
-  const { words, ensureMinimumPack } = useLexiconStore() as any;
+  const lexiconStore = useLexiconStore();
+  const learningStore = useLearningStore();
+  const { words, ensureBasicWordsAvailable } = lexiconStore;
 
   const hasHydrated = useSyncExternalStore(
     (cb) => (useLexiconStore as any).persist.onFinishHydration(cb),
     () => (useLexiconStore as any).persist.hasHydrated?.() ?? false,
     () => true
   );
+
+  // ✅ 스마트 패턴 서비스 초기화
+  useEffect(() => {
+    if (hasHydrated) {
+      smartPatternService.initialize(lexiconStore, learningStore);
+      ensureBasicWordsAvailable();
+    }
+  }, [hasHydrated, lexiconStore, learningStore, ensureBasicWordsAvailable]);
 
   const status = useMemo(() => {
     const posCount = words.reduce((acc, w) => {
@@ -39,37 +55,16 @@ export function LearnPage() {
     return { ready, missing, total, posCount };
   }, [words]);
 
-  const handleAddBasicWords = useCallback(() => {
-    if (!ensureMinimumPack) {
-      console.error("ensureMinimumPack 함수가 없습니다");
-      return;
-    }
-
-    console.log("🔄 기본 단어 자동 추가 시작...");
-    const result = ensureMinimumPack(15);
-    console.log("📊 추가 결과:", {
-      added: result.added,
-      before: result.totalBefore,
-      after: result.totalAfter,
-    });
-
-    if (result.added > 0) {
-      alert(`${result.added}개의 기본 단어가 추가되었습니다!`);
-    } else {
-      alert("이미 충분한 단어가 있습니다.");
-    }
-  }, [ensureMinimumPack]);
-
-  if (!hasHydrated) return <div>로딩 중...</div>;
+  if (!hasHydrated) return <div className="p-8 text-center">로딩 중...</div>;
 
   if (!status.ready) {
     return (
-      <div className="p-4 space-y-4">
-        <h2 className="text-xl font-bold">
+      <div className="p-8">
+        <h2 className="text-xl font-bold mb-4">
           패턴 생성을 위해 단어를 추가해주세요
         </h2>
 
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="mb-6">
           <h3 className="font-semibold mb-2">현재 상황:</h3>
           <p>총 {status.total}개 단어</p>
           <p>
@@ -80,26 +75,25 @@ export function LearnPage() {
           </p>
         </div>
 
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="mb-6">
           <h3 className="font-semibold mb-2">필요한 단어:</h3>
-          <ul className="list-disc list-inside space-y-1">
-            {status.missing.map((m) => (
-              <li key={m}>{m}</li>
-            ))}
-          </ul>
+          {status.missing.map((m) => (
+            <div key={m} className="text-red-600">
+              • {m}
+            </div>
+          ))}
         </div>
 
-        <div className="flex gap-2">
+        <div className="space-x-4">
           <button
-            onClick={handleAddBasicWords}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            onClick={() => ensureBasicWordsAvailable()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             기본 단어 자동 추가
           </button>
-
           <Link
             to="/library"
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 inline-block"
           >
             단어장에서 직접 추가
           </Link>
@@ -110,8 +104,15 @@ export function LearnPage() {
 
   return (
     <div className="p-4">
-      {/* ✅ 통합된 PatternCompose만 사용 - DailyPatternsSection 제거 */}
+      {/* ✅ 통합 패턴 서비스를 사용하는 PatternCompose */}
       <PatternCompose />
+
+      <div className="mt-8 text-center text-sm text-gray-500">
+        총 {status.total}개 단어 • 품사별:{" "}
+        {Object.entries(status.posCount || {})
+          .map(([pos, count]) => `${pos}:${count}개`)
+          .join(", ") || "없음"}
+      </div>
     </div>
   );
 }

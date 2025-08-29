@@ -38,7 +38,7 @@ export function LandingPage() {
     {
       icon: Zap,
       title: "즉시 피드백",
-      description: "AI가 실시간으로 발음과 문법을 체크해드려요",
+      description: "실시간으로 발음과 문법을 체크해드려요",
     },
     {
       icon: Target,
