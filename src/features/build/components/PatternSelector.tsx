@@ -1,24 +1,29 @@
 // src/features/build/components/PatternSelector.tsx
 import React from "react";
-import { ArrowRight, MessageCircle } from "lucide-react";
-import type { ConversationPattern } from "../types";
+import { ArrowRight, MessageCircle, Target, Zap } from "lucide-react";
+import type { ConversationPattern, UserIntent } from "../types";
 
 interface PatternSelectorProps {
   patterns: ConversationPattern[];
+  userInput: string; // 새로 추가: 사용자 입력 표시용
   onPatternSelect: (pattern: ConversationPattern) => void;
 }
 
 export const PatternSelector: React.FC<PatternSelectorProps> = ({
   patterns,
+  userInput,
   onPatternSelect,
 }) => {
   if (patterns.length === 0) {
     return (
-      <div className="bg-gray-50 rounded-xl p-8 text-center">
-        <MessageCircle size={48} className="mx-auto mb-4 text-gray-400" />
-        <p className="text-gray-600">관련된 대화 패턴을 찾을 수 없습니다.</p>
-        <p className="text-sm text-gray-500 mt-2">
-          다른 표현으로 다시 시도해보세요.
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+        <MessageCircle className="mx-auto h-12 w-12 text-yellow-400 mb-4" />
+        <h3 className="text-lg font-medium text-yellow-800 mb-2">
+          관련된 대화 패턴을 찾을 수 없습니다
+        </h3>
+        <p className="text-yellow-700">
+          다른 표현으로 다시 시도해보세요. <br />
+          예: "메가커피가 어디 있나요?" 또는 "강남역으로 어떻게 가나요?"
         </p>
       </div>
     );
