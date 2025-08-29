@@ -96,7 +96,7 @@ export const BuildPage: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4">
         {/* 헤더 */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-2">🎯 스마트 문장 만들기</h1>
+          <h1 className="text-2xl font-bold mb-2">🎯 문장 만들기</h1>
           <p className="text-gray-600">
             당신의 의도를 분석해서 최적의 영어 패턴을 제안합니다
           </p>
