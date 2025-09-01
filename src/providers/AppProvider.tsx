@@ -1,6 +1,5 @@
 // src/providers/AppProvider.tsx
 import React, { createContext, useEffect, useMemo, useReducer } from "react";
-
 import type {
   Sentence,
   Pattern,
@@ -11,6 +10,9 @@ import type {
 import { defaultSettings } from "@/entities";
 import { loadFromStorage, saveToStorage } from "./storage";
 import { generateDailyQueue } from "@/shared/lib/schedule";
+import { logger } from "@/shared/utils/logger";
+import { usePackStore } from "@/stores/packStore";
+import { useDailyPlanStore } from "@/stores/dailyPlanStore";
 
 // ---------- State / Action ----------
 export interface AppState {
@@ -49,12 +51,13 @@ const initialState: AppState = {
 
 // ---------- Reducer ----------
 function appReducer(state: AppState, action: AppAction): AppState {
-  // ... (기존 reducer 로직 그대로)
   switch (action.type) {
     case "SET_LOADING":
       return { ...state, loading: action.payload };
+
     case "SET_ERROR":
       return { ...state, error: action.payload, loading: false };
+
     case "LOAD_DATA": {
       const merged = {
         ...state,
@@ -68,6 +71,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         error: null,
       };
     }
+
     case "UPDATE_SENTENCE": {
       const updated = state.sentences.map((s) =>
         s.id === action.payload.id ? action.payload : s
@@ -78,6 +82,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         dailyQueue: generateDailyQueue(updated),
       };
     }
+
     case "UPDATE_SENTENCES": {
       const updated = action.payload;
       return {
@@ -86,23 +91,28 @@ function appReducer(state: AppState, action: AppAction): AppState {
         dailyQueue: generateDailyQueue(updated),
       };
     }
+
     case "UPDATE_SETTINGS":
       return {
         ...state,
         settings: { ...state.settings, ...action.payload },
       };
+
     case "ADD_SESSION":
       return {
         ...state,
         sessions: [...state.sessions, action.payload],
       };
+
     case "REFRESH_DAILY_QUEUE":
       return {
         ...state,
         dailyQueue: generateDailyQueue(state.sentences),
       };
+
     case "RESET_DATA":
       return { ...initialState, loading: false };
+
     default:
       return state;
   }
@@ -114,6 +124,41 @@ export const AppContext = createContext<{
   dispatch: React.Dispatch<AppAction>;
 } | null>(null);
 
+// ---------- Data Restoration Component ----------
+const DataRestoration: React.FC = () => {
+  const selectedPack = usePackStore((state) => state.selectedPack);
+  const currentPlan = useDailyPlanStore((state) => state.currentPlan);
+  const initializePlan = useDailyPlanStore((state) => state.initializePlan);
+
+  useEffect(() => {
+    const restoreData = async () => {
+      // 팩은 있는데 학습 계획이 없는 경우 복원
+      if (selectedPack && !currentPlan) {
+        console.log(
+          "🔥 Restoring daily plan from selected pack:",
+          selectedPack.title
+        );
+
+        try {
+          initializePlan(
+            selectedPack.id,
+            selectedPack.title,
+            selectedPack.items
+          );
+        } catch (error) {
+          console.error("Failed to restore daily plan:", error);
+        }
+      }
+    };
+
+    // persist 복원 대기를 위한 지연
+    const timer = setTimeout(restoreData, 200);
+    return () => clearTimeout(timer);
+  }, [selectedPack, currentPlan, initializePlan]);
+
+  return null;
+};
+
 // ---------- Provider Component ----------
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
@@ -124,6 +169,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         dispatch({ type: "SET_LOADING", payload: true });
         const saved = loadFromStorage();
+
         if (saved) {
           dispatch({
             type: "LOAD_DATA",
@@ -140,26 +186,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           dispatch({ type: "REFRESH_DAILY_QUEUE" });
         }
       } catch (e) {
-        console.error(e);
+        logger.error("AppProvider load error:", e);
         dispatch({
           type: "SET_ERROR",
           payload: "데이터 로딩에 실패했습니다.",
         });
       }
     };
+
     load();
   }, []);
 
-  // 변경 지속 저장
+  // 변경사항 지속 저장
   useEffect(() => {
     if (state.loading) return;
-    saveToStorage({
-      sentences: state.sentences,
-      patterns: state.patterns,
-      chunks: state.chunks,
-      settings: state.settings,
-      sessions: state.sessions,
-    } as any);
+
+    try {
+      saveToStorage({
+        sentences: state.sentences,
+        patterns: state.patterns,
+        chunks: state.chunks,
+        settings: state.settings,
+        sessions: state.sessions,
+      } as any);
+    } catch (error) {
+      logger.error("Failed to save to storage:", error);
+    }
   }, [
     state.sentences,
     state.patterns,
@@ -171,5 +223,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(() => ({ state, dispatch }), [state]);
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      <DataRestoration />
+      {children}
+    </AppContext.Provider>
+  );
 }

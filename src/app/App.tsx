@@ -6,70 +6,102 @@ import { MainLayout } from "@/app/layouts/MainLayout";
 import { LandingPage } from "@/pages/LandingPage";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { RequirePack } from "@/shared/components/RequirePack";
-import { useAuthStore } from "@/stores/authStore";
 
-const PacksPage = React.lazy(() => import("@/pages/PacksPage"));
-const LearnPage = React.lazy(() => import("@/pages/LearnPage"));
-const ReviewPage = React.lazy(() => import("@/pages/ReviewPage"));
-const SettingsPage = React.lazy(() => import("@/pages/SettingsPage"));
+// 기본 페이지들
+const PacksPage = React.lazy(() => import("@/pages/packs"));
+const LearnPage = React.lazy(() => import("@/pages/learn"));
+const ReviewPage = React.lazy(() => import("@/pages/review"));
+const SettingsPage = React.lazy(() => import("@/pages/settings"));
 
-function AppHomeRedirect() {
-  const { user, loading, isAuthenticated } = useAuthStore();
+// 학습 단계별 페이지들
+const FlashcardPage = React.lazy(() => import("@/pages/learn/FlashcardPage"));
+const OverviewPage = React.lazy(() => import("@/pages/learn/OverviewPage"));
+const PronunciationPage = React.lazy(
+  () => import("@/pages/learn/PronunciationPage")
+);
+const DictationPage = React.lazy(() => import("@/pages/learn/DictationPage"));
 
-  // ✅ 내장 hasHydrated 메서드로 재수화 완료 체크
-  const hasHydrated = useAuthStore.persist.hasHydrated();
-
-  if (!hasHydrated || loading) return <div className="p-6">Loading...</div>;
-  if (!isAuthenticated) return <Navigate to="/landing" replace />;
-
-  const to = user?.selectedPackId ? "/app/learn/day/1" : "/app/packs";
-  return <Navigate to={to} replace />;
-}
+// 팩 관련 페이지들
+const PackDetails = React.lazy(() => import("@/pages/packs/PackDetails"));
+const PackComparison = React.lazy(() => import("@/pages/packs/PackComparison"));
+const PackSettings = React.lazy(() => import("@/pages/packs/PackSettings"));
 
 export default function App() {
   return (
-    <React.Suspense fallback={<div className="p-6">Loading...</div>}>
+    <React.Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      }
+    >
       <AppProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/landing" element={<LandingPage />} />
+
             <Route
-              path="/app/*"
+              path="/app"
               element={
                 <ProtectedRoute requireAuth>
                   <MainLayout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<AppHomeRedirect />} />
+              {/* 🔥 기본 라우트를 packs로 변경 */}
+              <Route index element={<Navigate to="packs" replace />} />
+
+              {/* 메인 학습 대시보드 */}
+              <Route path="learn" element={<LearnPage />} />
+
+              {/* 🔥 학습 단계별 라우트를 먼저 배치 */}
+              <Route
+                path="learn/flashcard"
+                element={
+                  <RequirePack>
+                    <FlashcardPage />
+                  </RequirePack>
+                }
+              />
+              <Route
+                path="learn/overview"
+                element={
+                  <RequirePack>
+                    <OverviewPage />
+                  </RequirePack>
+                }
+              />
+              <Route
+                path="learn/pronunciation"
+                element={
+                  <RequirePack>
+                    <PronunciationPage />
+                  </RequirePack>
+                }
+              />
+              <Route
+                path="learn/dictation"
+                element={
+                  <RequirePack>
+                    <DictationPage />
+                  </RequirePack>
+                }
+              />
+
+              {/* 팩 관련 라우트들 */}
               <Route path="packs" element={<PacksPage />} />
-              <Route
-                path="learn"
-                element={
-                  <RequirePack>
-                    <LearnPage />
-                  </RequirePack>
-                }
-              />
-              <Route
-                path="learn/day/:day"
-                element={
-                  <RequirePack>
-                    <LearnPage />
-                  </RequirePack>
-                }
-              />
-              <Route
-                path="review"
-                element={
-                  <RequirePack>
-                    <ReviewPage />
-                  </RequirePack>
-                }
-              />
+
+              {/* 🔥 정적 라우트를 동적 라우트보다 먼저 배치 */}
+              <Route path="packs/comparison" element={<PackComparison />} />
+              <Route path="packs/settings" element={<PackSettings />} />
+              <Route path="packs/:packId" element={<PackDetails />} />
+
+              <Route path="review" element={<ReviewPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
-            <Route path="*" element={<Navigate to="/landing" replace />} />
+
+            {/* 🔥 모든 잘못된 경로는 packs로 리다이렉트 */}
+            <Route path="*" element={<Navigate to="/app/packs" replace />} />
           </Routes>
         </BrowserRouter>
       </AppProvider>

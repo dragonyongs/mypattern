@@ -1,155 +1,161 @@
-import React, { useState, useCallback } from "react";
-import { Play, Pause, Mic, MicOff, Volume2 } from "lucide-react";
+// src/features/pronunciation/ui/PronunciationCard.tsx
+import React, { useState, useCallback, useEffect, memo } from "react";
+import {
+  Play,
+  Pause,
+  Mic,
+  MicOff,
+  Volume2,
+  CheckCircle,
+  ArrowRight,
+} from "lucide-react";
 import { VocaItem } from "@/entities";
 import { useTTS, useVoiceRecorder } from "@/shared/hooks";
-import { WaveformVisualizer } from "@/shared/ui";
 
-interface PronunciationCardProps {
+export interface PronunciationCardProps {
   item: VocaItem;
+  onComplete: (correct: boolean) => void; // 🔥 누락되었을 수 있는 prop
   onNext: () => void;
   onPrevious: () => void;
 }
 
-export function PronunciationCard({
-  item,
-  onNext,
-  onPrevious,
-}: PronunciationCardProps) {
-  const [isRecording, setIsRecording] = useState(false);
-  const [hasRecorded, setHasRecorded] = useState(false);
+export const PronunciationCard = memo<PronunciationCardProps>(
+  ({ item, onComplete, onNext, onPrevious }) => {
+    const [isRecording, setIsRecording] = useState(false);
+    const [hasRecorded, setHasRecorded] = useState(false);
+    const [hasListened, setHasListened] = useState(false);
 
-  const { speak, isSpeaking, stop } = useTTS();
-  const {
-    startRecording,
-    stopRecording,
-    audioUrl,
-    isRecording: recordingState,
-  } = useVoiceRecorder();
+    const { speak, isSpeaking, stop } = useTTS();
+    const {
+      startRecording,
+      stopRecording,
+      audioUrl,
+      isRecording: recordingState,
+    } = useVoiceRecorder();
 
-  const handleSpeak = useCallback(() => {
-    if (isSpeaking) {
-      stop();
-    } else {
-      speak(item.exampleEn || item.headword);
-    }
-  }, [isSpeaking, stop, speak, item]);
+    const handleSpeak = useCallback(() => {
+      if (isSpeaking) {
+        stop();
+      } else {
+        // ✅ 안전한 텍스트 확보
+        const textToSpeak = item?.exampleEn || item?.headword || "";
+        if (textToSpeak) {
+          speak(textToSpeak);
+          setHasListened(true);
+        }
+      }
+    }, [isSpeaking, stop, speak, item]);
 
-  const handleRecord = useCallback(async () => {
-    if (isRecording) {
-      await stopRecording();
-      setIsRecording(false);
-      setHasRecorded(true);
-    } else {
-      await startRecording();
-      setIsRecording(true);
-    }
-  }, [isRecording, startRecording, stopRecording]);
+    const handleRecord = useCallback(async () => {
+      if (isRecording) {
+        await stopRecording();
+        setIsRecording(false);
+        setHasRecorded(true);
 
-  const handlePlayRecording = useCallback(() => {
-    if (audioUrl) {
-      const audio = new Audio(audioUrl);
-      audio.play();
-    }
-  }, [audioUrl]);
+        // 🔥 연습 완료 콜백 호출
+        if (hasListened && onComplete) {
+          onComplete(true);
+        }
+      } else {
+        await startRecording();
+        setIsRecording(true);
+      }
+    }, [isRecording, startRecording, stopRecording, hasListened, onComplete]);
 
-  return (
-    <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-      {/* 단어 표시 */}
-      <div className="text-center space-y-3">
-        <h2 className="text-3xl font-bold text-gray-900">{item.headword}</h2>
-        <p className="text-lg text-gray-600">{item.exampleEn}</p>
-        {item.exampleKo && (
-          <p className="text-sm text-gray-500">{item.exampleKo}</p>
-        )}
-      </div>
+    const handlePlayRecording = useCallback(() => {
+      if (audioUrl) {
+        const audio = new Audio(audioUrl);
+        audio.play();
+      }
+    }, [audioUrl]);
 
-      {/* 음성 재생 */}
-      <div className="text-center space-y-4">
-        <button
-          onClick={handleSpeak}
-          className={`flex items-center gap-2 mx-auto px-6 py-3 rounded-lg transition-colors ${
-            isSpeaking
-              ? "bg-red-100 text-red-700 hover:bg-red-200"
-              : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-          }`}
-        >
-          {isSpeaking ? (
-            <>
-              <Pause className="size-5" />
-              정지
-            </>
-          ) : (
-            <>
-              <Volume2 className="size-5" />
-              발음 듣기
-            </>
+    // ✅ 안전한 렌더링 - 객체 속성만 출력
+    return (
+      <div className="pronunciation-card p-6">
+        {/* 단어 표시 - 안전하게 속성 접근 */}
+        <div className="text-center mb-6">
+          <h3 className="text-3xl font-bold mb-2">
+            {item?.headword || "No word"}
+          </h3>
+          <p className="text-gray-600 mb-4">
+            {item?.definition || "No definition"}
+          </p>
+
+          {/* 예문 - 조건부 렌더링 */}
+          {item?.exampleEn && (
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <p className="text-blue-800 italic">"{item.exampleEn}"</p>
+              {item?.exampleKo && (
+                <p className="text-blue-600 text-sm mt-2">"{item.exampleKo}"</p>
+              )}
+            </div>
           )}
-        </button>
-      </div>
-
-      {/* 녹음 섹션 */}
-      <div className="border-t pt-6 space-y-4">
-        <h3 className="text-lg font-semibold text-center">따라 말해보세요</h3>
-
-        {/* 파형 시각화 (녹음 중) */}
-        {isRecording && (
-          <div className="flex justify-center">
-            <WaveformVisualizer isActive={isRecording} />
-          </div>
-        )}
-
-        {/* 녹음 버튼 */}
-        <div className="text-center">
-          <button
-            onClick={handleRecord}
-            className={`flex items-center gap-2 mx-auto px-6 py-3 rounded-full transition-all ${
-              isRecording
-                ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            {isRecording ? (
-              <>
-                <MicOff className="size-5" />
-                녹음 중지
-              </>
-            ) : (
-              <>
-                <Mic className="size-5" />
-                녹음 시작
-              </>
-            )}
-          </button>
         </div>
 
-        {/* 녹음 재생 */}
+        {/* 듣기 버튼 */}
+        <button
+          onClick={handleSpeak}
+          disabled={isSpeaking}
+          className={`w-full py-4 mb-4 rounded-lg font-semibold transition-colors ${
+            isSpeaking
+              ? "bg-blue-100 text-blue-700"
+              : hasListened
+              ? "bg-green-500 text-white hover:bg-green-600"
+              : "bg-blue-500 text-white hover:bg-blue-600"
+          }`}
+        >
+          <div className="flex items-center justify-center gap-2">
+            <Volume2 size={20} className={isSpeaking ? "animate-pulse" : ""} />
+            {isSpeaking ? "재생 중..." : hasListened ? "다시 듣기" : "🔊 듣기"}
+          </div>
+        </button>
+
+        {/* 녹음 버튼 */}
+        <button
+          onClick={handleRecord}
+          disabled={!hasListened}
+          className={`w-full py-4 mb-4 rounded-lg font-semibold transition-colors ${
+            isRecording
+              ? "bg-red-500 text-white animate-pulse"
+              : hasRecorded
+              ? "bg-green-500 text-white hover:bg-green-600"
+              : hasListened
+              ? "bg-orange-500 text-white hover:bg-orange-600"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
+        >
+          <div className="flex items-center justify-center gap-2">
+            {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
+            {isRecording
+              ? "🎤 녹음 중단"
+              : hasRecorded
+              ? "🎤 다시 녹음"
+              : "🎤 녹음 시작"}
+          </div>
+        </button>
+
+        {/* 녹음 재생 버튼 */}
         {hasRecorded && audioUrl && (
-          <div className="text-center">
-            <button
-              onClick={handlePlayRecording}
-              className="flex items-center gap-2 mx-auto px-4 py-2 text-sm text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-            >
-              <Play className="size-4" />내 발음 듣기
-            </button>
+          <button
+            onClick={handlePlayRecording}
+            className="w-full py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-semibold"
+          >
+            <div className="flex items-center justify-center gap-2">
+              <Play size={18} />내 녹음 재생
+            </div>
+          </button>
+        )}
+
+        {/* 완료 상태 */}
+        {hasListened && hasRecorded && (
+          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+            <CheckCircle size={24} className="mx-auto text-green-500 mb-2" />
+            <p className="text-green-800 font-semibold">발음 연습 완료!</p>
           </div>
         )}
       </div>
+    );
+  }
+);
 
-      {/* 네비게이션 */}
-      <div className="flex justify-between pt-6">
-        <button
-          onClick={onPrevious}
-          className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          이전
-        </button>
-        <button
-          onClick={onNext}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          다음
-        </button>
-      </div>
-    </div>
-  );
-}
+PronunciationCard.displayName = "PronunciationCard";

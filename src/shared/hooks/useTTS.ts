@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { logger } from "@/shared/utils/logger";
 
 interface TTSOptions {
   lang?: string;
@@ -17,7 +18,7 @@ export function useTTS() {
   const speak = useCallback(
     (text: string, options: TTSOptions = {}) => {
       if (!isSupported) {
-        console.warn("Speech synthesis not supported");
+        logger.warn("Speech synthesis not supported");
         return;
       }
 
@@ -32,7 +33,7 @@ export function useTTS() {
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = (e) => {
-        console.error("TTS Error:", e);
+        logger.error("TTS Error:", e);
         setIsSpeaking(false);
       };
 

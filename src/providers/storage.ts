@@ -17,6 +17,7 @@ export interface StorageData {
   lastUpdated: string;
   version: number; // 버전 관리 추가
 }
+import { logger } from "@/shared/utils/logger";
 
 const STORAGE_KEY = "mypattern-app-data";
 const CURRENT_VERSION = 1;
@@ -30,7 +31,7 @@ export function loadFromStorage(): Partial<StorageData> | null {
 
     // 버전 체크 및 마이그레이션
     if (parsed.version !== CURRENT_VERSION) {
-      console.log("Storage version mismatch, applying migration...");
+      logger.log("Storage version mismatch, applying migration...");
       return migrateData(parsed);
     }
 
@@ -45,7 +46,7 @@ export function loadFromStorage(): Partial<StorageData> | null {
       version: CURRENT_VERSION,
     };
   } catch (error) {
-    console.error("Failed to load from storage:", error);
+    logger.error("Failed to load from storage:", error);
     return null;
   }
 }
@@ -65,7 +66,7 @@ export function saveToStorage(data: Partial<StorageData>): boolean {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     return true;
   } catch (error) {
-    console.error("Failed to save to storage:", error);
+    logger.error("Failed to save to storage:", error);
     return false;
   }
 }
@@ -75,7 +76,7 @@ export function clearStorage(): boolean {
     localStorage.removeItem(STORAGE_KEY);
     return true;
   } catch (error) {
-    console.error("Failed to clear storage:", error);
+    logger.error("Failed to clear storage:", error);
     return false;
   }
 }
