@@ -1,12 +1,17 @@
+/* src/index.css */
 @import "tailwindcss";
 
-/* 커스텀 유틸리티 (4.0 새 문법) */
+/* 4.0 유틸 샘플 */
 @utility tab-4 {
   tab-size: 4;
 }
-
 @utility flex-center {
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+/* iOS safe-area 하단 패딩 */
+@utility safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom));
 }

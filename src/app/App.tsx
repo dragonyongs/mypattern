@@ -1,43 +1,78 @@
+// src/app/App.tsx
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider } from "@/providers/AppProvider";
+import { MainLayout } from "@/app/layouts/MainLayout";
 import { LandingPage } from "@/pages/LandingPage";
-import { LevelTestPage } from "@/pages/onboarding/LevelTestPage";
-import { LevelResultPage } from "@/pages/onboarding/LevelResultPage";
-import { InterestsPage } from "@/pages/onboarding/InterestsPage";
-import { LearnPage } from "@/pages/LearnPage";
-import { BuildPage } from "@/pages/BuildPage";
-import { ReviewPage } from "@/pages/ReviewPage";
-import { LibraryPage } from "@/pages/LibraryPage";
-import { SettingsPage } from "@/pages/SettingsPage";
-import { MainLayout } from "./layouts/MainLayout";
-import "../index.css";
+import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
+import { RequirePack } from "@/shared/components/RequirePack";
+import { useAuthStore } from "@/stores/authStore";
 
-function App() {
-  return (
-    <AppProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/landing" element={<LandingPage />} />
-          <Route path="/onboarding/level-test" element={<LevelTestPage />} />
-          <Route
-            path="/onboarding/level-result"
-            element={<LevelResultPage />}
-          />{" "}
-          {/* 추가 */}
-          <Route path="/onboarding/interests" element={<InterestsPage />} />
-          <Route path="/app/*" element={<MainLayout />}>
-            <Route path="learn" element={<LearnPage />} />
-            <Route path="build" element={<BuildPage />} />
-            <Route path="review" element={<ReviewPage />} />
-            <Route path="library" element={<LibraryPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AppProvider>
-  );
+const PacksPage = React.lazy(() => import("@/pages/PacksPage"));
+const LearnPage = React.lazy(() => import("@/pages/LearnPage"));
+const ReviewPage = React.lazy(() => import("@/pages/ReviewPage"));
+const SettingsPage = React.lazy(() => import("@/pages/SettingsPage"));
+
+function AppHomeRedirect() {
+  const { user, loading, isAuthenticated } = useAuthStore();
+
+  // ✅ 내장 hasHydrated 메서드로 재수화 완료 체크
+  const hasHydrated = useAuthStore.persist.hasHydrated();
+
+  if (!hasHydrated || loading) return <div className="p-6">Loading...</div>;
+  if (!isAuthenticated) return <Navigate to="/landing" replace />;
+
+  const to = user?.selectedPackId ? "/app/learn/day/1" : "/app/packs";
+  return <Navigate to={to} replace />;
 }
 
-export default App;
+export default function App() {
+  return (
+    <React.Suspense fallback={<div className="p-6">Loading...</div>}>
+      <AppProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/landing" element={<LandingPage />} />
+            <Route
+              path="/app/*"
+              element={
+                <ProtectedRoute requireAuth>
+                  <MainLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<AppHomeRedirect />} />
+              <Route path="packs" element={<PacksPage />} />
+              <Route
+                path="learn"
+                element={
+                  <RequirePack>
+                    <LearnPage />
+                  </RequirePack>
+                }
+              />
+              <Route
+                path="learn/day/:day"
+                element={
+                  <RequirePack>
+                    <LearnPage />
+                  </RequirePack>
+                }
+              />
+              <Route
+                path="review"
+                element={
+                  <RequirePack>
+                    <ReviewPage />
+                  </RequirePack>
+                }
+              />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/landing" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AppProvider>
+    </React.Suspense>
+  );
+}

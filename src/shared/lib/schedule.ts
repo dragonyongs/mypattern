@@ -1,85 +1,103 @@
-// src/schedule.ts
-import { addDays, parseISO, formatISO, isToday, isPast } from "date-fns";
-import type { Sentence, SentenceStatus, ReviewInterval } from "@/entities";
+// src/shared/lib/schedule.ts
+import type { Sentence, SentenceStatus } from "@/entities";
 
 /**
- * 상태별 복습 간격(reviewInterval)에서 일수(days)를 가져와 다음 기한 날짜(YYYY-MM-DD)를 계산
+ * 오늘 복습해야 할 문장들을 생성합니다.
+ * @param sentences 전체 문장 배열
+ * @returns 오늘 복습해야 할 문장들
+ */
+export function generateDailyQueue(sentences: Sentence[]): Sentence[] {
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD 형식
+
+  return sentences.filter((sentence) => {
+    // 완전히 숙달되지 않았거나 (red, yellow)
+    // 숙달되었어도 복습 날짜가 도래한 경우
+    return sentence.status !== "green" || sentence.nextDue <= today;
+  });
+}
+
+/**
+ * 문장 상태에 따른 다음 복습 날짜를 계산합니다.
+ * @param status 현재 문장 상태
+ * @param reviewInterval 복습 간격 설정
+ * @returns 다음 복습 날짜 (YYYY-MM-DD)
  */
 export function calculateNextDue(
   status: SentenceStatus,
-  reviewInterval: ReviewInterval
+  reviewInterval: { red: number; yellow: number; green: number }
 ): string {
-  const days = reviewInterval[status];
-  const nextDate = addDays(new Date(), days);
-  return formatISO(nextDate, { representation: "date" }); // YYYY-MM-DD
+  const today = new Date();
+  const daysToAdd = reviewInterval[status];
+
+  const nextDate = new Date(today);
+  nextDate.setDate(today.getDate() + daysToAdd);
+
+  return nextDate.toISOString().split("T")[0];
 }
 
 /**
- * 오늘 기준으로 기한이 도래한 문장들만 우선순위(빨>노>초)와 더 오래된 순으로 정렬해 반환
- */
-export function generateDailyQueue(sentences: Sentence[]): Sentence[] {
-  const today = formatISO(new Date(), { representation: "date" });
-  return sentences
-    .filter((sentence) => sentence.nextDue <= today)
-    .sort((a, b) => {
-      // 우선순위: red > yellow > green
-      const statusPriority: Record<SentenceStatus, number> = {
-        red: 3,
-        yellow: 2,
-        green: 1,
-      };
-      const aPriority = statusPriority[a.status];
-      const bPriority = statusPriority[b.status];
-      if (aPriority !== bPriority) {
-        return bPriority - aPriority; // 높은 우선순위 먼저
-      }
-      // 동일 우선순위면 nextDue가 더 오래된 것 먼저
-      return new Date(a.nextDue).getTime() - new Date(b.nextDue).getTime();
-    });
-}
-
-/**
- * 정답/오답 결과에 따라 박스 상태를 갱신하고, 연습 카운트/마지막 연습/다음 기한을 업데이트
+ * 문장 상태를 업데이트합니다.
+ * @param sentence 업데이트할 문장
+ * @param correct 정답 여부
+ * @param reviewInterval 복습 간격 설정
+ * @returns 업데이트된 문장
  */
 export function updateSentenceStatus(
   sentence: Sentence,
   correct: boolean,
-  reviewInterval: ReviewInterval
+  reviewInterval: { red: number; yellow: number; green: number }
 ): Sentence {
-  let newStatus: SentenceStatus = sentence.status;
+  const now = new Date().toISOString();
+  let newStatus: SentenceStatus;
 
+  // SRS 로직: 정답이면 단계 상승, 오답이면 red로 돌아감
   if (correct) {
-    // 정답: red -> yellow -> green (green은 유지)
-    if (sentence.status === "red") newStatus = "yellow";
-    else if (sentence.status === "yellow") newStatus = "green";
+    switch (sentence.status) {
+      case "red":
+        newStatus = "yellow";
+        break;
+      case "yellow":
+        newStatus = "green";
+        break;
+      case "green":
+        newStatus = "green"; // 유지
+        break;
+    }
   } else {
-    // 오답: 항상 red로 강등
-    newStatus = "red";
+    newStatus = "red"; // 오답시 처음부터 다시
   }
 
   return {
     ...sentence,
     status: newStatus,
     practiceCount: sentence.practiceCount + 1,
-    lastPracticed: new Date().toISOString(),
+    lastPracticed: now,
     nextDue: calculateNextDue(newStatus, reviewInterval),
   };
 }
 
 /**
- * 오늘 기준으로 연체인지 여부
+ * 복습 통계를 계산합니다.
+ * @param sentences 문장 배열
+ * @returns 상태별 통계
  */
-export function isOverdue(sentence: Sentence): boolean {
-  const dueDate = parseISO(sentence.nextDue);
-  return isPast(dueDate) && !isToday(dueDate);
-}
+export function getReviewStats(sentences: Sentence[]) {
+  const stats = {
+    red: 0,
+    yellow: 0,
+    green: 0,
+    total: sentences.length,
+  };
 
-/**
- * 다음 복습까지 남은 일수(오늘 포함하여 올림 처리)
- */
-export function getDaysUntilDue(sentence: Sentence): number {
-  const dueDate = parseISO(sentence.nextDue);
-  const today = new Date();
-  const diffTime = dueDate.getTime() - today.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  sentences.forEach((sentence) => {
+    stats[sentence.status]++;
+  });
+
+  const dailyQueue = generateDailyQueue(sentences);
+
+  return {
+    ...stats,
+    dueToday: dailyQueue.length,
+    masteryRate: Math.round((stats.green / stats.total) * 100) || 0,
+  };
 }
