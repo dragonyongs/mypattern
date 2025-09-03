@@ -16,7 +16,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
 import type { StudyMode, PackData } from "@/types";
-
+import { CompletionModal } from "../shared/components/CompletionModal";
 interface StudyInterfaceProps {
   pack: PackData;
   currentDay: number;
@@ -32,7 +32,17 @@ export const StudyInterface: React.FC<StudyInterfaceProps> = ({
 }) => {
   const navigate = useNavigate();
   const { setCurrentDay } = useAppStore();
-  const { getDayProgress, isModeAvailable } = useStudyProgressStore();
+  const { getDayProgress, isModeAvailable, getSettings } =
+    useStudyProgressStore();
+  const settings = useMemo(() => getSettings(pack.id), [pack.id, getSettings]);
+  const [completion, setCompletion] = useState<{
+    open: boolean;
+    completed: StudyMode | null;
+  }>({
+    open: false,
+    completed: null,
+  });
+  const [pendingMode, setPendingMode] = useState<StudyMode | null>(null);
   const { dayProgress, markModeCompleted, isModeAccessible } = useDayProgress(
     pack.id,
     currentDay
@@ -83,39 +93,74 @@ export const StudyInterface: React.FC<StudyInterfaceProps> = ({
   const handleModeChange = useCallback(
     (mode: StudyMode) => {
       const modeData = studyModes.find((m) => m.key === mode);
-      if (modeData?.available) {
-        onModeChange(mode);
+      if (!modeData) return;
+
+      if (modeData.completed) {
+        // ✅ 추가
+        setPendingMode(mode);
+        setCompletion({ open: true, completed: mode });
+        return;
       }
+      if (modeData.available) onModeChange(mode);
     },
     [studyModes, onModeChange]
   );
 
+  const nextModeMap: Record<StudyMode, StudyMode | null> = useMemo(
+    () => ({
+      vocab: "sentence",
+      sentence: "workbook",
+      workbook: null,
+    }),
+    []
+  );
+
   // 🎯 각 학습 모드 완료시 호출되는 핸들러
+
   const handleModeComplete = useCallback(
     (completedMode: StudyMode) => {
-      const nextModeMap: Record<StudyMode, StudyMode | null> = {
-        vocab: "sentence",
-        sentence: "workbook",
-        workbook: null,
-      };
-
+      if (completion.open) return; // 이미 열려 있으면 무시
+      // 기존: 즉시 onModeChange(nextMode) → 제거
       const nextMode = nextModeMap[completedMode];
-      if (nextMode) {
+
+      // 자동 진행이 필요한 경우에만 즉시 전환(옵션)
+      if (settings?.autoProgressEnabled && nextMode) {
         onModeChange(nextMode);
-      } else {
-        // 워크북까지 완료시 다음 날로 이동
-        const nextDay = currentDay + 1;
-        if (nextDay <= 14) {
-          setCurrentDay(nextDay);
-          onModeChange("vocab");
-          navigate("/calendar");
-        } else {
-          navigate("/calendar");
-        }
+        return;
       }
+
+      // 기본: 모달만 띄우고 현재 모드 유지
+      setCompletion({ open: true, completed: completedMode });
     },
-    [currentDay, setCurrentDay, onModeChange, navigate]
+    [completion.open, nextModeMap, onModeChange, settings]
   );
+
+  const handleConfirmNext = useCallback(() => {
+    if (!completion.completed) return;
+    const nextMode = nextModeMap[completion.completed];
+    setCompletion({ open: false, completed: null });
+
+    if (nextMode) {
+      onModeChange(nextMode);
+    } else {
+      // 워크북 완료 후 다음 날 이동 로직은 유지
+      const nextDay = currentDay + 1;
+      if (nextDay <= 14) {
+        setCurrentDay(nextDay);
+        onModeChange("vocab");
+        navigate("/calendar");
+      } else {
+        navigate("/calendar");
+      }
+    }
+  }, [
+    completion,
+    nextModeMap,
+    currentDay,
+    setCurrentDay,
+    onModeChange,
+    navigate,
+  ]);
 
   if (!dayData) {
     return (
@@ -153,9 +198,9 @@ export const StudyInterface: React.FC<StudyInterfaceProps> = ({
       case "vocab":
         return (
           <VocabularyMode
-            vocabularies={dayData.vocabularies || []}
+            vocabularies={dayData?.vocabularies || []}
             dayNumber={currentDay}
-            category={dayData.category || dayData.title || `Day ${currentDay}`}
+            category={dayData?.category}
             packId={pack.id}
             onComplete={() => handleModeComplete("vocab")}
           />
@@ -163,11 +208,13 @@ export const StudyInterface: React.FC<StudyInterfaceProps> = ({
       case "sentence":
         return (
           <SentenceMode
-            sentences={dayData.sentences || []}
+            sentences={(dayData as any)?.sentences ?? []} // ✅ 배열 보장
             dayNumber={currentDay}
-            category={dayData.category || dayData.title || `Day ${currentDay}`}
-            packId={pack.id}
-            onComplete={() => handleModeComplete("sentence")}
+            category={
+              (dayData as any)?.category ?? (dayData as any)?.title ?? ""
+            }
+            packId={pack.id} // ✅ 공통 설정용
+            onComplete={() => handleModeComplete("sentence")} // ✅ 상위 모달
           />
         );
       case "workbook":
@@ -188,7 +235,7 @@ export const StudyInterface: React.FC<StudyInterfaceProps> = ({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
-      <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
+      <div className="bg-white sticky top-0 z-10 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <button
@@ -253,6 +300,33 @@ export const StudyInterface: React.FC<StudyInterfaceProps> = ({
 
       {/* 컨텐츠 */}
       <div className="max-w-4xl mx-auto px-4 py-6">{renderContent()}</div>
+
+      <CompletionModal
+        open={completion.open}
+        title={
+          completion.completed === "vocab"
+            ? "단어 학습 완료"
+            : completion.completed === "sentence"
+            ? "문장 학습 완료"
+            : "워크북 학습 완료"
+        }
+        description={
+          completion.completed === "vocab"
+            ? "문장 모드로 이동해 문맥 속에서 단어를 연결해 보세요."
+            : undefined
+        }
+        onConfirm={handleConfirmNext}
+        confirmText="다음으로"
+        onClose={() => {
+          // ✅ 기존 탭 UI 유지, 전환만 보류분 이행
+          if (pendingMode) onModeChange(pendingMode);
+          setPendingMode(null);
+          setCompletion({ open: false, completed: null });
+        }}
+        cancelText={
+          completion.completed === "vocab" ? "단어 다시 보기" : "닫기"
+        }
+      />
     </div>
   );
 };
