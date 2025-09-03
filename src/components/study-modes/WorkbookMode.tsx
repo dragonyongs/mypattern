@@ -1,13 +1,6 @@
 // src/components/study-modes/WorkbookMode.tsx
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import {
-  CheckCircle,
-  XCircle,
-  RefreshCw,
-  Award,
-  ArrowRight,
-  Lightbulb,
-} from "lucide-react";
+import { CheckCircle, XCircle, ArrowRight, Lightbulb } from "lucide-react";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
 
 interface WorkbookItem {
@@ -29,7 +22,7 @@ interface WorkbookModeProps {
   onComplete?: () => void;
 }
 
-// 🎯 완료 모달 컴포넌트 정의
+// 🎯 완료 모달 컴포넌트
 const CompletionModal = ({
   isOpen,
   score,
@@ -51,60 +44,23 @@ const CompletionModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center shadow-2xl">
-        <div className="mb-6">
-          {isExcellent ? (
-            <Award className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-          ) : isGood ? (
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          ) : (
-            <RefreshCw className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-          )}
-
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">
-            워크북 완료!
-          </h2>
-
-          <div className="text-4xl font-bold mb-4">
-            <span
-              className={
-                isExcellent
-                  ? "text-yellow-600"
-                  : isGood
-                  ? "text-green-600"
-                  : "text-blue-600"
-              }
-            >
-              {percentage}%
-            </span>
-          </div>
-
-          <p className="text-gray-600 mb-4">
+      <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
+        <div className="text-center">
+          <div className="text-2xl font-bold mb-2">
             {score} / {totalQuestions} 정답
-          </p>
-
-          <p className="text-gray-700">
+          </div>
+          <p className="text-gray-600 mb-6">
             {isExcellent
               ? "🎉 훌륭합니다! 완벽하게 이해하셨네요!"
               : isGood
               ? "👍 잘하셨어요! 조금 더 연습해보세요."
               : "💪 다시 한 번 도전해보세요!"}
           </p>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-          >
-            검토하기
-          </button>
           <button
             onClick={onNext}
-            className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg w-full transition-colors"
           >
-            <ArrowRight className="w-4 h-4" />
-            다음으로
+            다른 날짜를 선택해주세요
           </button>
         </div>
       </div>
@@ -119,351 +75,243 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
   packId,
   onComplete,
 }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState("");
+  const [showResult, setShowResult] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [showResults, setShowResults] = useState<Record<string, boolean>>({});
-  const [showCompletion, setShowCompletion] = useState(false);
-  const [currentScore, setCurrentScore] = useState(0); // 🎯 실시간 점수 상태 추가
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
 
   const { markModeCompleted } = useDayProgress(packId, dayNumber);
 
-  const currentItem = workbook[currentIndex];
+  // 🎯 정답 가져오기 로직
+  const getCorrectAnswer = useCallback((item: WorkbookItem): string => {
+    return item.correctAnswer || item.answer || "";
+  }, []);
 
-  // 🎯 실시간 점수 계산
-  const score = useMemo(() => {
-    return Object.entries(answers).reduce((acc, [itemId, answer]) => {
-      const item = workbook.find((w) => w.id === itemId);
-      if (item && (answer === item.correctAnswer || answer === item.answer)) {
-        return acc + 1;
-      }
-      return acc;
+  // 🎯 점수 계산 (모달에서만 사용)
+  const currentScore = useMemo(() => {
+    return Object.entries(answers).reduce((score, [questionId, userAnswer]) => {
+      const question = workbook.find((q) => q.id === questionId);
+      if (!question) return score;
+
+      const correctAnswer = getCorrectAnswer(question);
+      return score + (correctAnswer === userAnswer ? 1 : 0);
     }, 0);
-  }, [answers, workbook]);
+  }, [answers, workbook, getCorrectAnswer]);
 
-  // 🎯 점수 변화 감지하여 실시간 업데이트
+  const currentQuestion = workbook[currentQuestionIndex];
+
+  // 🎯 이미 답변한 문제의 답안 표시
   useEffect(() => {
-    setCurrentScore(score);
-  }, [score]);
+    if (currentQuestion) {
+      const savedAnswer = answers[currentQuestion.id];
+      if (savedAnswer) {
+        // ✅ 이미 답변한 문제 → 답안 복원
+        setSelectedAnswer(savedAnswer);
+        setShowResult(true);
+      } else {
+        // ✅ 새 문제 → 깔끔하게 초기화
+        setSelectedAnswer("");
+        setShowResult(false);
+      }
+    }
+  }, [currentQuestionIndex, currentQuestion, answers]);
 
-  const percentage = useMemo(() => {
-    return workbook.length > 0
-      ? Math.round((score / workbook.length) * 100)
-      : 0;
-  }, [score, workbook.length]);
+  // 🎯 답안 제출 로직
+  const handleAnswerSubmit = useCallback(() => {
+    if (!currentQuestion || !selectedAnswer) return;
+    setAnswers((prev) => ({
+      ...prev,
+      [currentQuestion.id]: selectedAnswer,
+    }));
+    setShowResult(true);
+  }, [currentQuestion, selectedAnswer]);
 
-  const isCompleted = useMemo(() => {
-    return (
-      Object.keys(answers).length === workbook.length && workbook.length > 0
-    );
-  }, [answers, workbook.length]);
-
-  // 🎯 정답 선택 핸들러 (즉시 점수 반영)
-  const handleAnswer = useCallback((itemId: string, answer: string) => {
-    setAnswers((prev) => {
-      const newAnswers = { ...prev, [itemId]: answer };
-
-      // 🔥 정답 확인 즉시 결과 표시
-      setShowResults((prevResults) => ({ ...prevResults, [itemId]: true }));
-
-      return newAnswers;
-    });
-  }, []);
-
-  // 🎯 다음 문제로 이동
+  // 🎯 다음 문제로 이동 로직
   const handleNext = useCallback(() => {
-    if (currentIndex < workbook.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
+    if (currentQuestionIndex < workbook.length - 1) {
+      setCurrentQuestionIndex((prev) => prev + 1);
+      setSelectedAnswer("");
+      setShowResult(false);
+    } else {
+      setShowCompletionModal(true);
+      markModeCompleted(dayNumber, "workbook");
+      onComplete?.();
     }
-  }, [currentIndex, workbook.length]);
+  }, [
+    currentQuestionIndex,
+    workbook.length,
+    dayNumber,
+    markModeCompleted,
+    onComplete,
+  ]);
 
-  // 🎯 이전 문제로 이동
-  const handlePrev = useCallback(() => {
-    if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
-    }
-  }, [currentIndex]);
-
-  // 🎯 완료 처리
-  const handleComplete = useCallback(() => {
-    markModeCompleted(dayNumber, "workbook");
-    setShowCompletion(true);
-  }, [markModeCompleted, dayNumber]);
-
-  // 🎯 완료 조건 체크 (점수 반영 후)
-  useEffect(() => {
-    if (isCompleted && !showCompletion) {
-      // 🔥 약간의 지연 후 완료 처리 (상태 업데이트 완료 대기)
-      const timer = setTimeout(() => {
-        handleComplete();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isCompleted, showCompletion, handleComplete]);
-
-  // 🎯 완료 모달 핸들러들
-  const handleModalNext = useCallback(() => {
-    setShowCompletion(false);
-    onComplete?.(); // 부모 컴포넌트에게 완료 알림
-  }, [onComplete]);
-
-  const handleModalClose = useCallback(() => {
-    setShowCompletion(false);
-    // 검토 모드로 돌아가거나 그대로 유지
-  }, []);
-
-  // 정답 확인 함수
-  const isCorrect = useCallback(
-    (itemId: string, answer: string) => {
-      const item = workbook.find((w) => w.id === itemId);
-      return item && (answer === item.correctAnswer || answer === item.answer);
+  // 🎯 옵션 선택 로직
+  const handleOptionClick = useCallback(
+    (option: string) => {
+      if (!showResult) {
+        setSelectedAnswer(option);
+      }
     },
-    [workbook]
+    [showResult]
   );
 
-  if (!workbook.length) {
+  if (!currentQuestion) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] px-4">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-600 mb-2">
-            Day {dayNumber}에 워크북 문제가 없습니다
-          </h3>
-          <p className="text-gray-500">다른 날짜를 선택해주세요</p>
-        </div>
+      <div className="text-center py-8">
+        <p className="text-gray-600">문제를 로드할 수 없습니다.</p>
       </div>
     );
   }
 
-  if (!currentItem) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">로딩 중...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const questionText = currentItem.sentence || currentItem.question || "";
-  const correctAnswer = currentItem.correctAnswer || currentItem.answer || "";
-  const userAnswer = answers[currentItem.id];
-  const showResult = showResults[currentItem.id];
+  const correctAnswer = getCorrectAnswer(currentQuestion);
+  const isCorrect = selectedAnswer === correctAnswer;
 
   return (
-    <>
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* 헤더 */}
-        <div className="text-center mb-6">
-          <h1 className="text-xl font-bold text-gray-800 mb-2">
-            Day {dayNumber} - {category}
-          </h1>
-          <p className="text-sm text-gray-600 mb-4">
-            빈칸에 들어갈 알맞은 단어를 선택하세요
-          </p>
+    <div className="max-w-2xl mx-auto p-4 space-y-6">
+      {/* 🎯 진행률 표시 */}
+      <div className="text-center">
+        <div className="text-sm text-gray-500 mb-2">
+          문제 {currentQuestionIndex + 1} / {workbook.length}
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div
+            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+            style={{
+              width: `${
+                (Object.keys(answers).length / workbook.length) * 100
+              }%`,
+            }}
+          />
+        </div>
+      </div>
 
-          {/* 🎯 실시간 진행률 바 */}
-          <div className="w-full max-w-md mx-auto bg-gray-200 rounded-full h-2 mb-2">
-            <div
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-              style={{
-                width: `${
-                  (Object.keys(answers).length / workbook.length) * 100
-                }%`,
-              }}
-            />
-          </div>
-          <p className="text-xs text-gray-500">
-            {Object.keys(answers).length} / {workbook.length} 문제 완료
-          </p>
+      {/* 🎯 문제 카드 */}
+      <div className="bg-white rounded-lg p-6 shadow-sm border">
+        <div className="text-lg font-medium text-gray-800 mb-6">
+          {currentQuestion.sentence?.split("_____").map((part, index) => (
+            <React.Fragment key={index}>
+              {part}
+              {index === 0 && (
+                <span
+                  className={`inline-block min-w-[100px] mx-2 px-3 py-1 border-2 rounded font-bold transition-colors
+                  ${
+                    showResult
+                      ? isCorrect
+                        ? "border-green-500 bg-green-50 text-green-700"
+                        : "border-red-500 bg-red-50 text-red-700"
+                      : "border-blue-300 bg-blue-50"
+                  }
+                `}
+                >
+                  {showResult && selectedAnswer ? selectedAnswer : "_____"}
+                </span>
+              )}
+            </React.Fragment>
+          )) || currentQuestion.question}
         </div>
 
-        {/* 문제 카드 */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8 max-w-2xl mx-auto">
-          <div className="text-center mb-6">
-            <div className="text-sm text-gray-500 mb-2">
-              문제 {currentIndex + 1} / {workbook.length}
-            </div>
-
-            {/* 문제 문장 */}
-            <div className="text-xl font-medium text-gray-800 leading-relaxed mb-6">
-              {questionText.split("_____").map((part, index) => (
-                <span key={index}>
-                  {part}
-                  {index === 0 && (
-                    <span
-                      className={`inline-block min-w-[120px] mx-2 px-3 py-1 rounded-lg border-2 font-semibold ${
-                        showResult
-                          ? isCorrect(currentItem.id, userAnswer!)
-                            ? "bg-green-100 border-green-500 text-green-700"
-                            : "bg-red-100 border-red-500 text-red-700"
-                          : "bg-gray-100 border-gray-300 text-gray-500"
-                      }`}
-                    >
-                      {showResult ? userAnswer : "_____"}
-                    </span>
-                  )}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* 선택지 */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            {currentItem.options.map((option, index) => (
-              <button
-                key={index}
-                onClick={() => handleAnswer(currentItem.id, option)}
-                disabled={showResult}
-                className={`p-3 text-left border rounded-lg transition-all font-medium ${
-                  userAnswer === option
+        {/* 🎯 선택지 */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {currentQuestion.options.map((option) => (
+            <button
+              key={option}
+              onClick={() => handleOptionClick(option)}
+              disabled={showResult}
+              className={`
+                p-3 text-left border-2 rounded-lg transition-all font-medium
+                ${
+                  selectedAnswer === option
                     ? showResult
-                      ? isCorrect(currentItem.id, option)
+                      ? isCorrect
                         ? "border-green-500 bg-green-50 text-green-700"
                         : "border-red-500 bg-red-50 text-red-700"
                       : "border-blue-500 bg-blue-50 text-blue-700"
                     : showResult && option === correctAnswer
                     ? "border-green-500 bg-green-50 text-green-700"
                     : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
-                } ${showResult ? "cursor-not-allowed" : "cursor-pointer"}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span>{option}</span>
-                  {showResult &&
-                    userAnswer === option &&
-                    (isCorrect(currentItem.id, option) ? (
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <XCircle className="w-5 h-5 text-red-600" />
-                    ))}
-                  {showResult &&
-                    option === correctAnswer &&
-                    userAnswer !== option && (
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                    )}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* 결과 및 설명 */}
-          {showResult && (
-            <div
-              className={`p-4 rounded-lg mb-4 ${
-                isCorrect(currentItem.id, userAnswer!)
-                  ? "bg-green-100 border border-green-300"
-                  : "bg-red-100 border border-red-300"
-              }`}
+                }
+                ${showResult ? "cursor-default" : "cursor-pointer"}
+              `}
             >
-              <div className="flex items-center gap-2 mb-2">
-                {isCorrect(currentItem.id, userAnswer!) ? (
-                  <>
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    <span className="font-medium text-green-800">
-                      정답입니다!
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="w-5 h-5 text-red-600" />
-                    <span className="font-medium text-red-800">
-                      틀렸습니다. 정답: {correctAnswer}
-                    </span>
-                  </>
+              {option}
+              {showResult && option === correctAnswer && (
+                <CheckCircle className="inline-block w-4 h-4 ml-2 text-green-600" />
+              )}
+              {showResult &&
+                selectedAnswer === option &&
+                option !== correctAnswer && (
+                  <XCircle className="inline-block w-4 h-4 ml-2 text-red-600" />
                 )}
-              </div>
-              <div className="flex items-start gap-2 text-sm">
-                <Lightbulb className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <span className="font-medium text-blue-800">설명</span>
-                  <p className="text-gray-700 mt-1">
-                    {currentItem.explanation}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+            </button>
+          ))}
         </div>
 
-        {/* 네비게이션 */}
-        <div className="flex items-center justify-center gap-4 mb-6">
-          <button
-            onClick={handlePrev}
-            disabled={currentIndex === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors"
+        {/* 🎯 설명 표시 */}
+        {showResult && (
+          <div
+            className={`mt-4 p-4 rounded-lg ${
+              isCorrect ? "bg-green-50" : "bg-orange-50"
+            }`}
           >
-            이전
-          </button>
+            <div className="flex items-start gap-2">
+              <CheckCircle
+                className={`w-5 h-5 mt-0.5 ${
+                  isCorrect ? "text-green-600" : "text-orange-600"
+                }`}
+              />
+              <div>
+                <p className="font-medium text-gray-700">
+                  {isCorrect ? "정답입니다!" : "아쉽네요!"}
+                </p>
+                <p className="text-gray-600 text-sm mt-1">
+                  {currentQuestion.explanation}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
-          {currentIndex < workbook.length - 1 ? (
+        {/* 🎯 버튼 영역 - 점수 표시 제거 */}
+        <div className="flex justify-end items-center mt-6">
+          {!showResult ? (
             <button
-              onClick={handleNext}
-              disabled={!showResult}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
+              onClick={handleAnswerSubmit}
+              disabled={!selectedAnswer}
+              className={`
+                px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2
+                ${
+                  selectedAnswer
+                    ? "bg-blue-500 text-white hover:bg-blue-600"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }
+              `}
             >
-              다음
+              확인
             </button>
           ) : (
             <button
-              onClick={handleComplete}
-              disabled={!isCompleted}
-              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-600 transition-colors"
+              onClick={handleNext}
+              className="px-6 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors flex items-center gap-2"
             >
-              <CheckCircle className="w-4 h-4" />
-              완료
+              {currentQuestionIndex < workbook.length - 1 ? "다음" : "완료"}
+              <ArrowRight className="w-4 h-4" />
             </button>
           )}
         </div>
-
-        {/* 🎯 실시간 점수 표시 */}
-        <div className="bg-white rounded-xl p-6 shadow-lg max-w-md mx-auto">
-          <div className="text-center">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              현재 점수
-            </h3>
-            <div className="text-4xl font-bold mb-2">
-              <span
-                className={
-                  currentScore === workbook.length
-                    ? "text-green-600"
-                    : currentScore >= workbook.length * 0.8
-                    ? "text-blue-600"
-                    : "text-orange-600"
-                }
-              >
-                {percentage}%
-              </span>
-            </div>
-            <p className="text-gray-600 mb-4">
-              {currentScore} / {workbook.length} 정답
-            </p>
-
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div
-                className={`h-3 rounded-full transition-all duration-500 ${
-                  currentScore === workbook.length
-                    ? "bg-green-500"
-                    : currentScore >= workbook.length * 0.8
-                    ? "bg-blue-500"
-                    : "bg-orange-500"
-                }`}
-                style={{ width: `${percentage}%` }}
-              />
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* 완료 모달 */}
+      {/* 🎯 완료 모달 */}
       <CompletionModal
-        isOpen={showCompletion}
+        isOpen={showCompletionModal}
         score={currentScore}
         totalQuestions={workbook.length}
-        onNext={handleModalNext}
-        onClose={handleModalClose}
+        onNext={() => {
+          setShowCompletionModal(false);
+          onComplete?.();
+        }}
+        onClose={() => setShowCompletionModal(false)}
       />
-    </>
+    </div>
   );
 };

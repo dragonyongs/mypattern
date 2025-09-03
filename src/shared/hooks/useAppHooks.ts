@@ -1,4 +1,5 @@
 // src/shared/hooks/useAppHooks.ts
+import React, { useCallback } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
 import { StudySettings } from "@/types"; // 🎯 이미 정의된 타입 import
@@ -169,3 +170,39 @@ export function useCurrentPackStudyMode(day?: number) {
 
   return studyModeResult;
 }
+
+// 🎯 아이템별 학습 진행 상태 관리 훅
+export const useItemProgress = (packId: string, day: number) => {
+  const { setItemCompleted, getItemProgress, getCompletedItems } =
+    useStudyProgressStore();
+
+  const markItemCompleted = useCallback(
+    (itemId: string) => {
+      setItemCompleted(packId, day, itemId, true);
+    },
+    [packId, day, setItemCompleted]
+  );
+
+  const isItemCompleted = useCallback(
+    (itemId: string) => {
+      const progress = getItemProgress(packId, day, itemId);
+      return progress?.completed || false;
+    },
+    [packId, day, getItemProgress]
+  );
+
+  const getCompletedCount = useCallback(
+    (itemIds: string[]) => {
+      const completedItems = getCompletedItems(packId, day);
+      return itemIds.filter((id) => completedItems[id]?.completed).length;
+    },
+    [packId, day, getCompletedItems]
+  );
+
+  return {
+    markItemCompleted,
+    isItemCompleted,
+    getCompletedCount,
+    getCompletedItems: () => getCompletedItems(packId, day),
+  };
+};

@@ -11,6 +11,7 @@ import {
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
+import { useStudyProgressStore } from "@/stores/studyProgressStore";
 
 interface SentenceItem {
   id?: string;
@@ -25,6 +26,7 @@ interface SentenceModeProps {
   sentences: SentenceItem[];
   dayNumber: number;
   category: string;
+  packId?: string;
   onComplete?: () => void;
 }
 
@@ -95,15 +97,68 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   sentences,
   dayNumber,
   category,
+  packId,
   onComplete,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showTranslation, setShowTranslation] = useState(false);
   const [readSentences, setReadSentences] = useState<Set<number>>(new Set());
   const [showCompletion, setShowCompletion] = useState(false);
+  const { setItemCompleted, getCompletedItems } = useStudyProgressStore();
+  const [completedSentences, setCompletedSentences] = useState<Set<string>>(
+    new Set()
+  );
+  const [totalCompleted, setTotalCompleted] = useState(0);
 
   const { speak, isSpeaking } = useTTS();
-  const { markModeCompleted } = useDayProgress(dayNumber);
+  const { markModeCompleted } = useDayProgress(packId, dayNumber);
+
+  // 안정적인 sentenceId 배열 생성 (원본 id가 없으면 fallback id 사용)
+  const sentenceIds = useMemo(
+    () =>
+      sentences.map((s, i) =>
+        s.id && s.id.length > 0
+          ? s.id
+          : `pack:${packId ?? "unknown"}:day:${dayNumber}:sent:${i}`
+      ),
+    [sentences, packId, dayNumber]
+  );
+
+  const localBackupKey = useMemo(
+    () => `sp:${packId ?? "nopack"}:d${dayNumber}:sents`,
+    [packId, dayNumber]
+  );
+
+  // 컴포넌트 마운트 시 이전 상태 복원 (스토어 + localStorage 백업 병합)
+  useEffect(() => {
+    if (!sentenceIds || sentenceIds.length === 0) return;
+
+    // 1) 스토어에서 복원
+    const storeItems = getCompletedItems(packId, dayNumber) || {};
+    const fromStore = new Set(
+      sentenceIds.filter((id) => !!(storeItems[id] && storeItems[id].completed))
+    );
+
+    // 2) localStorage 백업 병합 (스토어가 비어있을 때 대비)
+    try {
+      const raw = localStorage.getItem(localBackupKey);
+      if (raw) {
+        const parsed: string[] = JSON.parse(raw);
+        parsed.forEach((id) => {
+          if (sentenceIds.includes(id)) fromStore.add(id);
+        });
+      }
+    } catch (e) {
+      console.warn("local backup read failed", e);
+    }
+
+    setCompletedSentences(fromStore);
+    setTotalCompleted(fromStore.size);
+
+    console.log(
+      `📖 문장 학습 상태 복원: ${fromStore.size}/${sentenceIds.length} 완료`
+    );
+  }, [sentenceIds, packId, dayNumber, getCompletedItems, localBackupKey]);
 
   const currentItem = useMemo(
     () => sentences[currentIndex],
@@ -120,7 +175,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
     return readSentences.size === sentences.length && sentences.length > 0;
   }, [readSentences.size, sentences.length]);
 
-  // Target Words 하이라이팅
+  // Target Words 하이라이팅 (기존 로직 유지)
   const renderHighlightedSentence = useCallback(
     (text: string, targetWords: string[]) => {
       if (!targetWords || targetWords.length === 0) {
@@ -144,55 +199,257 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
     []
   );
 
-  // 문장 보기 추적
+  // 로컬 백업 저장 유틸
+  const saveLocalBackup = useCallback(
+    (setOfIds: Set<string>) => {
+      try {
+        localStorage.setItem(
+          localBackupKey,
+          JSON.stringify(Array.from(setOfIds.values()))
+        );
+      } catch (e) {
+        console.warn("local backup save failed", e);
+      }
+    },
+    [localBackupKey]
+  );
+
+  useEffect(() => {
+    if (!sentenceIds || sentenceIds.length === 0) return;
+
+    // 1) store에서 복원 (유연하게 처리)
+    let mergedIds = new Set<string>();
+    try {
+      const storeItems = getCompletedItems(packId, dayNumber);
+      if (storeItems) {
+        if (Array.isArray(storeItems)) {
+          storeItems.forEach((id) => mergedIds.add(id));
+        } else if (typeof storeItems === "object") {
+          // storeItems가 { id: { completed: true } } 같은 형태일 수 있음
+          Object.keys(storeItems).forEach((k) => {
+            // 내부 값이 객체/불리언이면 존재하면 추가
+            if (storeItems[k]) mergedIds.add(k);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("getCompletedItems error", e);
+    }
+
+    // 2) local backup 병합 (구 포맷: 배열)
+    try {
+      const raw = localStorage.getItem(localBackupKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((id) => mergedIds.add(id));
+        } else if (parsed && typeof parsed === "object") {
+          // 혹시 object-map 형식으로 들어있다면 key들을 병합
+          Object.keys(parsed).forEach((k) => {
+            if (parsed[k]) mergedIds.add(k);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("local backup read failed", e);
+    }
+
+    // 3) 상태 반영: ID 집합 + 인덱스 집합(UI용)
+    setCompletedSentences(mergedIds);
+    setTotalCompleted(mergedIds.size);
+
+    const idxSet = new Set<number>();
+    mergedIds.forEach((id) => {
+      const idx = sentenceIds.indexOf(id);
+      if (idx >= 0) idxSet.add(idx);
+    });
+    setReadSentences(idxSet);
+    // console.log 복원 상태
+    console.log(
+      `Restored completed sentences: ${mergedIds.size} / ${sentenceIds.length}`
+    );
+  }, [sentenceIds, packId, dayNumber, getCompletedItems, localBackupKey]);
+
+  // 스토어 + 로컬 저장을 캡슐화
+  const persistCompleted = useCallback(
+    (sentenceId: string) => {
+      // 1) 스토어 저장 시도
+      try {
+        setItemCompleted(packId, dayNumber, sentenceId, true);
+      } catch (e) {
+        console.warn("setItemCompleted failed", e);
+      }
+
+      // 2) 로컬/상태 갱신 (함수형 업데이트)
+      setCompletedSentences((prev) => {
+        if (prev.has(sentenceId)) return prev;
+        const newSet = new Set(prev);
+        newSet.add(sentenceId);
+        saveLocalBackup(newSet);
+        setTotalCompleted(newSet.size);
+
+        // UI 인덱스도 갱신
+        const idx = sentenceIds.indexOf(sentenceId);
+        if (idx >= 0) {
+          setReadSentences((prevIdx) => {
+            const newIdx = new Set(prevIdx);
+            newIdx.add(idx);
+            return newIdx;
+          });
+        }
+
+        return newSet;
+      });
+    },
+    [packId, dayNumber, setItemCompleted, saveLocalBackup, sentenceIds]
+  );
+
+  // 🎯 문장 완료 처리 (함수형 업데이트로 stale closure 방지)
+  const handleSentenceCompleted = useCallback(
+    (sentenceId: string) => {
+      setCompletedSentences((prev) => {
+        if (prev.has(sentenceId)) return prev;
+        const newSet = new Set(prev);
+        newSet.add(sentenceId);
+
+        // 스토어/로컬에 저장
+        try {
+          setItemCompleted(packId, dayNumber, sentenceId, true);
+        } catch (e) {
+          console.warn("setItemCompleted failed", e);
+        }
+        saveLocalBackup(newSet);
+        setTotalCompleted(newSet.size);
+
+        // 모든 문장 완료 시 onComplete 호출
+        if (newSet.size === sentenceIds.length) {
+          console.log("🎉 모든 문장 학습 완료!");
+          onComplete?.();
+        }
+
+        return newSet;
+      });
+    },
+    [
+      packId,
+      dayNumber,
+      setItemCompleted,
+      saveLocalBackup,
+      onComplete,
+      sentenceIds.length,
+    ]
+  );
+
+  // 현재 문장 id 계산
+  const getSentenceIdByIndex = useCallback(
+    (index: number) => sentenceIds[index],
+    [sentenceIds]
+  );
+
+  // 현재 문장 완료 여부 확인
+  const currentSentence = sentences[currentIndex];
+  const currentSentenceId = currentSentence
+    ? getSentenceIdByIndex(currentIndex)
+    : undefined;
+  const isCurrentCompleted =
+    currentSentenceId && completedSentences.has(currentSentenceId);
+
+  // 문장 카드 클릭: 번역 토글 / 번역이 이미 보이면 완료 처리
+  const handleCardClick = useCallback(() => {
+    if (!showTranslation) {
+      setShowTranslation(true);
+      // 번역 보기 자체를 '읽음'으로 처리하고 싶다면 아래 주석 해제
+      if (currentSentenceId) {
+        // 읽음 상태 저장
+        persistCompleted(currentSentenceId);
+        setReadSentences((prev) => {
+          const s = new Set(prev);
+          s.add(currentIndex);
+          return s;
+        });
+      }
+    } else {
+      // 번역이 이미 보여진 상태에서 다시 클릭하면 '완료' 처리
+      if (currentSentenceId && !isCurrentCompleted) {
+        handleSentenceCompleted(currentSentenceId);
+      }
+    }
+  }, [
+    showTranslation,
+    currentIndex,
+    currentSentenceId,
+    isCurrentCompleted,
+    handleSentenceCompleted,
+    persistCompleted,
+  ]);
+
+  // 문장 보기(터치 등) - 읽음 처리 및 저장
   const handleSentenceView = useCallback(() => {
-    const newRead = new Set(readSentences);
-    newRead.add(currentIndex);
-    setReadSentences(newRead);
-    setShowTranslation(!showTranslation);
-  }, [currentIndex, readSentences, showTranslation]);
+    setReadSentences((prev) => {
+      const newRead = new Set(prev);
+      newRead.add(currentIndex);
+      return newRead;
+    });
+    setShowTranslation((prev) => !prev);
+
+    if (currentSentenceId) {
+      persistCompleted(currentSentenceId);
+    }
+  }, [currentIndex, currentSentenceId, persistCompleted]);
 
   // 네비게이션
   const goToNext = useCallback(() => {
-    if (currentIndex < sentences.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-      setShowTranslation(false);
-    }
-  }, [currentIndex, sentences.length]);
+    setCurrentIndex((prev) => {
+      const next = Math.min(prev + 1, sentences.length - 1);
+      return next;
+    });
+    setShowTranslation(false);
+  }, [sentences.length]);
 
   const goToPrev = useCallback(() => {
-    if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
-      setShowTranslation(false);
-    }
-  }, [currentIndex]);
+    setCurrentIndex((prev) => {
+      const next = Math.max(prev - 1, 0);
+      return next;
+    });
+    setShowTranslation(false);
+  }, []);
 
-  // 스와이프 제스처
+  // 스와이프
   const swipeHandlers = useSwipeGesture({
     onSwipeLeft: goToNext,
     onSwipeRight: goToPrev,
   });
 
-  // TTS 재생
+  // TTS 재생 -> 재생 시에도 읽음으로 처리
   const handleSpeak = useCallback(
     (text: string) => {
-      if (text) {
-        speak(text, { lang: "en-US", rate: 0.9 });
-        const newRead = new Set(readSentences);
-        newRead.add(currentIndex);
-        setReadSentences(newRead);
+      if (!text) return;
+      speak(text, { lang: "en-US", rate: 0.9 });
+      setReadSentences((prev) => {
+        const s = new Set(prev);
+        s.add(currentIndex);
+        return s;
+      });
+
+      if (currentSentenceId) {
+        persistCompleted(currentSentenceId);
       }
     },
-    [speak, readSentences, currentIndex]
+    [speak, currentIndex, currentSentenceId, persistCompleted]
   );
 
-  // 완료 처리
+  // 모드 전체 완료 처리 (UI용)
   const handleComplete = useCallback(() => {
-    markModeCompleted(dayNumber, "sentence");
+    // day progress에 완료 마킹 (store의 API에 따라 packId 포함 여부가 다를 수 있으니 맞춰 사용)
+    try {
+      markModeCompleted(dayNumber, "sentence");
+    } catch (e) {
+      console.warn("markModeCompleted failed", e);
+    }
     setShowCompletion(true);
   }, [markModeCompleted, dayNumber]);
 
-  // 완료 조건 체크
+  // 모든 문장 읽음 체크 -> 완료 처리
   useEffect(() => {
     if (isAllRead && !showCompletion) {
       handleComplete();
@@ -205,12 +462,16 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
     setShowTranslation(false);
     setReadSentences(new Set());
     setShowCompletion(false);
+    // 리뷰를 위해 스토어에서 완료 초기화할 필요가 있으면 추가 가능
   }, []);
 
+  // 다음 문장 (모달에서 워크북 이동 버튼 연결용)
   const handleNext = useCallback(() => {
-    setShowCompletion(false);
-    onComplete?.();
-  }, [onComplete]);
+    if (currentIndex < sentences.length - 1) {
+      setCurrentIndex((prev) => Math.min(prev + 1, sentences.length - 1));
+      setShowTranslation(false);
+    }
+  }, [currentIndex, sentences.length]);
 
   const handleClose = useCallback(() => {
     setShowCompletion(false);

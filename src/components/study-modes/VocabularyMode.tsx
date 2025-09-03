@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
-import { useAppStore } from "@/stores/appStore";
+// import { useAppStore } from "@/stores/appStore";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
 import { useStudySettings } from "@/shared/hooks/useAppHooks";
 
@@ -34,11 +34,11 @@ interface VocabularyModeProps {
   onComplete?: () => void;
 }
 
-interface StudySettings {
-  showMeaningEnabled: boolean;
-  autoProgressEnabled: boolean;
-  studyMode: "immersive" | "assisted"; // immersive = 의미 없이, assisted = 의미 도움
-}
+// interface StudySettings {
+//   showMeaningEnabled: boolean;
+//   autoProgressEnabled: boolean;
+//   studyMode: "immersive" | "assisted"; // immersive = 의미 없이, assisted = 의미 도움
+// }
 
 export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   vocabularies,
