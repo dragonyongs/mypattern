@@ -316,7 +316,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
       {/* 메인 컨텐츠 영역 */}
       <div className="flex-1 flex flex-col lg:flex-row">
         {/* 메인 카드 영역 */}
-        <div className="flex-1 flex flex-col items-center justify-center p-5 lg:p-8">
+        <div className="flex-1 flex flex-col items-center justify-start p-5 lg:p-8">
           <div className="w-full max-w-lg mx-auto">
             {/* 카드 상단 인디케이터 */}
             <div className="flex items-center justify-center mb-6">

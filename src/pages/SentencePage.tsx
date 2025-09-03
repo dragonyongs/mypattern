@@ -224,7 +224,7 @@ export default function SentencePage() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
       <div className="w-full max-w-none">
         {/* 헤더 */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="bg-white shadow-sm border-gray-200">
           <div className="max-w-4xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between mb-3">
               <h1 className="text-xl font-bold text-gray-900">
