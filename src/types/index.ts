@@ -58,7 +58,7 @@ export interface LearningMethod {
 
 export interface DayData {
   day: number;
-  type: "introduction" | "vocabulary";
+  type: "introduction" | "vocabularies";
   category?: string;
   page?: number;
   title: string;

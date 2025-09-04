@@ -7,7 +7,6 @@ import {
   Volume2,
   CheckCircle,
   RotateCcw,
-  Settings,
   Brain,
   Lightbulb,
   Eye,
@@ -23,9 +22,8 @@ import {
 } from "lucide-react";
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
-import { useDayProgress } from "@/shared/hooks/useAppHooks";
-import { useStudySettings } from "@/shared/hooks/useAppHooks";
-import { StudySettingsPanel } from "@/shared/components/StudySettingsPanel";
+import { useDayProgress, useStudySettings } from "@/shared/hooks/useAppHooks";
+import { StudySettingsPanel } from "@/shared/components/StudySettingsPanel"; // 수정된 패널 임포트
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
 
 interface VocabItem {
@@ -38,7 +36,7 @@ interface VocabItem {
 }
 
 interface VocabularyModeProps {
-  vocabularies: VocabItem[];
+  items: VocabItem[];
   dayNumber: number;
   category: string;
   packId: string;
@@ -46,7 +44,7 @@ interface VocabularyModeProps {
 }
 
 export const VocabularyMode: React.FC<VocabularyModeProps> = ({
-  vocabularies,
+  items,
   dayNumber,
   category,
   packId,
@@ -56,39 +54,26 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   const [showMeaning, setShowMeaning] = useState(false);
   const [studiedCards, setStudiedCards] = useState<Set<number>>(new Set());
   const [masteredCards, setMasteredCards] = useState<Set<number>>(new Set());
-  const [isSettingOpen, setIsSettingOpen] = useState(false);
 
   const { settings, updateSetting } = useStudySettings(packId);
   const { speak, isSpeaking } = useTTS();
   const { markModeCompleted } = useDayProgress(packId, dayNumber);
-
-  // 🔥 Zustand 스토어 추가
   const { setItemCompleted, getItemProgress } = useStudyProgressStore();
 
-  const currentItem = useMemo(
-    () => vocabularies[currentIndex],
-    [vocabularies, currentIndex]
-  );
-
+  const currentItem = useMemo(() => items[currentIndex], [items, currentIndex]);
   const progress = useMemo(
-    () =>
-      vocabularies.length
-        ? (masteredCards.size / vocabularies.length) * 100
-        : 0,
-    [masteredCards.size, vocabularies.length]
+    () => (items.length ? (masteredCards.size / items.length) * 100 : 0),
+    [masteredCards.size, items.length]
   );
-
   const isAllMastered = useMemo(
-    () => vocabularies.length > 0 && masteredCards.size === vocabularies.length,
-    [masteredCards.size, vocabularies.length]
+    () => items.length > 0 && masteredCards.size === items.length,
+    [masteredCards.size, items.length]
   );
 
-  // 🔥 로컬스토리지에서 완료 상태 복원
   useEffect(() => {
     const masteredSet = new Set<number>();
     const studiedSet = new Set<number>();
-
-    vocabularies.forEach((vocab, index) => {
+    items.forEach((vocab, index) => {
       if (vocab.id) {
         const progress = getItemProgress(packId, dayNumber, vocab.id);
         if (progress?.completed) {
@@ -97,19 +82,16 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
         }
       }
     });
-
     setMasteredCards(masteredSet);
     setStudiedCards(studiedSet);
-
     console.debug("[VocabularyMode] 완료 상태 복원:", {
       packId,
       dayNumber,
       masteredCount: masteredSet.size,
       studiedCount: studiedSet.size,
     });
-  }, [vocabularies, getItemProgress, packId, dayNumber]);
+  }, [items, getItemProgress, packId, dayNumber]);
 
-  // 핸들러들
   const handleModeChange = useCallback(
     (mode: "immersive" | "assisted") => {
       updateSetting("studyMode", mode);
@@ -121,13 +103,6 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   const handleAutoProgressChange = useCallback(
     (enabled: boolean) => {
       updateSetting("autoProgressEnabled", enabled);
-    },
-    [updateSetting]
-  );
-
-  const handleShowMeaningChange = useCallback(
-    (enabled: boolean) => {
-      updateSetting("showMeaningEnabled", enabled);
     },
     [updateSetting]
   );
@@ -149,46 +124,33 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
     }
   }, [settings.showMeaningEnabled, showMeaning, studiedCards, currentIndex]);
 
-  // 🔥 수정된 handleMarkAsMastered - setItemCompleted 추가
   const handleMarkAsMastered = useCallback(() => {
-    const currentVocab = vocabularies[currentIndex];
+    const currentVocab = items[currentIndex];
     if (!currentVocab?.id) {
       console.warn("[VocabularyMode] 단어 ID가 없습니다:", currentVocab);
       return;
     }
-
-    // 로컬 상태 업데이트
     const m = new Set(masteredCards);
     m.add(currentIndex);
     setMasteredCards(m);
-
     const s = new Set(studiedCards);
     s.add(currentIndex);
     setStudiedCards(s);
-
-    // 🔥 Zustand 스토어에 완료 상태 저장
     setItemCompleted(packId, dayNumber, currentVocab.id, true);
-
     console.debug("[VocabularyMode] 단어 완료 처리:", {
       packId,
       dayNumber,
       vocabId: currentVocab.id,
       word: currentVocab.word,
-      currentIndex,
     });
-
-    // 자동 진행
-    if (
-      settings.autoProgressEnabled &&
-      currentIndex < vocabularies.length - 1
-    ) {
+    if (settings.autoProgressEnabled && currentIndex < items.length - 1) {
       setTimeout(() => {
         setCurrentIndex((prev) => prev + 1);
         setShowMeaning(false);
       }, 300);
     }
   }, [
-    vocabularies,
+    items,
     currentIndex,
     masteredCards,
     studiedCards,
@@ -198,41 +160,27 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
     settings.autoProgressEnabled,
   ]);
 
-  // 🔥 수정된 handleMarkAsNotMastered - setItemCompleted 추가
   const handleMarkAsNotMastered = useCallback(() => {
-    const currentVocab = vocabularies[currentIndex];
+    const currentVocab = items[currentIndex];
     if (!currentVocab?.id) return;
-
-    // 로컬 상태 업데이트
     const m = new Set(masteredCards);
     m.delete(currentIndex);
     setMasteredCards(m);
-
-    // 🔥 Zustand 스토어에서 완료 상태 제거
     setItemCompleted(packId, dayNumber, currentVocab.id, false);
-
     console.debug("[VocabularyMode] 단어 완료 취소:", {
       packId,
       dayNumber,
       vocabId: currentVocab.id,
       word: currentVocab.word,
-      currentIndex,
     });
-  }, [
-    vocabularies,
-    currentIndex,
-    masteredCards,
-    setItemCompleted,
-    packId,
-    dayNumber,
-  ]);
+  }, [items, currentIndex, masteredCards, setItemCompleted, packId, dayNumber]);
 
   const goToNext = useCallback(() => {
-    if (currentIndex < vocabularies.length - 1) {
+    if (currentIndex < items.length - 1) {
       setCurrentIndex((prev) => prev + 1);
       setShowMeaning(false);
     }
-  }, [currentIndex, vocabularies.length]);
+  }, [currentIndex, items.length]);
 
   const goToPrev = useCallback(() => {
     if (currentIndex > 0) {
@@ -247,271 +195,212 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   });
 
   const handleComplete = useCallback(() => {
-    markModeCompleted(dayNumber, "vocab");
+    markModeCompleted(packId, "vocab");
     onComplete?.();
-  }, [markModeCompleted, dayNumber, onComplete]);
+  }, [markModeCompleted, onComplete]);
 
-  if (!vocabularies.length) {
+  if (!items.length) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] px-4">
-        <div className="text-5xl mb-4 opacity-50">📚</div>
-        <div className="text-lg font-medium text-gray-900 mb-1">
+      <div className="flex flex-col items-center justify-center h-full text-center p-8">
+        <Target className="w-16 h-16 text-gray-300 mb-4" />
+        <h2 className="text-xl font-bold text-gray-700">
           학습할 단어가 없습니다
-        </div>
-        <div className="text-sm text-gray-500">
+        </h2>
+        <p className="text-gray-500 mt-2">
           Day {dayNumber}의 단어를 확인해주세요
-        </div>
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 min-h-screen lg:flex-row">
-      {/* 모바일 헤더 */}
-      <div className="lg:hidden bg-white border-b border-gray-100">
-        <div className="flex items-center justify-between px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              {category}
-            </div>
-            <div className="w-1 h-1 bg-gray-300 rounded-full" />
-            <div className="text-xs font-semibold text-indigo-600">
-              Day {dayNumber}
-            </div>
-          </div>
-
-          <button
-            onClick={() => setIsSettingOpen((p) => !p)}
-            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-all"
-          >
-            <Settings className="w-4 h-4 text-gray-600" />
+    <div className="flex h-full min-h-[calc(100vh-129px)] bg-gray-50 font-sans">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Mobile Header */}
+        <header className="lg:hidden flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+          <button className="p-2 -ml-2">
+            <ArrowLeft className="w-5 h-5" />
           </button>
-        </div>
+          <div className="text-center">
+            <h1 className="font-bold text-gray-800">{category}</h1>
+            <p className="text-xs text-gray-500">Day {dayNumber}</p>
+          </div>
+          <div className="w-8"></div>
+        </header>
 
-        {/* 진행률 바 - 모바일 */}
-        <div className="px-5 pb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-gray-600">진행률</span>
-            <span className="text-xs font-bold text-gray-900">
-              {masteredCards.size}/{vocabularies.length}
+        {/* Mobile Progress Bar */}
+        <div className="lg:hidden p-4 bg-white">
+          <div className="flex justify-between items-center text-xs text-gray-500 mb-1.5">
+            <span className="font-medium">진행률</span>
+            <span className="font-semibold">
+              {masteredCards.size}/{items.length}
             </span>
           </div>
-          <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+          <div className="w-full bg-gray-200 rounded-full h-2">
             <div
-              className="bg-indigo-600 h-full rounded-full transition-all duration-500 ease-out"
+              className="bg-indigo-600 h-2 rounded-full transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
-      </div>
 
-      {/* 설정 패널 */}
-      {isSettingOpen && (
-        <StudySettingsPanel
-          packId={packId}
-          onClose={() => setIsSettingOpen(false)}
-        />
-      )}
-
-      {/* 메인 컨텐츠 영역 */}
-      <div className="flex-1 flex flex-col lg:flex-row">
-        {/* 메인 카드 영역 */}
-        <div className="flex-1 flex flex-col items-center justify-start p-5 lg:p-8">
-          <div className="w-full max-w-lg mx-auto">
-            {/* 카드 상단 인디케이터 */}
-            <div className="flex items-center justify-center mb-6">
-              <div className="flex items-center gap-1.5">
-                {vocabularies.map((_, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => {
-                      setCurrentIndex(idx);
-                      setShowMeaning(false);
-                    }}
-                    className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                      idx === currentIndex
-                        ? "w-8 bg-indigo-600"
-                        : masteredCards.has(idx)
-                        ? "w-1.5 bg-indigo-600"
-                        : "w-1.5 bg-gray-300 hover:bg-gray-400"
-                    }`}
-                  />
-                ))}
-              </div>
+        {/* Main Content Area */}
+        <main
+          className="flex-1 flex flex-col justify-center items-center p-4 overflow-y-auto"
+          {...swipeHandlers}
+        >
+          <div className="w-full max-w-xl">
+            <div className="flex items-center justify-center gap-1.5 mb-4">
+              {items.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setCurrentIndex(idx);
+                    setShowMeaning(false);
+                  }}
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                    idx === currentIndex
+                      ? "w-8 bg-indigo-600"
+                      : masteredCards.has(idx)
+                      ? "w-1.5 bg-indigo-600"
+                      : "w-1.5 bg-gray-300 hover:bg-gray-400"
+                  }`}
+                />
+              ))}
             </div>
 
-            {/* 메인 카드 */}
             <div
-              {...swipeHandlers}
+              className="relative bg-white rounded-2xl shadow-lg p-8 text-center cursor-pointer transition-transform active:scale-95"
               onClick={handleToggleMeaning}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 lg:p-10 text-center transform transition-all duration-300 hover:shadow-md cursor-pointer relative overflow-hidden"
             >
-              {/* 완료 상태 뱃지 */}
               {masteredCards.has(currentIndex) && (
-                <div className="absolute top-4 right-4">
-                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                    <Check className="w-4 h-4 text-indigo-600" />
-                  </div>
+                <div className="absolute top-4 right-4 bg-indigo-100 text-indigo-600 px-2.5 py-1 rounded-full text-xs font-bold">
+                  학습 완료
                 </div>
               )}
-
-              {/* 이모지 */}
-              <div className="text-6xl mb-6">{currentItem.emoji}</div>
-
-              {/* 단어 */}
-              <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
+              <div className="text-6xl mb-4">{currentItem.emoji}</div>
+              <h2 className="text-3xl font-bold text-gray-800">
                 {currentItem.word}
               </h2>
-
-              {/* 발음 */}
               {currentItem.pronunciation && (
-                <p className="text-gray-500 mb-6 text-base">
-                  {currentItem.pronunciation}
+                <p className="text-gray-500 mt-1">
+                  [{currentItem.pronunciation}]
                 </p>
               )}
-
-              {/* 발음 버튼 */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handleSpeak(currentItem.word);
                 }}
                 disabled={isSpeaking}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700 rounded-full text-sm font-medium transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700 rounded-full text-sm font-medium transition-all disabled:opacity-50 mt-4"
               >
                 <Volume2 className="w-4 h-4" />
-                {isSpeaking ? "재생중" : "발음 듣기"}
+                {isSpeaking ? "재생중..." : "발음 듣기"}
               </button>
 
-              {/* 의미 표시 영역 */}
-              {settings.showMeaningEnabled && showMeaning && (
-                <div className="mt-8 p-6 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="text-lg font-medium text-gray-900 leading-relaxed">
-                    {currentItem.meaning}
-                  </p>
-                  {currentItem.usage && (
-                    <p className="text-sm text-gray-600 mt-4 italic">
-                      "{currentItem.usage}"
+              <div className="h-20 mt-6 pt-6 border-t border-gray-200 flex flex-col justify-center">
+                {settings.showMeaningEnabled && showMeaning ? (
+                  <div className="animate-in fade-in">
+                    <p className="text-xl font-semibold text-gray-800">
+                      {currentItem.meaning}
                     </p>
-                  )}
-                </div>
-              )}
-
-              {/* 힌트 텍스트 */}
-              {!showMeaning && settings.showMeaningEnabled && (
-                <p className="text-gray-400 text-xs mt-8 flex items-center justify-center gap-1.5">
-                  <Eye className="w-3.5 h-3.5" />
-                  탭하여 의미 확인
-                </p>
-              )}
-
-              {settings.studyMode === "immersive" && (
-                <p className="text-indigo-600 text-xs mt-8 flex items-center justify-center gap-1.5">
-                  <Brain className="w-3.5 h-3.5" />
-                  영어로 의미를 생각해보세요
-                </p>
-              )}
+                    {currentItem.usage && (
+                      <p className="text-sm text-gray-500 mt-2 italic">
+                        "{currentItem.usage}"
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">
+                    {settings.studyMode === "immersive"
+                      ? "영어로 의미를 생각해보세요"
+                      : "탭하여 의미 확인"}
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* 네비게이션 버튼 */}
-            <div className="flex items-center justify-between mt-6 gap-4">
+            <div className="flex items-center gap-3 mt-6">
               <button
                 onClick={goToPrev}
                 disabled={currentIndex === 0}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl font-medium transition-all hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-3 bg-white border border-gray-200 rounded-xl disabled:opacity-30"
               >
-                <ChevronLeft className="w-4 h-4" />
-                이전
+                <ChevronLeft className="w-5 h-5" />
               </button>
-
-              <div className="text-sm font-semibold text-gray-600">
-                {currentIndex + 1} / {vocabularies.length}
+              <div className="flex-1 text-center text-sm font-medium text-gray-500">
+                {currentIndex + 1} / {items.length}
               </div>
-
               <button
                 onClick={goToNext}
-                disabled={currentIndex >= vocabularies.length - 1}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl font-medium transition-all hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                disabled={currentIndex === items.length - 1}
+                className="p-3 bg-white border border-gray-200 rounded-xl disabled:opacity-30"
               >
-                다음
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-5 h-5" />
               </button>
             </div>
 
-            {/* 액션 버튼 */}
             <div className="mt-4">
               {masteredCards.has(currentIndex) ? (
                 <button
                   onClick={handleMarkAsNotMastered}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-white border border-gray-200 text-gray-700 rounded-xl font-medium transition-all hover:bg-gray-50"
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-200 text-gray-700 rounded-xl font-medium transition-all hover:bg-gray-300"
                 >
-                  <RotateCcw className="w-4 h-4" />
-                  다시 학습
+                  <RotateCcw className="w-4 h-4" /> 다시 학습
                 </button>
               ) : (
                 <button
                   onClick={handleMarkAsMastered}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-all shadow-sm hover:shadow-md"
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 text-white rounded-xl font-medium transition-all hover:bg-indigo-700"
                 >
-                  <Target className="w-4 h-4" />
-                  학습 완료
+                  <Check className="w-4 h-4" /> 학습 완료
                 </button>
               )}
             </div>
 
-            {/* 완료 버튼 */}
             {isAllMastered && (
               <button
                 onClick={handleComplete}
-                className="w-full mt-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+                className="w-full mt-4 py-3 px-4 bg-green-500 text-white rounded-xl font-bold transition-all hover:bg-green-600"
               >
-                🎉 모든 학습 완료
+                🎉 모든 학습 완료!
               </button>
             )}
           </div>
-        </div>
+        </main>
+      </div>
 
-        {/* 데스크톱 사이드바 */}
-        <div className="hidden lg:block w-80 bg-white border-l border-gray-100 p-6 space-y-6">
-          {/* 헤더 정보 */}
-          <div className="pb-6 border-b border-gray-100">
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              {category}
-            </div>
-            <h3 className="text-xl font-bold text-gray-900">Day {dayNumber}</h3>
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:block w-80 bg-white shadow-md">
+        <div className="p-6 h-full flex flex-col space-y-6">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">{category}</h3>
+            <p className="text-sm text-gray-500">Day {dayNumber}</p>
           </div>
 
-          {/* 진행률 */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-gray-700">
-                학습 진행률
-              </span>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <h4 className="text-sm font-medium text-gray-700">학습 진행률</h4>
               <span className="text-sm font-bold text-indigo-600">
                 {Math.round(progress)}%
               </span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-gray-200 rounded-full h-2">
               <div
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 h-full rounded-full transition-all duration-500"
+                className="bg-indigo-600 h-2 rounded-full"
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="flex justify-between mt-2">
-              <span className="text-xs text-gray-500">완료</span>
-              <span className="text-xs font-medium text-gray-700">
-                {masteredCards.size}/{vocabularies.length}
-              </span>
-            </div>
+            <p className="text-xs text-right text-gray-500">
+              {masteredCards.size}/{items.length} 완료
+            </p>
           </div>
 
-          {/* 학습 현황 그리드 */}
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-3">
-              학습 카드
-            </h4>
-            <div className="grid grid-cols-5 gap-2">
-              {vocabularies.map((_, idx) => (
+          <div className="space-y-3 flex-1">
+            <h4 className="text-sm font-medium text-gray-700">학습 카드</h4>
+            <div className="grid grid-cols-7 gap-2">
+              {items.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => {
@@ -534,78 +423,15 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
             </div>
           </div>
 
-          {/* 학습 모드 설정 */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium text-gray-700">학습 모드</h4>
-            <div className="space-y-2">
-              <button
-                onClick={() => handleModeChange("assisted")}
-                className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
-                  settings.studyMode === "assisted"
-                    ? "bg-indigo-50 border-2 border-indigo-600 text-indigo-600"
-                    : "bg-gray-50 border-2 border-transparent text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Lightbulb className="w-4 h-4" />
-                  <span className="text-sm font-medium">도움 모드</span>
-                </div>
-                <p className="text-xs mt-1 opacity-75">의미를 바로 확인 가능</p>
-              </button>
-
-              <button
-                onClick={() => handleModeChange("immersive")}
-                className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
-                  settings.studyMode === "immersive"
-                    ? "bg-indigo-50 border-2 border-indigo-600 text-indigo-600"
-                    : "bg-gray-50 border-2 border-transparent text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Brain className="w-4 h-4" />
-                  <span className="text-sm font-medium">몰입 모드</span>
-                </div>
-                <p className="text-xs mt-1 opacity-75">영어로만 학습</p>
-              </button>
-            </div>
+          <div className="pt-6 border-t border-gray-200">
+            <StudySettingsPanel
+              settings={settings}
+              handleModeChange={handleModeChange}
+              handleAutoProgressChange={handleAutoProgressChange}
+            />
           </div>
-
-          {/* 자동 진행 토글 */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-gray-600" />
-              <span className="text-sm font-medium text-gray-700">
-                자동 진행
-              </span>
-            </div>
-            <button
-              onClick={() =>
-                handleAutoProgressChange(!settings.autoProgressEnabled)
-              }
-              className={`w-11 h-6 rounded-full transition-all ${
-                settings.autoProgressEnabled ? "bg-indigo-600" : "bg-gray-300"
-              }`}
-            >
-              <div
-                className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
-                  settings.autoProgressEnabled
-                    ? "translate-x-5"
-                    : "translate-x-0.5"
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* 설정 버튼 */}
-          <button
-            onClick={() => setIsSettingOpen(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-all"
-          >
-            <Settings className="w-4 h-4" />
-            상세 설정
-          </button>
         </div>
-      </div>
+      </aside>
     </div>
   );
 };

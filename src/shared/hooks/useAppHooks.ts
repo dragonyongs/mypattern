@@ -27,6 +27,7 @@ export function useUser() {
 // 🎯 팩 관련 훅들
 export function useSelectedPack() {
   const { selectedPackId, selectedPackData } = useAppStore();
+  // console.log("selectedPackData", selectedPackData);
   return {
     packId: selectedPackId,
     packData: selectedPackData,
@@ -75,29 +76,62 @@ export function useLearningProgress() {
   };
 }
 
+export const useDay1Progress = (packId: string) => {
+  const { getDayProgress, setModeCompleted, setDayCompleted } =
+    useStudyProgressStore();
+
+  const dayProgress = getDayProgress(packId, 1);
+
+  const markIntroductionCompleted = useCallback(() => {
+    console.log("🔥 Marking Day 1 introduction as completed");
+    // introduction을 vocab으로 간주하여 저장
+    setModeCompleted(packId, 1, "vocab", true);
+    // Day 1은 introduction만 있으므로 바로 완료 처리
+    setTimeout(() => {
+      setDayCompleted(packId, 1);
+    }, 100);
+  }, [packId, setModeCompleted, setDayCompleted]);
+
+  return {
+    isIntroductionCompleted: dayProgress?.vocabDone || false,
+    isDayCompleted: dayProgress?.dayCompleted || false,
+    markIntroductionCompleted,
+  };
+};
+
 // 🎯 일별 진행률 관리 (안전한 버전)
 export const useDayProgress = (packId: string, day: number) => {
   const { getDayProgress, setModeCompleted, setDayCompleted, isModeAvailable } =
     useStudyProgressStore();
 
+  // 🔥 실시간 상태 가져오기
   const dayProgress = getDayProgress(packId, day);
 
-  const markModeCompleted = (
-    day: number,
-    mode: "vocab" | "sentence" | "workbook"
-  ) => {
-    setModeCompleted(packId, day, mode, true);
-  };
+  const markModeCompleted = useCallback(
+    (day: number, mode: "vocab" | "sentence" | "workbook") => {
+      console.log(`🔥 Marking ${mode} as completed for day ${day}`); // 디버깅
 
-  const markDayCompleted = (day: number) => {
-    setDayCompleted(packId, day);
-  };
+      setModeCompleted(packId, day, mode, true);
 
-  const isModeAccessible = (mode: "vocab" | "sentence" | "workbook") => {
-    return isModeAvailable(packId, day, mode);
-  };
+      // 🔥 상태 업데이트 후 즉시 확인
+      setTimeout(() => {
+        const updatedProgress = getDayProgress(packId, day);
+        console.log("Updated progress:", updatedProgress); // 디버깅
+
+        if (
+          updatedProgress?.vocabDone &&
+          updatedProgress?.sentenceDone &&
+          updatedProgress?.workbookDone
+        ) {
+          setDayCompleted(packId, day);
+        }
+      }, 100); // 짧은 지연으로 상태 동기화 보장
+    },
+    [packId, setModeCompleted, setDayCompleted, getDayProgress]
+  );
 
   return {
+    // 🔥 실시간 진행 상태 반환
     dayProgress: {
       vocab: dayProgress?.vocabDone || false,
       sentence: dayProgress?.sentenceDone || false,
@@ -105,8 +139,80 @@ export const useDayProgress = (packId: string, day: number) => {
       completed: dayProgress?.dayCompleted || false,
     },
     markModeCompleted,
-    markDayCompleted,
-    isModeAccessible,
+    isModeAccessible: (mode: "vocab" | "sentence" | "workbook") => {
+      if (dayProgress?.[`${mode}Done`]) return true;
+      if (mode === "vocab") return true;
+      if (mode === "sentence") return dayProgress?.vocabDone || false;
+      if (mode === "workbook") return dayProgress?.sentenceDone || false;
+      return false;
+    },
+  };
+};
+
+export const useCalendarDayStatus = (packId: string, day: number) => {
+  const { getDayProgress } = useStudyProgressStore();
+  const dayProgress = getDayProgress(packId, day);
+
+  // Day 1은 '학습 방법 소개'만 있으므로, dayCompleted 여부로 완료를 판단합니다.
+  const isDay1AndCompleted = day === 1 && dayProgress?.dayCompleted;
+
+  const normalDayCompleted =
+    !!dayProgress?.vocabDone &&
+    !!dayProgress?.sentenceDone &&
+    !!dayProgress?.workbookDone;
+
+  const allCompleted = isDay1AndCompleted || normalDayCompleted;
+
+  // Day 1의 경우 모드 개수를 1로 설정하여 정확한 진행률을 표시합니다.
+  const totalModes = day === 1 ? 1 : 3;
+  const completedCount = [
+    dayProgress?.vocabDone,
+    dayProgress?.sentenceDone,
+    dayProgress?.workbookDone,
+  ].filter(Boolean).length;
+
+  return {
+    vocabCompleted: dayProgress?.vocabDone || false,
+    sentenceCompleted: dayProgress?.sentenceDone || false,
+    workbookCompleted: dayProgress?.workbookDone || false,
+    allCompleted, // 🔥 수정된 완료 상태
+    completedCount,
+    totalModes,
+    progressPercentage:
+      totalModes > 0 ? Math.round((completedCount / totalModes) * 100) : 0,
+  };
+};
+
+export const usePackProgressSummary = (packId: string) => {
+  const { getProgress } = useStudyProgressStore();
+  const packProgress = getProgress(packId);
+
+  if (!packProgress) {
+    return {
+      totalDays: 14,
+      completedDays: 0,
+      totalModes: 42,
+      completedModes: 0,
+      overallProgress: 0,
+    };
+  }
+
+  let completedModes = 0;
+  let completedDays = 0;
+
+  packProgress.perDay.forEach((day) => {
+    if (day.vocabDone) completedModes++;
+    if (day.sentenceDone) completedModes++;
+    if (day.workbookDone) completedModes++;
+    if (day.dayCompleted) completedDays++;
+  });
+
+  return {
+    totalDays: 14,
+    completedDays,
+    totalModes: 42,
+    completedModes,
+    overallProgress: Math.round((completedModes / 42) * 100),
   };
 };
 

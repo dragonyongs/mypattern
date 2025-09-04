@@ -286,7 +286,7 @@ class PackDataService {
           page: day.page || content.page,
           title: day.title || content.title,
           methods: day.methods || content.methods || [1],
-          vocabularies: content.vocabulary || content.vocabularies || [],
+          vocabularies: content.vocabularies || [],
           sentences: content.sentences || [],
           workbook: content.workbook || [],
         };

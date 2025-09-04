@@ -30,7 +30,7 @@ export function MainLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-gray-50">
       {/* 헤더 */}
       <header className="bg-white shadow-sm border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-3">

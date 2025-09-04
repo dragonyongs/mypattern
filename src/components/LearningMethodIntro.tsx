@@ -1,32 +1,54 @@
 // src/components/LearningMethodIntro.tsx
-
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
-
-import { useAppStore } from "@/stores/appStore";
 import type { LearningMethod } from "@/types";
-import { DynamicIcon } from "@/shared/components/DynamicIcon"; // DynamicIcon 컴포넌트 임포트
-
-// LearningMethod 타입에 icon 속성이 IconName을 사용하도록 명시해야 합니다.
-// 예: interface LearningMethod { ...; icon: IconName; }
+import { DynamicIcon } from "@/shared/components/DynamicIcon";
+import { useDay1Progress } from "@/shared/hooks/useAppHooks";
 
 interface LearningMethodIntroProps {
   methods: LearningMethod[];
   onComplete: () => void;
+  packId: string; // 🔥 packId prop 추가
 }
 
 export const LearningMethodIntro: React.FC<LearningMethodIntroProps> = ({
   methods,
   onComplete,
+  packId, // 🔥 packId 받기
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [completedCards, setCompletedCards] = useState<Set<number>>(new Set());
-  const { markModeCompleted } = useAppStore();
+
+  // 🔥 Day1 진행 상태 확인
+  const { isIntroductionCompleted, markIntroductionCompleted } =
+    useDay1Progress(packId);
+
+  useEffect(() => {
+    if (isIntroductionCompleted && methods.length > 0) {
+      // 마지막 페이지로 이동
+      setCurrentIndex(methods.length - 1);
+
+      // 모든 카드를 완료된 것으로 표시
+      const allCards = new Set(
+        Array.from({ length: methods.length }, (_, i) => i)
+      );
+      setCompletedCards(allCards);
+
+      console.log(
+        "🔥 Day 1 already completed, showing final page with start button"
+      );
+    }
+  }, [isIntroductionCompleted, methods.length]);
+
+  if (!methods || methods.length === 0) {
+    return <div>학습 방법 데이터를 불러오는 중...</div>;
+  }
 
   const currentMethod = methods[currentIndex];
 
   const handleCardView = () => {
     if (completedCards.has(currentIndex)) return;
+
     const newCompleted = new Set(completedCards);
     newCompleted.add(currentIndex);
     setCompletedCards(newCompleted);
@@ -38,7 +60,10 @@ export const LearningMethodIntro: React.FC<LearningMethodIntroProps> = ({
     if (currentIndex < methods.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     } else if (isAllCompleted) {
-      // markModeCompleted(1, "vocab"); // 실제 Day와 모드에 맞게 수정 필요
+      // 🔥 완료되지 않은 경우만 완료 상태 저장
+      if (!isIntroductionCompleted) {
+        markIntroductionCompleted();
+      }
       onComplete();
     }
   };
@@ -51,6 +76,15 @@ export const LearningMethodIntro: React.FC<LearningMethodIntroProps> = ({
 
   const progressPercentage =
     methods.length > 0 ? (completedCards.size / methods.length) * 100 : 0;
+
+  // 🔥 마지막 페이지이고 모든 카드가 완료된 경우의 버튼 텍스트
+  const isLastPageAndCompleted =
+    currentIndex === methods.length - 1 && isAllCompleted;
+  const buttonText = isLastPageAndCompleted
+    ? isIntroductionCompleted
+      ? "학습 시작"
+      : "완료"
+    : "다음";
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-4 font-sans">
@@ -105,7 +139,7 @@ export const LearningMethodIntro: React.FC<LearningMethodIntroProps> = ({
         </main>
 
         <footer className="mt-8">
-          <div className="flex items-center justify-between mb-5">
+          {/* <div className="flex items-center justify-between mb-5">
             <button
               onClick={handlePrev}
               disabled={currentIndex === 0}
@@ -133,6 +167,33 @@ export const LearningMethodIntro: React.FC<LearningMethodIntroProps> = ({
                 ? "학습 시작"
                 : "다음"}
               <ArrowRight size={16} />
+            </button>
+          </div> */}
+          <div className="flex justify-between items-center mb-4">
+            <button
+              onClick={handlePrev}
+              disabled={currentIndex === 0}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              이전
+            </button>
+
+            <div className="text-sm text-gray-600">
+              {currentIndex + 1} / {methods.length}
+            </div>
+
+            <button
+              onClick={handleNext}
+              disabled={!isAllCompleted && currentIndex === methods.length - 1}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium ${
+                isLastPageAndCompleted && isIntroductionCompleted
+                  ? "bg-green-600 text-white hover:bg-green-700"
+                  : "bg-indigo-600 text-white hover:bg-indigo-700"
+              }`}
+            >
+              {buttonText}
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 

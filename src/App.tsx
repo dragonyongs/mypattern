@@ -7,7 +7,7 @@ import PackSelectPage from "@/pages/PackSelectPage";
 import CalendarPage from "@/pages/CalendarPage";
 import { StudyInterface } from "@/components/StudyInterface";
 import { useParams } from "react-router-dom";
-import { MainLayout } from "@/components/MainLayout";
+// import { MainLayout } from "@/components/MainLayout";
 
 // ✅ 수정: StudyPage 컴포넌트에서 useParams 사용
 function StudyPage() {

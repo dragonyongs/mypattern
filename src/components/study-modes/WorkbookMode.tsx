@@ -48,7 +48,7 @@ interface WorkbookItem {
 }
 
 interface WorkbookModeProps {
-  workbook: WorkbookItem[];
+  items: WorkbookItem[];
   dayNumber: number;
   category: string;
   packId: string;
@@ -60,7 +60,7 @@ interface WorkbookModeProps {
 // =======================================================================
 
 export const WorkbookMode: React.FC<WorkbookModeProps> = ({
-  workbook: rawWorkbook,
+  items: rawWorkbook,
   dayNumber,
   category,
   packId,
@@ -358,7 +358,7 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
   }
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50">
+    <div className="flex flex-col lg:flex-row h-auto bg-gray-50">
       {/* 모바일 헤더 */}
       <div className="lg:hidden bg-white border-b px-4 py-3">
         <div className="flex items-center justify-between">
@@ -403,15 +403,6 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
           </div>
         </div>
       </div>
-
-      {/* 설정 패널 */}
-      {isSettingOpen && (
-        <StudySettingsPanel
-          packId={packId}
-          showMeaningLabel="설명 표시 허용"
-          onClose={() => setIsSettingOpen(false)}
-        />
-      )}
 
       {/* 메인 컨텐츠 영역 */}
       <div className="flex-1 flex flex-col">
@@ -769,76 +760,13 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
           </div>
 
           {/* 학습 모드 설정 */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-900 mb-3">
-              학습 모드
-            </h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => handleModeChange("assisted")}
-                className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
-                  settings.studyMode === "assisted"
-                    ? "bg-indigo-50 border-2 border-indigo-600 text-indigo-600"
-                    : "bg-gray-50 border-2 border-transparent text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Lightbulb className="w-4 h-4" />
-                  <span className="font-medium">도움 모드</span>
-                </div>
-                <p className="text-xs">설명을 바로 확인 가능</p>
-              </button>
-
-              <button
-                onClick={() => handleModeChange("immersive")}
-                className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
-                  settings.studyMode === "immersive"
-                    ? "bg-indigo-50 border-2 border-indigo-600 text-indigo-600"
-                    : "bg-gray-50 border-2 border-transparent text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Brain className="w-4 h-4" />
-                  <span className="font-medium">몰입 모드</span>
-                </div>
-                <p className="text-xs">영어로만 학습</p>
-              </button>
-            </div>
+          <div className="pt-6 border-t border-gray-200">
+            <StudySettingsPanel
+              settings={settings}
+              handleModeChange={handleModeChange}
+              handleAutoProgressChange={handleAutoProgressChange}
+            />
           </div>
-
-          {/* 자동 진행 토글 */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-900">
-                자동 진행
-              </span>
-              <button
-                onClick={() =>
-                  handleAutoProgressChange(!settings.autoProgressEnabled)
-                }
-                className={`w-11 h-6 rounded-full transition-all ${
-                  settings.autoProgressEnabled ? "bg-indigo-600" : "bg-gray-300"
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                    settings.autoProgressEnabled
-                      ? "translate-x-6"
-                      : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-
-          {/* 설정 버튼 */}
-          <button
-            onClick={() => setIsSettingOpen(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-all"
-          >
-            <Settings className="w-4 h-4" />
-            상세 설정
-          </button>
         </div>
       </div>
     </div>

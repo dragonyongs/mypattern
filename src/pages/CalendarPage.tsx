@@ -16,6 +16,10 @@ import {
 
 import { useAppStore } from "../stores/appStore";
 import { useStudyProgressStore } from "../stores/studyProgressStore";
+import {
+  useCalendarDayStatus,
+  useSelectedPack,
+} from "@/shared/hooks/useAppHooks";
 import type { StudyMode, Day } from "@/types";
 
 // --- Helper Components for Clean UI ---
@@ -38,109 +42,166 @@ const StatCard = ({ icon: Icon, value, label, colorClass }) => (
 /**
  * 학습 캘린더의 각 날짜를 표시하는 카드 컴포넌트
  */
-const DayCard = ({ day, status, onSelect, isCurrent }) => {
-  const statusConfig = {
-    completed: {
-      bgColor: "bg-green-50",
-      borderColor: "border-green-200",
-      icon: <CheckCircle className="h-4 w-4 text-green-500" />,
-    },
-    available: {
-      bgColor: "bg-white",
-      borderColor: "border-slate-200",
-      hoverBorderColor: "hover:border-blue-400",
-      icon: <ChevronRight className="h-5 w-5 text-blue-500" />,
-    },
-    locked: {
-      bgColor: "bg-slate-100",
-      borderColor: "border-slate-200",
-      textColor: "text-slate-400",
-      icon: <Lock className="h-4 w-4 text-slate-400" />,
-    },
-  };
+const DayCard = ({ day, status, onSelect, packId: propPackId }) => {
+  const { vocabCompleted, sentenceCompleted, workbookCompleted } =
+    useCalendarDayStatus(propPackId || "", day.day);
 
-  const config = statusConfig[status];
-  const isIntro = day.type === "introduction" || day.introduction;
+  const isDay1Introduction = day.day === 1 && day.type === "introduction";
+
+  // 🔥 2. 클릭 핸들러가 onSelect를 호출하도록 수정
+  const handleClick = () => {
+    // 잠겨있지 않고, onSelect가 함수일 때만 실행
+    if (status !== "locked" && typeof onSelect === "function") {
+      console.log(`🔥 Day ${day.day} clicked, executing onSelect...`); // 디버깅
+      onSelect(day); // 부모로부터 받은 onSelect 함수에 day 객체 전체를 전달
+    }
+  };
 
   return (
     <div
-      onClick={status !== "locked" ? onSelect : undefined}
+      onClick={handleClick} // 수정된 핸들러 연결
       className={`
-        group p-4 rounded-xl border-2 flex flex-col justify-between
-        ${config.bgColor} ${
-        isCurrent ? "ring-2 ring-blue-500 ring-offset-1" : config.borderColor
-      }
+        relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:shadow-md
         ${
-          status !== "locked"
-            ? `cursor-pointer transition-all duration-200 ${config.hoverBorderColor} shadow-sm hover:shadow-md`
-            : "cursor-not-allowed opacity-70"
+          status === "locked"
+            ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-60"
+            : status === "completed"
+            ? "border-green-200 bg-green-50 hover:bg-green-100"
+            : status === "current"
+            ? "border-blue-400 bg-blue-50 hover:bg-blue-100 shadow-md"
+            : "border-gray-200 bg-white hover:bg-gray-50"
         }
       `}
     >
-      <div>
-        <div className="flex justify-between items-start mb-2">
-          <div className="-mt-1">
-            <p
-              className={`font-bold text-lg ${
-                config.textColor || "text-slate-800"
-              }`}
-            >
-              Day {day.day}
-            </p>
-            <p className="text-sm text-slate-500">{day.title}</p>
-          </div>
-          {config.icon}
+      {/* 상태 아이콘 */}
+      <div className="absolute top-3 right-3">
+        {status === "locked" && <Lock className="w-4 h-4 text-gray-400" />}
+        {status === "completed" && (
+          <CheckCircle className="w-4 h-4 text-green-600" />
+        )}
+        {status === "current" && <Play className="w-4 h-4 text-blue-600" />}
+      </div>
+
+      {/* Day 번호와 제목 */}
+      <div className="mb-2">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-lg font-bold text-gray-800">Day {day.day}</span>
+          {status === "current" && (
+            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+              진행중
+            </span>
+          )}
         </div>
+        <h3 className="text-sm font-medium text-gray-700 mb-2">{day.title}</h3>
+      </div>
 
-        {status === "available" && !isIntro && (
-          <div className="space-y-1 text-xs mt-3">
-            {day.vocabularies?.length > 0 && (
-              <p className="text-slate-600 font-medium">
-                단어 {day.vocabularies.length}개
-              </p>
-            )}
-            {day.sentences?.length > 0 && (
-              <p className="text-slate-600 font-medium">
-                문장 {day.sentences.length}개
-              </p>
-            )}
-            {day.workbook?.length > 0 && (
-              <p className="text-slate-600 font-medium">
-                문제 {day.workbook.length}개
-              </p>
-            )}
+      {/* 🔥 학습 모드별 완료 상태 표시 */}
+      {!isDay1Introduction && (
+        <div className="flex gap-2 mb-3">
+          <div
+            className={`w-2 h-2 rounded-full ${
+              vocabCompleted ? "bg-green-500" : "bg-gray-200"
+            }`}
+            title="단어 학습"
+          />
+          <div
+            className={`w-2 h-2 rounded-full ${
+              sentenceCompleted ? "bg-blue-500" : "bg-gray-200"
+            }`}
+            title="문장 학습"
+          />
+          <div
+            className={`w-2 h-2 rounded-full ${
+              workbookCompleted ? "bg-purple-500" : "bg-gray-200"
+            }`}
+            title="워크북"
+          />
+        </div>
+      )}
+
+      {/* Day 1 특별 표시 */}
+      {isDay1Introduction && (
+        <div className="flex items-center gap-1 mb-3 text-xs text-gray-500">
+          <Lightbulb className="w-3 h-3" />
+          <span>학습 방법 소개</span>
+          <CheckCircle className="w-3 h-3 text-green-500 ml-auto" />
+        </div>
+      )}
+
+      {/* 콘텐츠 정보 */}
+      <div className="space-y-1 text-xs text-gray-500">
+        {day.content?.vocabularies?.length > 0 && (
+          <div className="flex items-center gap-1">
+            <BookOpen className="w-3 h-3" />
+            <span>단어 {day.content.vocabularies.length}개</span>
           </div>
         )}
-
-        {isIntro && status === "available" && (
-          <div className="mt-3 bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-1 rounded-md inline-block">
-            학습 가이드
+        {day.content?.sentences?.length > 0 && (
+          <div className="flex items-center gap-1">
+            <MessageSquare className="w-3 h-3" />
+            <span>문장 {day.content.sentences.length}개</span>
+          </div>
+        )}
+        {day.content?.workbook?.length > 0 && (
+          <div className="flex items-center gap-1">
+            <PenTool className="w-3 h-3" />
+            <span>문제 {day.content.workbook.length}개</span>
           </div>
         )}
       </div>
 
-      <div className="mt-4 flex justify-between items-center">
-        <p className="text-xs font-medium text-slate-400">
-          {day.pageRange || " "}
-        </p>
-        <p
-          className={`text-xs font-semibold ${
-            status === "completed" ? "text-green-600" : "text-slate-400"
-          }`}
-        >
-          {status === "locked" && "준비 중"}
-          {status === "completed" && "완료됨"}
-        </p>
-      </div>
+      {/* 페이지 정보 */}
+      {day.pageRange && (
+        <div className="mt-2 text-xs text-gray-400">{day.pageRange}</div>
+      )}
+
+      {/* 상태 텍스트 */}
+      {!day.pageRange && (
+        <div className="mt-2 text-xs">
+          {status === "locked" && (
+            <span className="text-gray-400">준비 중</span>
+          )}
+          {status === "completed" && (
+            <span className="text-green-600">완료됨</span>
+          )}
+        </div>
+      )}
     </div>
   );
 };
 
-export default function CalendarPage() {
-  // --- 기존 로직 (수정되지 않음) ---
+export default function CalendarPage(day) {
   const navigate = useNavigate();
-  const { selectedPackData, currentDay, setCurrentDay } = useAppStore();
+  const { currentDay, setCurrentDay } = useAppStore();
   const { getDayProgress } = useStudyProgressStore();
+
+  const { packId, packData: selectedPackData } = useSelectedPack();
+  const { allCompleted } = useCalendarDayStatus(packId, day);
+
+  // 🔥 상태 계산 함수 개선
+  const getDayStatus = useCallback(
+    (day: number) => {
+      if (!packId) return "locked";
+
+      const { currentDay } = useAppStore.getState();
+
+      if (allCompleted) return "completed";
+      if (day === currentDay) return "current";
+      if (day <= currentDay) return "available";
+      return "locked";
+    },
+    [packId]
+  );
+
+  // 🔥 학습 시작 핸들러
+  const handleStudy = useCallback(
+    (day: number) => {
+      console.log(`🔥 Starting study for day ${day}`); // 디버깅
+      setCurrentDay(day);
+      navigate("/study");
+    },
+    [setCurrentDay, navigate]
+  );
 
   const determineStudyMode = useCallback(
     (day) => {
@@ -302,8 +363,6 @@ export default function CalendarPage() {
     navigate("/pack-select");
   }, [navigate]);
 
-  // --- 개선된 렌더링 로직 ---
-
   if (!calendarData || !selectedPackData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
@@ -420,9 +479,11 @@ export default function CalendarPage() {
               <DayCard
                 key={day.day}
                 day={day}
-                status={getCardStatus(day)}
-                isCurrent={day.day === currentDay}
+                status={getDayStatus(day.day)}
+                onStudy={handleStudy}
+                // isCurrent={day.day === currentDay}
                 onSelect={() => handleDaySelect(day)}
+                packId={packId}
               />
             ))}
           </div>
