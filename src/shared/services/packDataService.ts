@@ -286,13 +286,9 @@ class PackDataService {
           page: day.page || content.page,
           title: day.title || content.title,
           methods: day.methods || content.methods || [1],
-          vocabularies:
-            content.vocabulary ||
-            content.vocabularies ||
-            day.vocabularies ||
-            [],
-          sentences: content.sentences || day.sentences || [],
-          workbook: content.workbook || day.workbook || [],
+          vocabularies: content.vocabulary || content.vocabularies || [],
+          sentences: content.sentences || [],
+          workbook: content.workbook || [],
         };
       }),
     };
@@ -308,6 +304,7 @@ class PackDataService {
         totalDays: basePackData.totalDays, // JSON 파일의 실제 일수 우선
       };
     }
+    console.log("basePackData", basePackData);
 
     return basePackData;
   }

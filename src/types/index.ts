@@ -47,14 +47,14 @@ export interface LearningMethod {
   days: string;
 }
 
-export interface DayContent {
-  introduction?: boolean;
-  learningGuide?: Record<string, string>;
-  targetWords?: string[];
-  vocabulary?: VocabItem[];
-  sentences?: SentenceItem[];
-  workbook?: WorkbookItem[];
-}
+// export interface DayContent {
+//   introduction?: boolean;
+//   learningGuide?: Record<string, string>;
+//   targetWords?: string[];
+//   vocabulary?: VocabItem[];
+//   sentences?: SentenceItem[];
+//   workbook?: WorkbookItem[];
+// }
 
 export interface DayData {
   day: number;
@@ -63,7 +63,13 @@ export interface DayData {
   page?: number;
   title: string;
   methods: string[];
-  content: DayContent;
+  vocabularies: VocabItem[]; // ✅ 직접 접근
+  sentences: SentenceItem[]; // ✅ 직접 접근
+  workbook: WorkbookItem[]; // ✅ 직접 접근
+  // Day 1 전용 필드들
+  introduction?: boolean;
+  learningGuide?: Record<string, string>;
+  targetWords?: string[];
 }
 
 export interface PackData {

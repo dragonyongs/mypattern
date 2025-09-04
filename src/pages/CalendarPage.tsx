@@ -1,7 +1,7 @@
 // src/pages/CalendarPage.tsx
 
-import React, { useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useMemo, useCallback } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import * as LucideIcons from "lucide-react";
 import {
   Calendar,
@@ -12,56 +12,80 @@ import {
   MessageSquare,
   PenTool,
   Lightbulb,
+  ArrowLeft,
 } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useStudyProgressStore } from "../stores/studyProgressStore";
 import type { StudyMode } from "@/types";
 
-const DynamicIcon = ({ name, ...props }) => {
-  const IconComponent = LucideIcons[name];
-  if (!IconComponent) {
-    return null;
-  }
-  return <IconComponent {...props} />;
-};
-
 export default function CalendarPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { selectedPackData, currentDay, setCurrentDay } = useAppStore();
-  const { getStudyProgress } = useStudyProgressStore();
+  const { getDayProgress } = useStudyProgressStore();
 
-  // ✅ 콘솔에 전체 상태 로깅
-  useEffect(() => {
-    console.log("=== CalendarPage Debug Info ===");
-    console.log("selectedPackData:", selectedPackData);
-    console.log("selectedPackData type:", typeof selectedPackData);
-    if (selectedPackData) {
-      console.log("selectedPackData.days:", selectedPackData.days);
-      console.log(
-        "selectedPackData.days length:",
-        selectedPackData.days?.length
-      );
-      if (selectedPackData.days) {
-        selectedPackData.days.forEach((day, index) => {
-          console.log(`Day ${day.day} content:`, day.content);
-        });
+  // 학습 모드 결정 로직
+  const determineStudyMode = useCallback(
+    (day): StudyMode => {
+      // Day 1은 introduction 특별 처리
+      if (day.day === 1 && day.type === "introduction") {
+        // introduction 타입이 있다면 그것을 반환, 아니면 vocab
+        return "vocab"; // StudyMode 타입에 따라 조정
       }
-    }
-    console.log("=== End Debug Info ===");
-  }, [selectedPackData]);
 
-  // ✅ 단순화된 캘린더 데이터 변환
+      // 진행 상태 확인
+      let dayProgress = null;
+      try {
+        if (selectedPackData?.id) {
+          dayProgress = getDayProgress(selectedPackData.id, day.day);
+        }
+      } catch (error) {
+        console.warn(
+          `[CalendarPage] getDayProgress error for day ${day.day}:`,
+          error
+        );
+      }
+
+      // 완료되지 않은 모드 우선 선택
+      if (!dayProgress?.vocabDone && day.vocabularies?.length > 0) {
+        return "vocab";
+      }
+      if (!dayProgress?.sentenceDone && day.sentences?.length > 0) {
+        return "sentence";
+      }
+      if (!dayProgress?.workbookDone && day.workbook?.length > 0) {
+        return "workbook";
+      }
+
+      // 모든 모드가 완료되었거나 진행 상태를 알 수 없는 경우
+      // 가용 콘텐츠 우선순위로 선택
+      if (day.vocabularies?.length > 0) return "vocab";
+      if (day.sentences?.length > 0) return "sentence";
+      if (day.workbook?.length > 0) return "workbook";
+
+      // 기본값
+      return "vocab";
+    },
+    [selectedPackData?.id, getDayProgress]
+  );
+
+  // 캘린더 데이터 생성 및 처리
   const calendarData = useMemo(() => {
     if (!selectedPackData) {
       console.log("[CalendarPage] selectedPackData is null/undefined");
       return null;
     }
 
+    if (!selectedPackData?.days) {
+      console.log("[CalendarPage] selectedPackData.days is missing");
+      return { availableDays: 0, allDays: [] };
+    }
+
     const { days = [], totalDays = 14 } = selectedPackData;
 
     if (!Array.isArray(days)) {
       console.error("[CalendarPage] days is not an array:", days);
-      return null;
+      return { availableDays: 0, allDays: [] };
     }
 
     console.log(
@@ -74,33 +98,30 @@ export default function CalendarPage() {
     for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
       const jsonDay = days.find((d) => d.day === dayNum);
 
-      if (jsonDay && jsonDay.content) {
-        const content = jsonDay.content;
-
-        // ✅ 간단하고 확실한 콘텐츠 감지 로직
+      if (jsonDay) {
+        // ✅ Day 1 introduction은 항상 hasContent=true
         const hasContent =
-          // Day 1: introduction
-          content.introduction === true ||
-          // Day 2,3: 어떤 종류든 콘텐츠가 있음
-          (content.vocabulary && content.vocabulary.length > 0) ||
-          (content.sentences && content.sentences.length > 0) ||
-          (content.workbook && content.workbook.length > 0) ||
-          (content.targetWords && content.targetWords.length > 0) ||
-          (content.learningGuide &&
-            Object.keys(content.learningGuide).length > 0);
+          // Day 1: introduction은 항상 접근 가능
+          (dayNum === 1 && jsonDay.type === "introduction") ||
+          // introduction 플래그 체크
+          jsonDay.introduction === true ||
+          // 학습 가이드가 있는 경우
+          (jsonDay.learningGuide &&
+            Object.keys(jsonDay.learningGuide).length > 0) ||
+          // 실제 학습 콘텐츠 체크
+          (jsonDay.vocabularies && jsonDay.vocabularies.length > 0) ||
+          (jsonDay.sentences && jsonDay.sentences.length > 0) ||
+          (jsonDay.workbook && jsonDay.workbook.length > 0) ||
+          (jsonDay.targetWords && jsonDay.targetWords.length > 0);
 
-        // ✅ getStudyProgress 호출 방식 단순화 (다양한 형태 시도)
+        // 완료 상태 확인
         let isCompleted = false;
         try {
-          // 여러 가지 key 형태로 시도
-          isCompleted =
-            getStudyProgress(`day-${dayNum}`) ||
-            getStudyProgress(`${selectedPackData.id}-day-${dayNum}`) ||
-            getStudyProgress(dayNum.toString()) ||
-            false;
+          const dayProgress = getDayProgress(selectedPackData.id, dayNum);
+          isCompleted = dayProgress?.dayCompleted || false;
         } catch (error) {
           console.warn(
-            `[CalendarPage] getStudyProgress error for day ${dayNum}:`,
+            `[CalendarPage] getDayProgress error for day ${dayNum}:`,
             error
           );
           isCompleted = false;
@@ -108,10 +129,6 @@ export default function CalendarPage() {
 
         console.log(
           `[CalendarPage] Day ${dayNum}: hasContent=${hasContent}, isCompleted=${isCompleted}`
-        );
-        console.log(
-          `[CalendarPage] Day ${dayNum} content keys:`,
-          Object.keys(content)
         );
 
         allDays.push({
@@ -121,7 +138,12 @@ export default function CalendarPage() {
           page: jsonDay.page,
           title: jsonDay.title || jsonDay.category || `Day ${dayNum}`,
           methods: jsonDay.methods || [],
-          content: content,
+          vocabularies: jsonDay.vocabularies || [],
+          sentences: jsonDay.sentences || [],
+          workbook: jsonDay.workbook || [],
+          introduction: jsonDay.introduction,
+          learningGuide: jsonDay.learningGuide,
+          targetWords: jsonDay.targetWords,
           hasContent: hasContent,
           isCompleted: isCompleted,
           pageRange: jsonDay.page ? `p.${jsonDay.page}` : null,
@@ -136,7 +158,9 @@ export default function CalendarPage() {
           page: null,
           title: `Day ${dayNum}`,
           methods: [],
-          content: {},
+          vocabularies: [],
+          sentences: [],
+          workbook: [],
           hasContent: false,
           isCompleted: false,
           pageRange: null,
@@ -159,28 +183,62 @@ export default function CalendarPage() {
     );
 
     return result;
-  }, [selectedPackData, getStudyProgress]);
+  }, [selectedPackData, getDayProgress]);
 
-  // ✅ 상태 결정 로직
-  const getCardStatus = (day) => {
+  // 카드 상태 결정
+  const getCardStatus = useCallback((day) => {
     if (day.isCompleted) return "completed";
     if (day.hasContent) return "available";
     return "locked";
-  };
+  }, []);
 
-  // ✅ 로딩 상태
+  // 날짜 선택 핸들러
+  const handleDaySelect = useCallback(
+    (day) => {
+      const status = getCardStatus(day);
+      console.log("[CalendarPage] Day selected:", day.day, "status:", status);
+
+      if (status === "locked") {
+        console.log("[CalendarPage] Day is locked, cannot proceed");
+        return;
+      }
+
+      // 학습 모드 결정
+      const studyMode = determineStudyMode(day);
+      console.log("[CalendarPage] Determined study mode:", studyMode);
+
+      // 상태 업데이트
+      setCurrentDay(day.day);
+
+      // ✅ 수정: URL 파라미터로 이동
+      navigate(`/study/${day.day}`, {
+        state: {
+          mode: studyMode,
+          from: "calendar",
+        },
+      });
+    },
+    [getCardStatus, determineStudyMode, setCurrentDay, navigate]
+  );
+
+  // 뒤로 가기 핸들러
+  const handleBack = useCallback(() => {
+    navigate("/pack-select");
+  }, [navigate]);
+
+  // 로딩 상태
   if (!selectedPackData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <Book className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            학습팩이 선택되지 않았습니다.
-          </h2>
-          <p className="text-gray-600 mb-4">먼저 학습팩을 선택해주세요.</p>
+          <Book className="w-16 h-16 mx-auto mb-4 text-blue-600" />
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+            학습팩을 선택해주세요
+          </h1>
+          <p className="text-gray-600 mb-6">먼저 학습팩을 선택해주세요.</p>
           <button
-            onClick={() => navigate("/packs")}
-            className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+            onClick={handleBack}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
           >
             학습팩 선택하기
           </button>
@@ -189,340 +247,219 @@ export default function CalendarPage() {
     );
   }
 
+  // 데이터 처리 중
   if (!calendarData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">데이터를 처리하는 중...</p>
-          <div className="mt-4 text-sm text-gray-500 space-y-1">
-            <p>selectedPackData: {selectedPackData ? "있음" : "없음"}</p>
-            <p>days 배열: {selectedPackData?.days?.length || 0}개</p>
-            {selectedPackData?.days && (
-              <p>
-                days 상세:{" "}
-                {selectedPackData.days.map((d) => `Day${d.day}`).join(", ")}
-              </p>
-            )}
-          </div>
+          <div className="animate-spin w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+            데이터를 처리하는 중...
+          </h1>
         </div>
       </div>
     );
   }
 
-  const handleDaySelect = (day) => {
-    const status = getCardStatus(day);
-    if (status !== "locked") {
-      setCurrentDay(day.day);
-      navigate("/study");
-    }
-  };
-
-  const getCategoryIcon = (day) => {
-    if (day.type === "introduction") return <Lightbulb className="w-4 h-4" />;
-    return <Book className="w-4 h-4" />;
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* 헤더 */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between mb-4">
+      <div className="bg-white/80 backdrop-blur-sm border-b border-white/20 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
             <button
-              onClick={() => navigate("/packs")}
+              onClick={handleBack}
               className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
             >
-              <LucideIcons.ArrowLeft className="w-5 h-5" />
-              돌아가기
+              <ArrowLeft className="w-5 h-5" />
+              <span>돌아가기</span>
             </button>
-            <Calendar className="w-6 h-6 text-indigo-600" />
+            <Calendar className="w-6 h-6 text-blue-600" />
           </div>
-
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <div className="text-center mt-4">
+            <h1 className="text-2xl font-bold text-gray-800">
               {selectedPackData.title}
             </h1>
-            {selectedPackData.subtitle && (
-              <p className="text-gray-600">{selectedPackData.subtitle}</p>
-            )}
+            <p className="text-gray-600 mt-1">{selectedPackData.subtitle}</p>
           </div>
         </div>
       </div>
 
-      {/* ✅ 강화된 디버깅 정보 */}
-      <div className="max-w-4xl mx-auto p-4">
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-5 w-5 text-blue-400"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div className="ml-3 flex-1">
-              <h3 className="text-sm font-medium text-blue-800">
-                실시간 디버깅 정보
-              </h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p>
-                      <strong>총 일수:</strong> {calendarData.allDays.length}
-                    </p>
-                    <p>
-                      <strong>사용 가능한 일수:</strong>{" "}
-                      {calendarData.availableDays}
-                    </p>
-                    <p>
-                      <strong>완료된 일수:</strong>{" "}
-                      {calendarData.allDays.filter((d) => d.isCompleted).length}
-                    </p>
-                  </div>
-                  <div>
-                    <p>
-                      <strong>JSON days 길이:</strong>{" "}
-                      {selectedPackData.days?.length || 0}
-                    </p>
-                    <p>
-                      <strong>선택된 팩:</strong> {selectedPackData.id}
-                    </p>
-                    <p>
-                      <strong>현재 날짜:</strong> {currentDay}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <p className="font-medium">사용 가능한 날들:</p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {calendarData.allDays
-                      .filter((d) => d.hasContent)
-                      .map((day) => (
-                        <span
-                          key={day.day}
-                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800"
-                        >
-                          Day {day.day}: {day.category}
-                          {day.type === "introduction" && " (가이드)"}
-                        </span>
-                      ))}
-                  </div>
-                  {calendarData.availableDays === 0 && (
-                    <p className="text-red-600 font-medium mt-2">
-                      ⚠️ 콘텐츠 감지 실패 - 개발자 콘솔을 확인하세요
-                    </p>
-                  )}
-                </div>
+      {/* 진행률 정보 */}
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="bg-white/60 backdrop-blur-sm rounded-xl p-6 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-blue-600">
+                {calendarData.allDays.length}
               </div>
+              <div className="text-sm text-gray-600">총 일수</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-green-600">
+                {calendarData.availableDays}
+              </div>
+              <div className="text-sm text-gray-600">사용 가능한 일수</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-purple-600">
+                {calendarData.allDays.filter((d) => d.isCompleted).length}
+              </div>
+              <div className="text-sm text-gray-600">완료된 일수</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-indigo-600">
+                {currentDay}
+              </div>
+              <div className="text-sm text-gray-600">현재 날짜</div>
             </div>
           </div>
         </div>
 
-        {/* 진도 현황 요약 */}
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl text-white p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
+        {/* 학습 진도 */}
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-6 text-white mb-6">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold">학습 진도</h3>
+              <h2 className="text-xl font-bold mb-2">학습 진도</h2>
               <p className="text-indigo-100">
                 현재 {calendarData.availableDays}일분 학습 콘텐츠가 준비되어
                 있습니다
               </p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold">
-                {calendarData.allDays.filter((d) => d.isCompleted).length}/
-                {calendarData.availableDays || 1}
+              <div className="text-3xl font-bold">
+                {calendarData.availableDays}/14
               </div>
-              <div className="text-sm text-indigo-100">완료</div>
+              <div className="text-indigo-200">완료</div>
             </div>
           </div>
 
-          <div className="w-full bg-indigo-400 rounded-full h-2">
-            <div
-              className="bg-white h-2 rounded-full transition-all"
-              style={{
-                width: `${
-                  calendarData.availableDays > 0
-                    ? (calendarData.allDays.filter((d) => d.isCompleted)
-                        .length /
-                        calendarData.availableDays) *
-                      100
-                    : 0
-                }%`,
-              }}
-            />
+          {/* 진행률 바 */}
+          <div className="mt-4">
+            <div className="w-full bg-white/20 rounded-full h-3">
+              <div
+                className="bg-white h-3 rounded-full transition-all duration-300"
+                style={{ width: `${(calendarData.availableDays / 14) * 100}%` }}
+              ></div>
+            </div>
           </div>
         </div>
 
         {/* 캘린더 그리드 */}
-        <div className="bg-white rounded-xl shadow-sm border p-6">
+        <div className="bg-white rounded-xl p-6">
           <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-indigo-600" />
+            <Calendar className="w-5 h-5 text-blue-600" />
             학습 달력
           </h3>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4">
             {calendarData.allDays.map((day) => {
               const status = getCardStatus(day);
-              const isCurrentDay = currentDay === day.day;
-
               return (
                 <div
                   key={day.day}
                   onClick={() => handleDaySelect(day)}
                   className={`
-                    p-4 rounded-lg cursor-pointer transition-all border-2 relative
+                    p-4 rounded-lg cursor-pointer transition-all transform hover:scale-105
                     ${
                       status === "completed"
-                        ? "bg-green-100 border-green-300"
+                        ? "bg-green-100 border-2 border-green-300 shadow-lg"
                         : status === "available"
-                        ? "bg-white border-indigo-200 hover:border-indigo-400 hover:shadow-md"
-                        : "bg-gray-100 border-gray-200 cursor-not-allowed opacity-50"
+                        ? "bg-white border-2 border-blue-200 hover:border-blue-400 shadow-md hover:shadow-lg"
+                        : "bg-gray-100 border-2 border-gray-200 cursor-not-allowed opacity-50"
                     }
-                    ${isCurrentDay ? "ring-2 ring-indigo-500" : ""}
+                    ${currentDay === day.day ? "ring-2 ring-blue-500" : ""}
                   `}
                 >
-                  {/* ✅ 디버그 점 추가 */}
-                  <div
-                    className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
-                      day.hasContent ? "bg-green-400" : "bg-red-400"
-                    }`}
-                  ></div>
-
+                  {/* 날짜 헤더 */}
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-lg font-bold text-gray-700">
                       Day {day.day}
                     </span>
-                    {status === "completed" ? (
+                    {status === "completed" && (
                       <CheckCircle className="w-5 h-5 text-green-500" />
-                    ) : status === "available" ? (
-                      <div className="flex items-center gap-1">
-                        {getCategoryIcon(day)}
-                        <Play className="w-3 h-3 text-indigo-500" />
-                      </div>
-                    ) : (
+                    )}
+                    {status === "locked" && (
                       <Lock className="w-4 h-4 text-gray-400" />
+                    )}
+                    {status === "available" && (
+                      <Play className="w-4 h-4 text-blue-500" />
                     )}
                   </div>
 
-                  <div className="text-sm">
-                    <p className="text-gray-700 font-medium mb-1 truncate">
+                  {/* 카테고리 */}
+                  <div className="mb-2">
+                    <p className="text-sm font-medium text-gray-800">
                       {day.category}
                     </p>
-
                     {day.pageRange && (
                       <p className="text-xs text-gray-500">{day.pageRange}</p>
                     )}
-
-                    {day.type === "introduction" && (
-                      <p className="text-xs text-indigo-600 mt-1">
-                        학습 가이드
-                      </p>
-                    )}
-
-                    {!day.hasContent && (
-                      <p className="text-xs text-gray-400 mt-1">준비 중</p>
-                    )}
-
-                    {/* ✅ 콘텐츠 타입 표시 */}
-                    {day.hasContent && day.type !== "introduction" && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {day.content.vocabulary?.length > 0 && (
-                          <span className="text-xs bg-blue-100 text-blue-600 px-1 rounded">
-                            단어{day.content.vocabulary.length}
-                          </span>
-                        )}
-                        {day.content.sentences?.length > 0 && (
-                          <span className="text-xs bg-green-100 text-green-600 px-1 rounded">
-                            문장{day.content.sentences.length}
-                          </span>
-                        )}
-                        {day.content.workbook?.length > 0 && (
-                          <span className="text-xs bg-purple-100 text-purple-600 px-1 rounded">
-                            연습{day.content.workbook.length}
-                          </span>
-                        )}
-                        {day.content.targetWords?.length > 0 && (
-                          <span className="text-xs bg-orange-100 text-orange-600 px-1 rounded">
-                            핵심{day.content.targetWords.length}
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
+
+                  {/* 콘텐츠 타입 표시 */}
+                  {day.type === "introduction" && (
+                    <div className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                      <Lightbulb className="w-3 h-3" />
+                      <span>학습 가이드</span>
+                    </div>
+                  )}
+
+                  {!day.hasContent && (
+                    <div className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded">
+                      준비 중
+                    </div>
+                  )}
+
+                  {/* 학습 방법들 */}
+                  {day.hasContent && day.type !== "introduction" && (
+                    <div className="space-y-1">
+                      {day.vocabularies?.length > 0 && (
+                        <div className="text-xs text-blue-600 font-medium">
+                          단어 {day.vocabularies.length}개
+                        </div>
+                      )}
+                      {day.sentences?.length > 0 && (
+                        <div className="text-xs text-green-600 font-medium">
+                          문장 {day.sentences.length}개
+                        </div>
+                      )}
+                      {day.workbook?.length > 0 && (
+                        <div className="text-xs text-purple-600 font-medium">
+                          문제 {day.workbook.length}개
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
           {/* 범례 */}
-          <div className="mt-6 flex flex-wrap gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-100 border border-green-300 rounded"></div>
-              <span className="text-gray-600">완료</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-white border border-indigo-200 rounded"></div>
+          <div className="flex flex-wrap gap-4 mt-6 pt-6 border-t border-gray-200">
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-4 h-4 bg-white border-2 border-blue-200 rounded"></div>
               <span className="text-gray-600">학습 가능</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-gray-100 border border-gray-200 rounded"></div>
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-4 h-4 bg-green-100 border-2 border-green-300 rounded"></div>
+              <span className="text-gray-600">완료됨</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-4 h-4 bg-gray-100 border-2 border-gray-200 rounded"></div>
               <span className="text-gray-600">준비 중</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              <span className="text-gray-600">콘텐츠 있음</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-              <span className="text-gray-600">콘텐츠 없음</span>
             </div>
           </div>
         </div>
 
-        {/* 학습 방법 안내 */}
-        {selectedPackData.learningMethods &&
-          selectedPackData.learningMethods.length > 0 && (
-            <div className="mt-6 bg-indigo-50 rounded-xl p-6">
-              <h4 className="text-lg font-semibold mb-4 text-indigo-900 flex items-center gap-2">
-                <Lightbulb className="w-5 h-5" />
-                학습 방법
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {selectedPackData.learningMethods.map((method, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start gap-3 bg-white p-4 rounded-lg border border-indigo-100"
-                  >
-                    <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <DynamicIcon
-                        name={method.icon}
-                        className="w-4 h-4 text-indigo-600"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h5 className="font-medium text-gray-900 mb-1">
-                        {method.name}
-                      </h5>
-                      <p className="text-sm text-gray-600 mb-1">
-                        {method.description}
-                      </p>
-                      <p className="text-xs text-indigo-600">
-                        Day {method.days}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        {/* 도움말 */}
+        <div className="mt-6 bg-blue-50 rounded-lg p-4">
+          <p className="text-sm text-blue-800">
+            💡 <strong>학습 팁:</strong> 각 날짜를 클릭하여 학습을 시작하세요.
+            완료된 학습은 다시 복습할 수 있습니다.
+          </p>
+        </div>
       </div>
     </div>
   );
