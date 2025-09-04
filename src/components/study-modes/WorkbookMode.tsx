@@ -358,7 +358,7 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-auto bg-gray-50">
+    <div className="flex h-full min-h-[calc(100vh-129px)] bg-gray-50 font-sans">
       {/* 모바일 헤더 */}
       <div className="lg:hidden bg-white border-b px-4 py-3">
         <div className="flex items-center justify-between">
@@ -590,6 +590,28 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
                     : "💡 필요시 설명을 확인하며 학습하세요"}
                 </div>
               )}
+
+              {/* 액션 버튼 */}
+              <div className="mt-4">
+                {!isCurrentAnswered ? (
+                  <button
+                    onClick={handleCheckAnswer}
+                    disabled={!selectedAnswers[currentIndex]}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all"
+                  >
+                    <Check className="w-4 h-4" />
+                    정답 확인
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleRetry}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-all"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    다시 풀기
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* 네비게이션 버튼 */}
@@ -615,28 +637,6 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
                 다음
                 <ArrowRight className="w-4 h-4" />
               </button>
-            </div>
-
-            {/* 액션 버튼 */}
-            <div className="mt-4">
-              {!isCurrentAnswered ? (
-                <button
-                  onClick={handleCheckAnswer}
-                  disabled={!selectedAnswers[currentIndex]}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all"
-                >
-                  <Check className="w-4 h-4" />
-                  정답 확인
-                </button>
-              ) : (
-                <button
-                  onClick={handleRetry}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-all"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  다시 풀기
-                </button>
-              )}
             </div>
 
             {/* 전체 학습 완료 버튼 */}
