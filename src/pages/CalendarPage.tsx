@@ -11,7 +11,6 @@ import {
   MessageSquare,
   PenTool,
   Lightbulb,
-  ChevronRight,
 } from "lucide-react";
 
 import { useAppStore } from "../stores/appStore";
@@ -22,12 +21,19 @@ import {
 } from "@/shared/hooks/useAppHooks";
 import type { StudyMode, Day } from "@/types";
 
-// --- Helper Components for Clean UI ---
+type StatCardProps = {
+  icon: React.ComponentType<any>;
+  value: number | string;
+  label: string;
+  colorClass?: string;
+};
 
-/**
- * 상단 통계 정보를 표시하는 카드 컴포넌트
- */
-const StatCard = ({ icon: Icon, value, label, colorClass }) => (
+const StatCard: React.FC<StatCardProps> = ({
+  icon: Icon,
+  value,
+  label,
+  colorClass = "",
+}) => (
   <div className="bg-white p-4 rounded-xl shadow-sm flex items-center border border-slate-200">
     <div className={`mr-4 p-3 rounded-lg ${colorClass}`}>
       <Icon className="h-5 w-5 text-white" />
@@ -39,29 +45,36 @@ const StatCard = ({ icon: Icon, value, label, colorClass }) => (
   </div>
 );
 
-/**
- * 학습 캘린더의 각 날짜를 표시하는 카드 컴포넌트
- */
-const DayCard = ({ day, status, onSelect, packId: propPackId }) => {
+type DayCardProps = {
+  day: Day & {
+    pageRange?: string;
+    hasContent?: boolean;
+    isCompleted?: boolean;
+  };
+  status: "current" | "completed" | "locked" | "available";
+  onSelect?: (day: Day) => void;
+  packId?: string | null;
+};
+
+const DayCardInner: React.FC<DayCardProps> = ({
+  day,
+  status,
+  onSelect,
+  packId,
+}) => {
   const { vocabCompleted, sentenceCompleted, workbookCompleted } =
-    useCalendarDayStatus(propPackId || "", day.day);
+    useCalendarDayStatus(packId || "", day.day);
 
   const isDay1Introduction = day.day === 1 && day.type === "introduction";
 
-  // 🔥 2. 클릭 핸들러가 onSelect를 호출하도록 수정
   const handleClick = () => {
-    // 잠겨있지 않고, onSelect가 함수일 때만 실행
-    if (status !== "locked" && typeof onSelect === "function") {
-      console.log(`🔥 Day ${day.day} clicked, executing onSelect...`); // 디버깅
-      onSelect(day); // 부모로부터 받은 onSelect 함수에 day 객체 전체를 전달
-    }
+    if (status === "locked") return;
+    if (typeof onSelect === "function") onSelect(day);
   };
-
-  console.log("status", status);
 
   return (
     <div
-      onClick={handleClick} // 수정된 핸들러 연결
+      onClick={handleClick}
       className={`
         relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:shadow-md
         ${
@@ -75,7 +88,6 @@ const DayCard = ({ day, status, onSelect, packId: propPackId }) => {
         }
       `}
     >
-      {/* 상태 아이콘 */}
       <div className="absolute top-3 right-3">
         {status === "locked" && <Lock className="w-4 h-4 text-gray-400" />}
         {status === "completed" && (
@@ -84,7 +96,6 @@ const DayCard = ({ day, status, onSelect, packId: propPackId }) => {
         {status === "current" && <Play className="w-4 h-4 text-blue-600" />}
       </div>
 
-      {/* Day 번호와 제목 */}
       <div className="mb-2">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg font-bold text-gray-800">Day {day.day}</span>
@@ -97,7 +108,6 @@ const DayCard = ({ day, status, onSelect, packId: propPackId }) => {
         <h3 className="text-sm font-medium text-gray-700 mb-2">{day.title}</h3>
       </div>
 
-      {/* 🔥 학습 모드별 완료 상태 표시 */}
       {!isDay1Introduction && (
         <div className="flex gap-2 mb-3">
           <div
@@ -121,7 +131,6 @@ const DayCard = ({ day, status, onSelect, packId: propPackId }) => {
         </div>
       )}
 
-      {/* Day 1 특별 표시 */}
       {isDay1Introduction && (
         <div className="flex items-center gap-1 mb-3 text-xs text-gray-500">
           <Lightbulb className="w-3 h-3" />
@@ -130,7 +139,6 @@ const DayCard = ({ day, status, onSelect, packId: propPackId }) => {
         </div>
       )}
 
-      {/* 콘텐츠 정보 */}
       <div className="space-y-1 text-xs text-gray-500">
         {day.content?.vocabularies?.length > 0 && (
           <div className="flex items-center gap-1">
@@ -152,12 +160,10 @@ const DayCard = ({ day, status, onSelect, packId: propPackId }) => {
         )}
       </div>
 
-      {/* 페이지 정보 */}
       {day.pageRange && (
         <div className="mt-2 text-xs text-gray-400">{day.pageRange}</div>
       )}
 
-      {/* 상태 텍스트 */}
       {!day.pageRange && (
         <div className="mt-2 text-xs">
           {status === "locked" && (
@@ -172,103 +178,70 @@ const DayCard = ({ day, status, onSelect, packId: propPackId }) => {
   );
 };
 
-export default function CalendarPage(day) {
-  const { getProgress } = useStudyProgressStore();
+const DayCard = React.memo(DayCardInner);
+
+export default function CalendarPage(): JSX.Element {
   const navigate = useNavigate();
   const { currentDay, setCurrentDay } = useAppStore();
-  const { getDayProgress } = useStudyProgressStore();
+  const { getProgress, getDayProgress } = useStudyProgressStore();
   const { packId, packData: selectedPackData } = useSelectedPack();
-  const { allCompleted } = useCalendarDayStatus(packId, day);
 
-  // 🔥 상태 계산 함수 개선
   const getDayStatus = useCallback(
     (dayNumber: number): "current" | "completed" | "locked" | "available" => {
       if (!packId) return "locked";
+      if (dayNumber === currentDay) return "current";
 
-      // 1. 현재 학습일인지 확인 (가장 높은 우선순위)
-      if (dayNumber === currentDay) {
-        return "current";
-      }
+      const progress = getProgress(packId);
+      const dayProgress = progress?.perDay?.[dayNumber - 1];
+      if (dayProgress?.dayCompleted) return "completed";
 
-      // 2. 해당 날짜의 학습이 완료되었는지 확인 (두 번째 우선순위)
-      const dayProgress = getProgress(packId)?.perDay?.[dayNumber - 1];
-      if (dayProgress?.dayCompleted) {
-        return "completed";
-      }
+      const prevDayProgress = progress?.perDay?.[dayNumber - 2];
+      if (dayNumber === 1 || prevDayProgress?.dayCompleted) return "available";
 
-      // 3. 이전 날짜가 완료되어 학습 가능한 상태인지 확인
-      const prevDayProgress = getProgress(packId)?.perDay?.[dayNumber - 2];
-      // Day 1은 항상 접근 가능하거나, Day 2 이상은 이전 날짜가 완료되어야 함
-      if (dayNumber === 1 || prevDayProgress?.dayCompleted) {
-        return "available";
-      }
-
-      // 4. 위의 모든 조건에 해당하지 않으면 잠금 상태
       return "locked";
     },
-    [packId, currentDay, getProgress] // 의존성 배열에 필요한 모든 값을 추가
-  );
-
-  // 🔥 학습 시작 핸들러
-  const handleStudy = useCallback(
-    (day: number) => {
-      console.log(`🔥 Starting study for day ${day}`); // 디버깅
-      setCurrentDay(day);
-      navigate("/study");
-    },
-    [setCurrentDay, navigate]
+    [packId, currentDay, getProgress]
   );
 
   const determineStudyMode = useCallback(
-    (day) => {
-      if (day.day === 1 && day.type === "introduction") {
-        return "vocab";
-      }
+    (d: any): StudyMode => {
+      // day 타입이 정확하지 않을 수 있으므로 안전하게 접근
+      const dayObj = d as Day;
+      if (dayObj.day === 1 && dayObj.type === "introduction") return "vocab";
+
       let dayProgress = null;
-      try {
-        if (selectedPackData?.id) {
-          dayProgress = getDayProgress(selectedPackData.id, day.day);
+      if (selectedPackData?.id) {
+        try {
+          dayProgress = getDayProgress(selectedPackData.id, dayObj.day);
+        } catch (e) {
+          // 실패 시 기본 동작으로 계속 진행
+          console.warn(`[CalendarPage] getDayProgress error:`, e);
         }
-      } catch (error) {
-        console.warn(
-          `[CalendarPage] getDayProgress error for day ${day.day}:`,
-          error
-        );
       }
-      if (!dayProgress?.vocabDone && day.vocabularies?.length > 0)
+
+      if (!dayProgress?.vocabDone && (dayObj.vocabularies?.length ?? 0) > 0)
         return "vocab";
-      if (!dayProgress?.sentenceDone && day.sentences?.length > 0)
+      if (!dayProgress?.sentenceDone && (dayObj.sentences?.length ?? 0) > 0)
         return "sentence";
-      if (!dayProgress?.workbookDone && day.workbook?.length > 0)
+      if (!dayProgress?.workbookDone && (dayObj.workbook?.length ?? 0) > 0)
         return "workbook";
-      if (day.vocabularies?.length > 0) return "vocab";
-      if (day.sentences?.length > 0) return "sentence";
-      if (day.workbook?.length > 0) return "workbook";
+      if ((dayObj.vocabularies?.length ?? 0) > 0) return "vocab";
+      if ((dayObj.sentences?.length ?? 0) > 0) return "sentence";
+      if ((dayObj.workbook?.length ?? 0) > 0) return "workbook";
       return "vocab";
     },
     [selectedPackData?.id, getDayProgress]
   );
 
   const calendarData = useMemo(() => {
-    if (!selectedPackData) {
-      console.log("[CalendarPage] selectedPackData is null/undefined");
-      return null;
-    }
-    if (!selectedPackData?.days) {
-      console.log("[CalendarPage] selectedPackData.days is missing");
-      return { availableDays: 0, completedDays: 0, allDays: [] };
-    }
+    if (!selectedPackData) return null;
+
     const { days = [], totalDays = 14 } = selectedPackData;
-    if (!Array.isArray(days)) {
-      console.error("[CalendarPage] days is not an array:", days);
-      return { availableDays: 0, completedDays: 0, allDays: [] };
-    }
-    console.log(
-      `[CalendarPage] Processing ${days.length} days out of ${totalDays} total days`
-    );
+    if (!Array.isArray(days))
+      return { availableDays: 0, completedDays: 0, allDays: [] as any[] };
 
     let completedDaysCount = 0;
-    const allDays = [];
+    const allDays: any[] = [];
 
     for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
       const jsonDay = days.find((d) => d.day === dayNum);
@@ -285,44 +258,24 @@ export default function CalendarPage(day) {
 
         let isCompleted = false;
         try {
-          const dayProgress = getDayProgress(selectedPackData.id, dayNum);
-          isCompleted = dayProgress?.dayCompleted || false;
+          const dp = getDayProgress(selectedPackData.id, dayNum);
+          isCompleted = !!dp?.dayCompleted;
           if (isCompleted) completedDaysCount++;
-        } catch (error) {
-          console.warn(
-            `[CalendarPage] getDayProgress error for day ${dayNum}:`,
-            error
-          );
-          isCompleted = false;
+        } catch (e) {
+          // ignore
         }
-        console.log(
-          `[CalendarPage] Day ${dayNum}: hasContent=${hasContent}, isCompleted=${isCompleted}`
-        );
 
         allDays.push({
+          ...jsonDay,
           day: dayNum,
-          type: jsonDay.type || "vocabulary",
-          category: jsonDay.category || jsonDay.title || `Day ${dayNum}`,
-          page: jsonDay.page,
-          title: jsonDay.title || jsonDay.category || `Day ${dayNum}`,
-          methods: jsonDay.methods || [],
-          vocabularies: jsonDay.vocabularies || [],
-          sentences: jsonDay.sentences || [],
-          workbook: jsonDay.workbook || [],
-          introduction: jsonDay.introduction,
-          learningGuide: jsonDay.learningGuide,
-          targetWords: jsonDay.targetWords,
-          hasContent: hasContent,
-          isCompleted: isCompleted,
+          hasContent,
+          isCompleted,
           pageRange: jsonDay.page ? `p.${jsonDay.page}` : null,
         });
       } else {
-        console.log(`[CalendarPage] Day ${dayNum}: no data found`);
         allDays.push({
           day: dayNum,
           type: "locked",
-          category: `Day ${dayNum}`,
-          page: null,
           title: `Day ${dayNum}`,
           methods: [],
           vocabularies: [],
@@ -334,39 +287,28 @@ export default function CalendarPage(day) {
         });
       }
     }
-    const result = {
+
+    return {
       ...selectedPackData,
       allDays,
       availableDays: allDays.filter((d) => d.hasContent && !d.isCompleted)
         .length,
       completedDays: completedDaysCount,
     };
-    console.log(
-      `[CalendarPage] Final result: ${result.availableDays} available days, ${result.completedDays} completed days out of ${result.allDays.length}`
-    );
-    console.log(
-      "[CalendarPage] Available days:",
-      allDays.filter((d) => d.hasContent).map((d) => `Day ${d.day}`)
-    );
-    return result;
   }, [selectedPackData, getDayProgress]);
 
-  const getCardStatus = useCallback((day) => {
-    if (day.isCompleted) return "completed";
-    if (day.hasContent) return "available";
+  const getCardStatus = useCallback((d: any) => {
+    if (d.isCompleted) return "completed";
+    if (d.hasContent) return "available";
     return "locked";
   }, []);
 
   const handleDaySelect = useCallback(
-    (day) => {
+    (day: any) => {
       const status = getCardStatus(day);
-      console.log("[CalendarPage] Day selected:", day.day, "status:", status);
-      if (status === "locked") {
-        console.log("[CalendarPage] Day is locked, cannot proceed");
-        return;
-      }
+      if (status === "locked") return;
+
       const studyMode = determineStudyMode(day);
-      console.log("[CalendarPage] Determined study mode:", studyMode);
       setCurrentDay(day.day);
       navigate(`/study/${day.day}`, {
         state: { mode: studyMode, from: "calendar" },
@@ -375,9 +317,7 @@ export default function CalendarPage(day) {
     [getCardStatus, determineStudyMode, setCurrentDay, navigate]
   );
 
-  const handleBack = useCallback(() => {
-    navigate("/pack-select");
-  }, [navigate]);
+  const handleBack = useCallback(() => navigate("/pack-select"), [navigate]);
 
   if (!calendarData || !selectedPackData) {
     return (
@@ -481,7 +421,7 @@ export default function CalendarPage(day) {
             <div
               className="bg-blue-500 h-2.5 rounded-full transition-all duration-500 ease-out"
               style={{ width: `${progressPercentage}%` }}
-            ></div>
+            />
           </div>
         </div>
 
@@ -491,14 +431,12 @@ export default function CalendarPage(day) {
             학습 캘린더
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
-            {calendarData.allDays.map((day) => (
+            {calendarData.allDays.map((d: any) => (
               <DayCard
-                key={day.day}
-                day={day}
-                status={getDayStatus(day.day)}
-                // onStudy={handleStudy}
-                // isCurrent={day.day === currentDay}
-                onSelect={() => handleDaySelect(day)}
+                key={d.day}
+                day={d}
+                status={getDayStatus(d.day)}
+                onSelect={handleDaySelect}
                 packId={packId}
               />
             ))}
