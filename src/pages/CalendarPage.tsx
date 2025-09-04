@@ -57,6 +57,8 @@ const DayCard = ({ day, status, onSelect, packId: propPackId }) => {
     }
   };
 
+  console.log("status", status);
+
   return (
     <div
       onClick={handleClick} // 수정된 핸들러 연결
@@ -171,26 +173,40 @@ const DayCard = ({ day, status, onSelect, packId: propPackId }) => {
 };
 
 export default function CalendarPage(day) {
+  const { getProgress } = useStudyProgressStore();
   const navigate = useNavigate();
   const { currentDay, setCurrentDay } = useAppStore();
   const { getDayProgress } = useStudyProgressStore();
-
   const { packId, packData: selectedPackData } = useSelectedPack();
   const { allCompleted } = useCalendarDayStatus(packId, day);
 
   // 🔥 상태 계산 함수 개선
   const getDayStatus = useCallback(
-    (day: number) => {
+    (dayNumber: number): "current" | "completed" | "locked" | "available" => {
       if (!packId) return "locked";
 
-      const { currentDay } = useAppStore.getState();
+      // 1. 현재 학습일인지 확인 (가장 높은 우선순위)
+      if (dayNumber === currentDay) {
+        return "current";
+      }
 
-      if (allCompleted) return "completed";
-      if (day === currentDay) return "current";
-      if (day <= currentDay) return "available";
+      // 2. 해당 날짜의 학습이 완료되었는지 확인 (두 번째 우선순위)
+      const dayProgress = getProgress(packId)?.perDay?.[dayNumber - 1];
+      if (dayProgress?.dayCompleted) {
+        return "completed";
+      }
+
+      // 3. 이전 날짜가 완료되어 학습 가능한 상태인지 확인
+      const prevDayProgress = getProgress(packId)?.perDay?.[dayNumber - 2];
+      // Day 1은 항상 접근 가능하거나, Day 2 이상은 이전 날짜가 완료되어야 함
+      if (dayNumber === 1 || prevDayProgress?.dayCompleted) {
+        return "available";
+      }
+
+      // 4. 위의 모든 조건에 해당하지 않으면 잠금 상태
       return "locked";
     },
-    [packId]
+    [packId, currentDay, getProgress] // 의존성 배열에 필요한 모든 값을 추가
   );
 
   // 🔥 학습 시작 핸들러
@@ -480,7 +496,7 @@ export default function CalendarPage(day) {
                 key={day.day}
                 day={day}
                 status={getDayStatus(day.day)}
-                onStudy={handleStudy}
+                // onStudy={handleStudy}
                 // isCurrent={day.day === currentDay}
                 onSelect={() => handleDaySelect(day)}
                 packId={packId}
