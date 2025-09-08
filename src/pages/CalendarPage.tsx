@@ -15,11 +15,6 @@ import {
 
 import { useAppStore } from "../stores/appStore";
 import { useStudyProgressStore } from "../stores/studyProgressStore";
-import {
-  useCalendarDayStatus,
-  useSelectedPack,
-} from "@/shared/hooks/useAppHooks";
-import type { StudyMode, Day } from "@/types";
 
 type StatCardProps = {
   icon: React.ComponentType<any>;
@@ -46,13 +41,9 @@ const StatCard: React.FC<StatCardProps> = ({
 );
 
 type DayCardProps = {
-  day: Day & {
-    pageRange?: string;
-    hasContent?: boolean;
-    isCompleted?: boolean;
-  };
+  day: any;
   status: "current" | "completed" | "locked" | "available";
-  onSelect?: (day: Day) => void;
+  onSelect?: (day: any) => void;
   packId?: string | null;
 };
 
@@ -62,10 +53,29 @@ const DayCardInner: React.FC<DayCardProps> = ({
   onSelect,
   packId,
 }) => {
-  const { vocabCompleted, sentenceCompleted, workbookCompleted } =
-    useCalendarDayStatus(packId || "", day.day);
+  const dayProgress = useStudyProgressStore((state) =>
+    packId ? state.progress[packId]?.progressByDay[day.day] : null
+  );
 
-  const isDay1Introduction = day.day === 1 && day.type === "introduction";
+  const vocabCompleted = dayProgress?.completedModes
+    ? Object.keys(dayProgress.completedModes).some(
+        (mode) => mode.includes("vocab") && dayProgress.completedModes[mode]
+      )
+    : false;
+  const sentenceCompleted = dayProgress?.completedModes
+    ? Object.keys(dayProgress.completedModes).some(
+        (mode) => mode.includes("sentence") && dayProgress.completedModes[mode]
+      )
+    : false;
+  const workbookCompleted = dayProgress?.completedModes
+    ? Object.keys(dayProgress.completedModes).some(
+        (mode) => mode.includes("workbook") && dayProgress.completedModes[mode]
+      )
+    : false;
+
+  const isDay1Introduction =
+    day.day === 1 &&
+    (day.type === "introduction" || day.modes?.[0]?.type === "introduction");
 
   const handleClick = () => {
     if (status === "locked") return;
@@ -140,39 +150,28 @@ const DayCardInner: React.FC<DayCardProps> = ({
       )}
 
       <div className="space-y-1 text-xs text-gray-500">
-        {day.content?.vocabularies?.length > 0 && (
+        {day.vocabCount > 0 && (
           <div className="flex items-center gap-1">
             <BookOpen className="w-3 h-3" />
-            <span>단어 {day.content.vocabularies.length}개</span>
+            <span>단어 {day.vocabCount}개</span>
           </div>
         )}
-        {day.content?.sentences?.length > 0 && (
+        {day.sentenceCount > 0 && (
           <div className="flex items-center gap-1">
             <MessageSquare className="w-3 h-3" />
-            <span>문장 {day.content.sentences.length}개</span>
+            <span>문장 {day.sentenceCount}개</span>
           </div>
         )}
-        {day.content?.workbook?.length > 0 && (
+        {day.workbookCount > 0 && (
           <div className="flex items-center gap-1">
             <PenTool className="w-3 h-3" />
-            <span>문제 {day.content.workbook.length}개</span>
+            <span>문제 {day.workbookCount}개</span>
           </div>
         )}
       </div>
 
       {day.pageRange && (
         <div className="mt-2 text-xs text-gray-400">{day.pageRange}</div>
-      )}
-
-      {!day.pageRange && (
-        <div className="mt-2 text-xs">
-          {status === "locked" && (
-            <span className="text-gray-400">준비 중</span>
-          )}
-          {status === "completed" && (
-            <span className="text-green-600">완료됨</span>
-          )}
-        </div>
       )}
     </div>
   );
@@ -182,107 +181,175 @@ const DayCard = React.memo(DayCardInner);
 
 export default function CalendarPage(): JSX.Element {
   const navigate = useNavigate();
-  const { currentDay, setCurrentDay } = useAppStore();
-  const { getProgress, getDayProgress } = useStudyProgressStore();
-  const { packId, packData: selectedPackData } = useSelectedPack();
 
+  const currentDay = useAppStore((state) => state.currentDay);
+  const setCurrentDay = useAppStore((state) => state.setCurrentDay);
+  const selectedPackData = useAppStore((state) => state.selectedPackData);
+
+  // [중요] hydration 상태 확인
+  const hasHydrated = useStudyProgressStore((state) => state._hasHydrated);
+
+  const packId = selectedPackData?.id;
+  const getDayProgress = useStudyProgressStore((state) => state.getDayProgress);
+  const getPackProgress = useStudyProgressStore(
+    (state) => state.getPackProgress
+  );
+
+  // [중요] packId 유효성 검사
+  React.useEffect(() => {
+    console.log("📋 CalendarPage - packId:", packId);
+    console.log("📋 CalendarPage - selectedPackData:", selectedPackData);
+    if (packId === undefined || packId === "undefined") {
+      console.error("❌ Invalid packId detected in CalendarPage");
+    }
+  }, [packId, selectedPackData]);
+
+  // hydration 완료 전에는 로딩 표시
+  if (!hasHydrated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-lg font-medium text-gray-700">
+            학습 데이터 로딩 중...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // packData가 없으면 에러 처리
+  if (!selectedPackData || !packId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-800">
+            학습팩 정보가 없습니다
+          </h2>
+          <p className="mt-2 text-gray-500">학습팩을 먼저 선택해주세요.</p>
+          <button
+            onClick={() => navigate("/")}
+            className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded-lg"
+          >
+            홈으로 이동
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 나머지 코드는 동일하지만 getDayStatus에서 packId 검증 추가
   const getDayStatus = useCallback(
     (dayNumber: number): "current" | "completed" | "locked" | "available" => {
-      if (!packId) return "locked";
-      if (dayNumber === currentDay) return "current";
-
-      const progress = getProgress(packId);
-      const dayProgress = progress?.perDay?.[dayNumber - 1];
-      if (dayProgress?.dayCompleted) return "completed";
-
-      const prevDayProgress = progress?.perDay?.[dayNumber - 2];
-      if (dayNumber === 1 || prevDayProgress?.dayCompleted) return "available";
-
-      return "locked";
-    },
-    [packId, currentDay, getProgress]
-  );
-
-  const determineStudyMode = useCallback(
-    (d: any): StudyMode => {
-      // day 타입이 정확하지 않을 수 있으므로 안전하게 접근
-      const dayObj = d as Day;
-      if (dayObj.day === 1 && dayObj.type === "introduction") return "vocab";
-
-      let dayProgress = null;
-      if (selectedPackData?.id) {
-        try {
-          dayProgress = getDayProgress(selectedPackData.id, dayObj.day);
-        } catch (e) {
-          // 실패 시 기본 동작으로 계속 진행
-          console.warn(`[CalendarPage] getDayProgress error:`, e);
-        }
+      if (!packId || packId === "undefined") {
+        console.warn("⚠️ Invalid packId in getDayStatus:", packId);
+        return "locked";
       }
 
-      if (!dayProgress?.vocabDone && (dayObj.vocabularies?.length ?? 0) > 0)
-        return "vocab";
-      if (!dayProgress?.sentenceDone && (dayObj.sentences?.length ?? 0) > 0)
-        return "sentence";
-      if (!dayProgress?.workbookDone && (dayObj.workbook?.length ?? 0) > 0)
-        return "workbook";
-      if ((dayObj.vocabularies?.length ?? 0) > 0) return "vocab";
-      if ((dayObj.sentences?.length ?? 0) > 0) return "sentence";
-      if ((dayObj.workbook?.length ?? 0) > 0) return "workbook";
-      return "vocab";
+      const progress = getPackProgress(packId);
+      console.log(`📊 Checking Day ${dayNumber} status. Progress:`, progress);
+
+      if (!progress) {
+        console.log(`❌ No progress found for ${packId}`);
+        return dayNumber === 1 ? "available" : "locked";
+      }
+
+      const dayProgress = progress.progressByDay?.[dayNumber];
+
+      if (dayProgress?.isCompleted) {
+        console.log(`✅ Day ${dayNumber} is completed`);
+        return "completed";
+      }
+
+      if (dayNumber === 1) return "available";
+
+      const prevDayProgress = progress.progressByDay?.[dayNumber - 1];
+      if (prevDayProgress?.isCompleted) {
+        console.log(`🚀 Day ${dayNumber} is available (prev day completed)`);
+        return "available";
+      }
+
+      console.log(`🔒 Day ${dayNumber} is locked`);
+      return "locked";
     },
-    [selectedPackData?.id, getDayProgress]
+    [packId, getPackProgress]
   );
+  // [추가] 디버깅 버튼 (개발 중에만 사용)
+  const debugProgress = useStudyProgressStore((state) => state.debugProgress);
+
+  // JSX에 디버깅 버튼 추가 (개발용)
+  const handleDebug = () => {
+    if (packId) {
+      debugProgress(packId);
+    }
+  };
 
   const calendarData = useMemo(() => {
     if (!selectedPackData) return null;
 
-    const { days = [], totalDays = 14 } = selectedPackData;
-    if (!Array.isArray(days))
-      return { availableDays: 0, completedDays: 0, allDays: [] as any[] };
+    const { learningPlan, contents } = selectedPackData;
+    const totalDays = learningPlan?.totalDays || 14;
 
     let completedDaysCount = 0;
     const allDays: any[] = [];
 
     for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
-      const jsonDay = days.find((d) => d.day === dayNum);
-      if (jsonDay) {
+      const dayPlan = learningPlan?.days?.find((d) => d.day === dayNum);
+
+      if (dayPlan) {
+        let vocabCount = 0,
+          sentenceCount = 0,
+          workbookCount = 0;
+
+        dayPlan.modes?.forEach((mode) => {
+          const items =
+            mode.contentIds
+              ?.map((id) => contents?.find((c) => c.id === id))
+              .filter(Boolean) || [];
+          items.forEach((item) => {
+            if (item?.type === "vocabulary") vocabCount++;
+            else if (item?.type === "sentence") sentenceCount++;
+            else if (item?.type === "workbook") workbookCount++;
+          });
+        });
+
         const hasContent =
-          (dayNum === 1 && jsonDay.type === "introduction") ||
-          jsonDay.introduction === true ||
-          (jsonDay.learningGuide &&
-            Object.keys(jsonDay.learningGuide).length > 0) ||
-          (jsonDay.vocabularies && jsonDay.vocabularies.length > 0) ||
-          (jsonDay.sentences && jsonDay.sentences.length > 0) ||
-          (jsonDay.workbook && jsonDay.workbook.length > 0) ||
-          (jsonDay.targetWords && jsonDay.targetWords.length > 0);
+          dayPlan.type === "introduction" ||
+          vocabCount > 0 ||
+          sentenceCount > 0 ||
+          workbookCount > 0;
 
         let isCompleted = false;
         try {
           const dp = getDayProgress(selectedPackData.id, dayNum);
-          isCompleted = !!dp?.dayCompleted;
+          isCompleted = !!dp?.isCompleted;
           if (isCompleted) completedDaysCount++;
         } catch (e) {
           // ignore
         }
 
         allDays.push({
-          ...jsonDay,
           day: dayNum,
+          title: dayPlan.title,
+          type: dayPlan.type || "vocabulary",
+          modes: dayPlan.modes,
           hasContent,
           isCompleted,
-          pageRange: jsonDay.page ? `p.${jsonDay.page}` : null,
+          vocabCount,
+          sentenceCount,
+          workbookCount,
+          pageRange: null,
         });
       } else {
         allDays.push({
           day: dayNum,
           type: "locked",
           title: `Day ${dayNum}`,
-          methods: [],
-          vocabularies: [],
-          sentences: [],
-          workbook: [],
           hasContent: false,
           isCompleted: false,
+          vocabCount: 0,
+          sentenceCount: 0,
+          workbookCount: 0,
           pageRange: null,
         });
       }
@@ -294,30 +361,36 @@ export default function CalendarPage(): JSX.Element {
       availableDays: allDays.filter((d) => d.hasContent && !d.isCompleted)
         .length,
       completedDays: completedDaysCount,
+      totalDays,
     };
   }, [selectedPackData, getDayProgress]);
 
-  const getCardStatus = useCallback((d: any) => {
-    if (d.isCompleted) return "completed";
-    if (d.hasContent) return "available";
-    return "locked";
-  }, []);
-
+  // [수정] 더 단순하고 명확한 Day 선택 로직
   const handleDaySelect = useCallback(
     (day: any) => {
-      const status = getCardStatus(day);
-      if (status === "locked") return;
+      const status = getDayStatus(day.day);
 
-      const studyMode = determineStudyMode(day);
+      console.log(`Day ${day.day} clicked, status: ${status}`); // 디버깅용
+
+      if (status === "locked") {
+        console.log(`Day ${day.day} is locked`);
+        return;
+      }
+
+      // currentDay 설정
       setCurrentDay(day.day);
+
+      console.log(`Navigating to /study/${day.day}`); // 디버깅용
+
+      // 네비게이션
       navigate(`/study/${day.day}`, {
-        state: { mode: studyMode, from: "calendar" },
+        replace: false,
       });
     },
-    [getCardStatus, determineStudyMode, setCurrentDay, navigate]
+    [getDayStatus, setCurrentDay, navigate]
   );
 
-  const handleBack = useCallback(() => navigate("/pack-select"), [navigate]);
+  const handleBack = useCallback(() => navigate("/"), [navigate]);
 
   if (!calendarData || !selectedPackData) {
     return (
@@ -333,10 +406,10 @@ export default function CalendarPage(): JSX.Element {
           </p>
           <button
             onClick={handleBack}
-            className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            학습팩 선택으로
+            홈으로
           </button>
         </div>
       </div>
@@ -372,6 +445,12 @@ export default function CalendarPage(): JSX.Element {
             <div className="w-24 text-right">
               <Calendar className="h-6 w-6 text-slate-400 inline-block" />
             </div>
+            <button
+              onClick={handleDebug}
+              className="px-2 py-1 text-xs bg-red-500 text-white rounded"
+            >
+              Debug
+            </button>
           </div>
         </div>
       </header>

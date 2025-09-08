@@ -1,120 +1,149 @@
 // src/stores/appStore.ts
-
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { User, PackData } from "@/types";
+import type { PackData } from "@/types";
 
-// 💡 AppState 인터페이스를 간소화합니다.
-// 학습 진행률 관련 상태(completedDays, dayProgress 등)는 studyProgressStore에서 전담합니다.
+// 실제 팩 데이터 import (경로 수정)
+import realVocaBasicData from "../../public/data/packs/real-voca-basic.json";
+
 interface AppState {
-  user: User | null;
+  // 인증 상태
   isAuthenticated: boolean;
   loading: boolean;
-  selectedPackId: string | null;
+  user: any | null;
+
+  // 학습 상태
   selectedPackData: PackData | null;
-  currentDay: number; // 현재 사용자가 보고 있는 Day (UI 상태)
+  currentDay: number;
+
+  // hydration 상태
+  _hasHydrated: boolean;
 }
 
 interface AppActions {
-  // 인증
+  // 인증 액션
   login: () => Promise<void>;
   logout: () => void;
-  setLoading: (loading: boolean) => void;
-  // 팩 관리
-  selectPack: (packId: string, packData: PackData) => void;
-  clearPack: () => void;
-  // 학습 UI 상태
+
+  // 학습 액션
+  setSelectedPackData: (packData: PackData) => void;
   setCurrentDay: (day: number) => void;
+
   // 유틸리티
-  reset: () => void;
+  initialize: () => void;
+  setHasHydrated: (state: boolean) => void;
 }
 
-const initialState: AppState = {
-  user: null,
-  isAuthenticated: false,
-  loading: false,
-  selectedPackId: null,
-  selectedPackData: null,
-  currentDay: 1,
-};
-
-// ✅ appStore는 이제 인증, 선택된 팩, 현재 UI가 보고 있는 Day 정보 등 전역 UI 상태만 관리합니다.
 export const useAppStore = create<AppState & AppActions>()(
   persist(
     (set, get) => ({
-      ...initialState,
+      // --- 상태 (State) ---
+      isAuthenticated: false,
+      loading: false,
+      user: null,
+      selectedPackData: null,
+      currentDay: 1,
+      _hasHydrated: false,
 
-      // --- 인증 ---
+      // --- 액션 (Actions) ---
+      setHasHydrated: (state) => {
+        set({ _hasHydrated: state });
+      },
+
       login: async () => {
+        console.log("🔥 Login process started");
         set({ loading: true });
+
         try {
-          await new Promise((resolve) => setTimeout(resolve, 800));
-          const dummyUser: User = {
-            id: `user_${Date.now()}`,
-            email: "demo@realvoca.com",
-            name: "데모 사용자",
-            createdAt: new Date().toISOString(),
+          // 데모 로그인 시뮬레이션
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          const demoUser = {
+            id: "demo-user",
+            name: "Demo User",
+            email: "demo@example.com",
           };
+
           set({
-            user: dummyUser,
             isAuthenticated: true,
+            user: demoUser,
             loading: false,
           });
+
+          console.log("✅ Login successful");
         } catch (error) {
+          console.error("❌ Login failed:", error);
           set({ loading: false });
           throw error;
         }
       },
-      logout: () => {
-        set(initialState);
-      },
-      setLoading: (loading) => set({ loading }),
 
-      // --- 팩 관리 ---
-      selectPack: (packId, packData) => {
+      logout: () => {
+        console.log("🔥 Logout process started");
         set({
-          selectedPackId: packId,
-          selectedPackData: packData,
-          currentDay: 1, // 새로운 팩 선택 시 항상 Day 1로 초기화
-        });
-      },
-      clearPack: () => {
-        set({
-          selectedPackId: null,
+          isAuthenticated: false,
+          user: null,
           selectedPackData: null,
           currentDay: 1,
         });
+        console.log("✅ Logout completed");
       },
 
-      // --- 학습 UI 상태 ---
-      setCurrentDay: (day) => {
-        const { selectedPackData } = get();
-        if (selectedPackData && (day < 1 || day > selectedPackData.totalDays)) {
-          console.warn(`[appStore] 유효하지 않은 Day로 설정 시도: ${day}`);
+      setSelectedPackData: (packData) => {
+        console.log("🔥 Setting selected pack data:", packData?.title);
+        if (!packData) {
+          console.error("❌ Invalid packData provided to setSelectedPackData");
           return;
         }
+        set({ selectedPackData: packData });
+      },
+
+      setCurrentDay: (day) => {
+        console.log("🔥 Setting current day:", day);
         set({ currentDay: day });
       },
 
-      // --- 유틸리티 ---
-      reset: () => set(initialState),
+      initialize: () => {
+        console.log("🔥 App initialization started");
+        const state = get();
 
-      // 💡 markDayCompleted, markModeCompleted, getCompletionRate 등
-      // 진행률 관련 함수들은 모두 제거되었습니다.
-      // 이 로직은 studyProgressStore와 이를 사용하는 커스텀 훅으로 완전히 이전되었습니다.
+        // 이미 팩이 선택되어 있지 않고 인증되어 있다면 기본 팩 설정
+        if (state.isAuthenticated && !state.selectedPackData) {
+          try {
+            set({ selectedPackData: realVocaBasicData as PackData });
+            console.log("✅ Default pack data set");
+          } catch (error) {
+            console.error("❌ Failed to set default pack data:", error);
+          }
+        }
+
+        console.log("✅ App initialization completed");
+      },
     }),
     {
-      name: "real-voca-app-storage",
+      name: "app-store-v2",
       storage: createJSONStorage(() => localStorage),
-      // 💡 partialize를 통해 localStorage에 저장할 상태를 명확히 합니다.
-      // 이제 학습 진행률 데이터는 이 스토어에 중복 저장되지 않습니다.
+      // [중요] 함수 제외하고 상태만 저장
       partialize: (state) => ({
-        user: state.user,
         isAuthenticated: state.isAuthenticated,
-        selectedPackId: state.selectedPackId,
+        user: state.user,
         selectedPackData: state.selectedPackData,
         currentDay: state.currentDay,
       }),
+      // [중요] hydration 완료 후 함수 복원 및 초기화
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error("💥 App store hydration failed:", error);
+        } else {
+          console.log("✅ App store hydration completed");
+          if (state) {
+            // hydration 완료 표시
+            state.setHasHydrated(true);
+            // 초기화 실행
+            state.initialize();
+          }
+        }
+      },
     }
   )
 );

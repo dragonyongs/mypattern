@@ -1,5 +1,4 @@
 // src/components/study-modes/VocabularyMode.tsx
-
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   ArrowLeft,
@@ -23,24 +22,20 @@ import {
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
 import { useDayProgress, useStudySettings } from "@/shared/hooks/useAppHooks";
-import { StudySettingsPanel } from "@/shared/components/StudySettingsPanel"; // 수정된 패널 임포트
+import { StudySettingsPanel } from "@/shared/components/StudySettingsPanel";
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
 
-interface VocabItem {
-  id?: string;
-  word: string;
-  meaning: string;
-  emoji: string;
-  pronunciation?: string;
-  usage?: string;
-}
-
 interface VocabularyModeProps {
-  items: VocabItem[];
+  items: any[];
   dayNumber: number;
   category: string;
   packId: string;
-  onComplete?: () => void;
+  settings?: any;
+  getItemProgress?: (itemId: string) => {
+    isCompleted: boolean;
+    lastStudied?: string | null;
+  };
+  onComplete: () => void;
 }
 
 export const VocabularyMode: React.FC<VocabularyModeProps> = ({
@@ -48,6 +43,10 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   dayNumber,
   category,
   packId,
+  settings: propsSettings = {}, // [수정] props settings를 propsSettings로 변경
+  onItemCompleted,
+  getItemProgress,
+  // getItemProgress = () => ({ isCompleted: false }),
   onComplete,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -55,10 +54,21 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   const [studiedCards, setStudiedCards] = useState<Set<number>>(new Set());
   const [masteredCards, setMasteredCards] = useState<Set<number>>(new Set());
 
+  // [수정] 훅에서 받는 settings는 그대로 사용
   const { settings, updateSetting } = useStudySettings(packId);
   const { speak, isSpeaking } = useTTS();
   const { markModeCompleted } = useDayProgress(packId, dayNumber);
-  const { setItemCompleted, getItemProgress } = useStudyProgressStore();
+  const { setItemCompleted, getItemProgress: storeGetItemProgress } =
+    useStudyProgressStore();
+
+  // [수정] 최종 settings는 hook settings와 props settings를 합성
+  const finalSettings = useMemo(
+    () => ({
+      ...propsSettings,
+      ...settings,
+    }),
+    [propsSettings, settings]
+  );
 
   const currentItem = useMemo(() => items[currentIndex], [items, currentIndex]);
   const progress = useMemo(
@@ -70,13 +80,28 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
     [masteredCards.size, items.length]
   );
 
+  // [수정] 안전한 getItemProgress 사용
+  const safeGetItemProgress = useCallback(
+    (itemId: string) => {
+      if (typeof getItemProgress === "function") {
+        return getItemProgress(itemId);
+      }
+      if (typeof storeGetItemProgress === "function") {
+        return storeGetItemProgress(packId, dayNumber, itemId);
+      }
+      console.warn("getItemProgress is not available, using default");
+      return { isCompleted: false };
+    },
+    [getItemProgress, storeGetItemProgress, packId, dayNumber]
+  );
+
   useEffect(() => {
     const masteredSet = new Set<number>();
     const studiedSet = new Set<number>();
     items.forEach((vocab, index) => {
       if (vocab.id) {
-        const progress = getItemProgress(packId, dayNumber, vocab.id);
-        if (progress?.completed) {
+        const progress = safeGetItemProgress(vocab.id);
+        if (progress?.completed || progress?.isCompleted) {
           masteredSet.add(index);
           studiedSet.add(index);
         }
@@ -90,7 +115,20 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
       masteredCount: masteredSet.size,
       studiedCount: studiedSet.size,
     });
-  }, [items, getItemProgress, packId, dayNumber]);
+  }, [items, safeGetItemProgress, packId, dayNumber]);
+
+  const handleCardCompleted = useCallback(
+    (itemId: string) => {
+      // ✅ 개별 카드 완료 시 즉시 저장
+      onItemCompleted?.(itemId, true);
+    },
+    [onItemCompleted]
+  );
+
+  // 완료된 카드 수 계산
+  const completedCount = useMemo(() => {
+    return items.filter((item) => getItemProgress(item.id).isCompleted).length;
+  }, [items, getItemProgress]);
 
   const handleModeChange = useCallback(
     (mode: "immersive" | "assisted") => {
@@ -115,14 +153,19 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   );
 
   const handleToggleMeaning = useCallback(() => {
-    if (!settings.showMeaningEnabled) return;
+    if (!finalSettings.showMeaningEnabled) return;
     setShowMeaning((prev) => !prev);
     if (!showMeaning) {
       const s = new Set(studiedCards);
       s.add(currentIndex);
       setStudiedCards(s);
     }
-  }, [settings.showMeaningEnabled, showMeaning, studiedCards, currentIndex]);
+  }, [
+    finalSettings.showMeaningEnabled,
+    showMeaning,
+    studiedCards,
+    currentIndex,
+  ]);
 
   const handleMarkAsMastered = useCallback(() => {
     const currentVocab = items[currentIndex];
@@ -136,14 +179,20 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
     const s = new Set(studiedCards);
     s.add(currentIndex);
     setStudiedCards(s);
-    setItemCompleted(packId, dayNumber, currentVocab.id, true);
+
+    // [수정] setItemCompleted 안전하게 호출
+    if (typeof setItemCompleted === "function") {
+      setItemCompleted(packId, dayNumber, currentVocab.id, true);
+    }
+
     console.debug("[VocabularyMode] 단어 완료 처리:", {
       packId,
       dayNumber,
       vocabId: currentVocab.id,
       word: currentVocab.word,
     });
-    if (settings.autoProgressEnabled && currentIndex < items.length - 1) {
+
+    if (finalSettings.autoProgressEnabled && currentIndex < items.length - 1) {
       setTimeout(() => {
         setCurrentIndex((prev) => prev + 1);
         setShowMeaning(false);
@@ -157,7 +206,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
     setItemCompleted,
     packId,
     dayNumber,
-    settings.autoProgressEnabled,
+    finalSettings.autoProgressEnabled,
   ]);
 
   const handleMarkAsNotMastered = useCallback(() => {
@@ -166,7 +215,12 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
     const m = new Set(masteredCards);
     m.delete(currentIndex);
     setMasteredCards(m);
-    setItemCompleted(packId, dayNumber, currentVocab.id, false);
+
+    // [수정] setItemCompleted 안전하게 호출
+    if (typeof setItemCompleted === "function") {
+      setItemCompleted(packId, dayNumber, currentVocab.id, false);
+    }
+
     console.debug("[VocabularyMode] 단어 완료 취소:", {
       packId,
       dayNumber,
@@ -195,9 +249,11 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   });
 
   const handleComplete = useCallback(() => {
-    markModeCompleted(packId, "vocab");
+    if (typeof markModeCompleted === "function") {
+      markModeCompleted(packId, "vocab");
+    }
     onComplete?.();
-  }, [markModeCompleted, onComplete]);
+  }, [markModeCompleted, packId, onComplete]);
 
   if (!items.length) {
     return (
@@ -226,6 +282,10 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
             <p className="text-xs text-gray-500">Day {dayNumber}</p>
           </div>
           <div className="w-8"></div>
+          {/* ✅ 실제 진행도 표시 */}
+          <div className="progress-indicator">
+            완료: {completedCount} / {items.length}
+          </div>
         </header>
 
         {/* Mobile Progress Bar */}
@@ -300,7 +360,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               </button>
 
               <div className="h-20 mt-6 pt-6 border-t border-gray-200 flex flex-col justify-center">
-                {settings.showMeaningEnabled && showMeaning ? (
+                {finalSettings.showMeaningEnabled && showMeaning ? (
                   <div className="animate-in fade-in">
                     <p className="text-xl font-semibold text-gray-800">
                       {currentItem.meaning}
@@ -313,7 +373,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400">
-                    {settings.studyMode === "immersive"
+                    {finalSettings.studyMode === "immersive"
                       ? "영어로 의미를 생각해보세요"
                       : "탭하여 의미 확인"}
                   </p>
@@ -425,7 +485,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
 
           <div className="pt-6 border-t border-gray-200">
             <StudySettingsPanel
-              settings={settings}
+              settings={finalSettings}
               handleModeChange={handleModeChange}
               handleAutoProgressChange={handleAutoProgressChange}
             />

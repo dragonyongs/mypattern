@@ -1,385 +1,367 @@
 // src/stores/studyProgressStore.ts
+
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type {
+  PackProgress,
+  DayProgress,
+  PackData,
+  StudySettings,
+} from "@/types";
 
-// -----------------------------
-// 타입
-// -----------------------------
-export type StudySettings = {
-  repeatCount?: number;
-  ttsRate?: number;
-  autoAdvance?: boolean;
-  [k: string]: any;
-};
-
-export interface DayProgress {
-  completedItems: Record<
-    string,
-    {
-      itemId: string;
-      completed: boolean;
-      completedAt?: string;
-      [k: string]: any;
-    }
-  >;
-  vocabDone?: boolean;
-  sentenceDone?: boolean;
-  workbookDone?: boolean;
-  dayCompleted?: boolean;
-  settings?: StudySettings;
-  [k: string]: any;
+interface StudyProgressState {
+  progress: Record<string, PackProgress>;
+  _hasHydrated: boolean;
 }
 
-export interface PackProgress {
-  packId: string;
-  perDay: DayProgress[];
-  currentDay?: number;
-  completedDays?: number;
-  lastStudiedAt?: string | null;
-  settings?: StudySettings;
-  [k: string]: any;
-}
-
-type Progress = Record<string, PackProgress>;
-
-export interface StudyProgressState {
-  progress: Progress;
-
-  // 읽기
-  getProgress: (packId: string) => PackProgress | null;
-  getDayProgress: (packId: string, day: number) => DayProgress;
-
-  // 모드/일자 완료
+interface StudyProgressActions {
   setModeCompleted: (
     packId: string,
     day: number,
-    mode: "vocab" | "sentence" | "workbook",
-    completed: boolean
+    modeType: string,
+    packData: PackData
   ) => void;
-  setDayCompleted: (packId: string, day: number) => void;
-  setCurrentDay: (packId: string, day: number) => void;
 
-  // 설정
-  getSettings: (packId: string) => StudySettings;
-  updateSettings: (packId: string, newSettings: Partial<StudySettings>) => void;
-
-  // 아이템 단위 완료
+  // ✅ 개별 아이템 완료 상태 관리 추가
   setItemCompleted: (
     packId: string,
     day: number,
     itemId: string,
     completed: boolean
   ) => void;
+
   getItemProgress: (
     packId: string,
     day: number,
     itemId: string
-  ) => { itemId: string; completed: boolean; completedAt?: string } | null;
+  ) => { isCompleted: boolean; lastStudied: string | null };
 
-  getCompletedItems: (packId?: string, day?: number) => Record<string, any>;
-
-  // 접근성
-  isModeAvailable: (
-    packId: string,
-    day: number,
-    mode: "vocab" | "sentence" | "workbook"
-  ) => boolean;
+  getPackProgress: (packId: string) => PackProgress | null;
+  getDayProgress: (packId: string, day: number) => DayProgress | null;
+  updateSettings: (packId: string, newSettings: Partial<StudySettings>) => void;
+  getSettings: (packId: string) => StudySettings;
+  completeDay1Introduction: (packId: string) => void;
+  debugProgress: (packId: string) => void;
+  setHasHydrated: (state: boolean) => void;
 }
 
-// -----------------------------
-// 헬퍼
-// -----------------------------
-function createEmptyDayProgress(): DayProgress {
-  return { completedItems: {} };
-}
-
-const createDefaultSettings = (): StudySettings => ({
+// ✅ StudySettings 기본값 생성 함수
+const createDefaultStudySettings = (): StudySettings => ({
   showMeaningEnabled: true,
-  autoProgressEnabled: false,
-  studyMode: "assisted",
+  autoProgressEnabled: true,
+  studyMode: "immersive",
 });
 
-function createEmptyPackProgress(
-  packId?: string,
-  defaultDays = 14
-): PackProgress {
-  return {
-    packId: packId ?? "unknown",
-    perDay: Array.from({ length: defaultDays }, () => createEmptyDayProgress()),
-    currentDay: 1,
-    completedDays: 0,
-    lastStudiedAt: null,
-    settings: createDefaultSettings(),
-  };
-}
+// ✅ 개선된 DayProgress 생성 - 개별 아이템 완료 상태 포함
+const createEmptyDayProgress = (day: number): DayProgress => ({
+  day,
+  completedModes: {},
+  completedItems: {}, // ✅ 개별 아이템 완료 상태 추가
+  isCompleted: false,
+});
 
-function normalizeProgress(progress: any, defaultDays = 14): Progress {
-  if (!progress || typeof progress !== "object") return {};
-  const normalized: Progress = { ...progress };
-  Object.keys(normalized).forEach((packKey) => {
-    const pack = normalized[packKey];
-    if (!pack || typeof pack !== "object") {
-      normalized[packKey] = createEmptyPackProgress(packKey, defaultDays);
-      return;
-    }
+// ✅ 수정된 PackProgress 생성 - packId 인자 필수
+const createEmptyPackProgress = (packId: string): PackProgress => ({
+  packId,
+  lastStudiedDay: 1,
+  completedDaysCount: 0,
+  progressByDay: {},
+  settings: createDefaultStudySettings(), // ✅ 기본 설정 제공
+});
 
-    if (!Array.isArray(pack.perDay)) pack.perDay = [];
-    while (pack.perDay.length < defaultDays) {
-      pack.perDay.push(createEmptyDayProgress());
-    }
-
-    pack.perDay = pack.perDay.map((d: any) => {
-      if (!d || typeof d !== "object") return createEmptyDayProgress();
-      if (!d.completedItems || typeof d.completedItems !== "object")
-        d.completedItems = {};
-      return d;
-    });
-
-    if (typeof pack.completedDays !== "number") pack.completedDays = 0;
-    if (typeof pack.currentDay !== "number") pack.currentDay = 1;
-    if (!pack.settings || typeof pack.settings !== "object")
-      pack.settings = createDefaultSettings();
-  });
-  return normalized;
-}
-
-function safeGetCompletedItemsFromState(
-  state: any,
-  packId?: string,
-  day?: number
-) {
-  try {
-    if (!state || !state.progress) return {};
-    if (!packId) return {};
-    const pack = state.progress[packId];
-    if (!pack || !Array.isArray(pack.perDay)) return {};
-    const dayIdx = Math.max(0, (day ?? 1) - 1);
-    if (!pack.perDay[dayIdx]) return {};
-    const dayProgress = pack.perDay[dayIdx];
-    if (!dayProgress || typeof dayProgress !== "object") return {};
-    return dayProgress.completedItems || {};
-  } catch {
-    return {};
-  }
-}
-
-export function createSafeGetCompletedItems(get: any) {
-  return (packId?: string, day?: number) => {
-    try {
-      const state = typeof get === "function" ? get() : get;
-      return safeGetCompletedItemsFromState(state, packId, day);
-    } catch {
-      return {};
-    }
-  };
-}
-
-export function createSafeSetItemCompleted(get: any, set: any) {
-  return (packId: string, day: number, itemId: string, completed: boolean) => {
-    try {
-      const state = typeof get === "function" ? get() : get;
-      const prevProgress: Progress =
-        state && state.progress && typeof state.progress === "object"
-          ? { ...state.progress }
-          : {};
-
-      // pack 보장
-      if (!prevProgress[packId]) {
-        prevProgress[packId] = createEmptyPackProgress(packId);
-      }
-
-      // perDay 보장
-      if (!Array.isArray(prevProgress[packId].perDay))
-        prevProgress[packId].perDay = [];
-      const dayIndex = Math.max(0, (day ?? 1) - 1);
-      while (prevProgress[packId].perDay.length <= dayIndex) {
-        prevProgress[packId].perDay.push(createEmptyDayProgress());
-      }
-
-      // dayProgress 보장
-      if (
-        !prevProgress[packId].perDay[dayIndex] ||
-        typeof prevProgress[packId].perDay[dayIndex] !== "object"
-      ) {
-        prevProgress[packId].perDay[dayIndex] = createEmptyDayProgress();
-      }
-      const dayProgress = prevProgress[packId].perDay[dayIndex];
-
-      // completedItems 보장
-      if (
-        !dayProgress.completedItems ||
-        typeof dayProgress.completedItems !== "object"
-      ) {
-        dayProgress.completedItems = {};
-      }
-
-      // 기록
-      dayProgress.completedItems[itemId] = {
-        ...(dayProgress.completedItems[itemId] || {}),
-        itemId,
-        completed,
-        completedAt: new Date().toISOString(),
-      };
-
-      // 메타
-      prevProgress[packId].lastStudiedAt = new Date().toISOString();
-
-      console.debug("[study] item completed", {
-        packId,
-        day,
-        itemId,
-        completed,
-      });
-
-      // 저장
-      set({ progress: prevProgress });
-    } catch (err) {
-      console.error("createSafeSetItemCompleted failed", err);
-    }
-  };
-}
-
-// -----------------------------
-// 스토어
-// -----------------------------
-export const useStudyProgressStore = create<StudyProgressState>()(
+export const useStudyProgressStore = create<
+  StudyProgressState & StudyProgressActions
+>()(
   persist(
     (set, get) => ({
+      // --- 상태 (State) ---
       progress: {},
+      _hasHydrated: false,
 
-      getCompletedItems: createSafeGetCompletedItems(get),
-      setItemCompleted: createSafeSetItemCompleted(get, set),
-
-      getProgress: (packId: string) => {
-        const state = get();
-        return state.progress[packId] || null;
+      // --- 액션 (Actions) ---
+      setHasHydrated: (state) => {
+        set({ _hasHydrated: state });
       },
 
-      getDayProgress: (packId: string, day: number) => {
-        const state = get();
-        const progress = { ...state.progress };
-        if (!progress[packId]) {
-          progress[packId] = createEmptyPackProgress(packId);
-          set({ progress });
-        }
-        if (day < 1 || day > 14) return createEmptyDayProgress();
-        return progress[packId].perDay[day - 1] || createEmptyDayProgress();
-      },
-
-      setModeCompleted: (packId, day, mode, completed) => {
-        const state = get();
-        const progress = { ...state.progress };
-        if (!progress[packId])
-          progress[packId] = createEmptyPackProgress(packId);
-
-        const dayIndex = day - 1;
-        const modeKey = `${mode}Done` as keyof DayProgress;
-        const cur =
-          progress[packId].perDay[dayIndex] || createEmptyDayProgress();
-        progress[packId].perDay[dayIndex] = {
-          ...cur,
-          [modeKey]: completed,
-        };
-
-        const d = progress[packId].perDay[dayIndex];
-        if (d.vocabDone && d.sentenceDone && d.workbookDone) {
-          d.dayCompleted = true;
-          progress[packId].completedDays = Math.max(
-            progress[packId].completedDays || 0,
-            day
+      getPackProgress: (packId) => {
+        if (!packId || packId === "undefined") {
+          console.warn(
+            "⚠️ Invalid packId provided to getPackProgress:",
+            packId
           );
+          return null;
+        }
+        return get().progress[packId] || null;
+      },
+
+      getDayProgress: (packId, day) => {
+        if (!packId || packId === "undefined") {
+          console.warn("⚠️ Invalid packId provided to getDayProgress:", packId);
+          return null;
+        }
+        return get().progress[packId]?.progressByDay[day] || null;
+      },
+
+      // ✅ 수정된 getSettings - 올바른 타입 반환
+      getSettings: (packId): StudySettings => {
+        if (!packId || packId === "undefined") {
+          return createDefaultStudySettings();
         }
 
-        progress[packId].lastStudiedAt = new Date().toISOString();
-        set({ progress });
+        const packProgress = get().progress[packId];
+        if (!packProgress?.settings) {
+          return createDefaultStudySettings();
+        }
+
+        // 기본값과 저장된 설정 병합
+        return {
+          ...createDefaultStudySettings(),
+          ...packProgress.settings,
+        };
       },
 
-      setDayCompleted: (packId, day) => {
-        const state = get();
-        const progress = { ...state.progress };
-        if (!progress[packId])
-          progress[packId] = createEmptyPackProgress(packId);
+      // ✅ 개별 아이템 완료 상태 설정
+      setItemCompleted: (packId, day, itemId, completed) => {
+        if (!packId || packId === "undefined") {
+          console.error(
+            "❌ Invalid packId provided to setItemCompleted:",
+            packId
+          );
+          return;
+        }
 
-        const dayIndex = day - 1;
-        const cur =
-          progress[packId].perDay[dayIndex] || createEmptyDayProgress();
-        cur.dayCompleted = true;
-        progress[packId].perDay[dayIndex] = cur;
+        set((state) => {
+          console.log(
+            `🔥 setItemCompleted: ${packId}, day ${day}, item ${itemId} = ${completed}`
+          );
 
-        progress[packId].completedDays = Math.max(
-          progress[packId].completedDays || 0,
-          day
-        );
-        progress[packId].lastStudiedAt = new Date().toISOString();
-        set({ progress });
+          const newProgress = { ...state.progress };
+
+          // PackProgress 초기화
+          if (!newProgress[packId]) {
+            newProgress[packId] = createEmptyPackProgress(packId);
+          }
+
+          const packProgress = { ...newProgress[packId] };
+
+          // DayProgress 초기화
+          if (!packProgress.progressByDay[day]) {
+            packProgress.progressByDay[day] = createEmptyDayProgress(day);
+          }
+
+          const dayProgress = { ...packProgress.progressByDay[day] };
+
+          // 개별 아이템 완료 상태 업데이트
+          dayProgress.completedItems = {
+            ...dayProgress.completedItems,
+            [itemId]: completed,
+          };
+
+          // 마지막 학습 시간 업데이트
+          dayProgress.lastStudiedAt = new Date().toISOString();
+
+          // 상태 저장
+          packProgress.progressByDay[day] = dayProgress;
+          newProgress[packId] = packProgress;
+
+          return { progress: newProgress };
+        });
       },
 
-      setCurrentDay: (packId, day) => {
-        const state = get();
-        const progress = { ...state.progress };
-        if (!progress[packId])
-          progress[packId] = createEmptyPackProgress(packId);
+      // ✅ 개별 아이템 진행도 조회
+      getItemProgress: (packId, day, itemId) => {
+        if (!packId || packId === "undefined") {
+          return { isCompleted: false, lastStudied: null };
+        }
 
-        progress[packId].currentDay = day;
-        progress[packId].lastStudiedAt = new Date().toISOString();
-        set({ progress });
+        const state = get();
+        const dayProgress = state.progress[packId]?.progressByDay[day];
+
+        return {
+          isCompleted: dayProgress?.completedItems?.[itemId] || false,
+          lastStudied: dayProgress?.lastStudiedAt || null,
+        };
       },
 
-      getSettings: (packId) => {
-        const state = get();
-        return state.progress[packId]?.settings || createDefaultSettings();
+      setModeCompleted: (packId, day, modeType, packData) => {
+        // [중요] packId 유효성 검사
+        if (!packId || packId === "undefined") {
+          console.error(
+            "❌ Invalid packId provided to setModeCompleted:",
+            packId
+          );
+          return;
+        }
+
+        set((state) => {
+          console.log(
+            `🔥 setModeCompleted: ${packId}, day ${day}, mode ${modeType}`
+          );
+
+          const newProgress = { ...state.progress };
+
+          // ✅ 수정된 부분 - packId 인자 전달
+          if (!newProgress[packId]) {
+            newProgress[packId] = createEmptyPackProgress(packId);
+          }
+
+          const packProgress = { ...newProgress[packId] };
+
+          if (!packProgress.progressByDay[day]) {
+            packProgress.progressByDay[day] = createEmptyDayProgress(day);
+          }
+
+          const dayProgress = { ...packProgress.progressByDay[day] };
+
+          dayProgress.completedModes = {
+            ...dayProgress.completedModes,
+            [modeType]: true,
+          };
+
+          if (packData?.learningPlan?.days) {
+            const dayPlan = packData.learningPlan.days.find(
+              (d) => d.day === day
+            );
+
+            if (dayPlan) {
+              const allModesCompleted = dayPlan.modes.every(
+                (m) => dayProgress.completedModes[m.type]
+              );
+
+              if (allModesCompleted && !dayProgress.isCompleted) {
+                dayProgress.isCompleted = true;
+
+                packProgress.progressByDay = {
+                  ...packProgress.progressByDay,
+                  [day]: dayProgress,
+                };
+
+                packProgress.completedDaysCount = Object.values(
+                  packProgress.progressByDay
+                ).filter((d) => d.isCompleted).length;
+
+                packProgress.lastStudiedDay = day;
+                packProgress.lastStudiedAt = new Date().toISOString();
+
+                console.log(
+                  `🎉 Day ${day} completed! Total: ${packProgress.completedDaysCount}`
+                );
+              }
+            }
+          }
+
+          packProgress.progressByDay[day] = dayProgress;
+          newProgress[packId] = packProgress;
+
+          return { progress: newProgress };
+        });
+      },
+
+      completeDay1Introduction: (packId) => {
+        if (!packId || packId === "undefined") {
+          console.error(
+            "❌ Invalid packId provided to completeDay1Introduction:",
+            packId
+          );
+          return;
+        }
+
+        set((state) => {
+          console.log(`🔥 Completing Day 1 introduction for ${packId}`);
+
+          const newProgress = { ...state.progress };
+
+          // ✅ 수정된 부분 - packId 인자 전달
+          if (!newProgress[packId]) {
+            newProgress[packId] = createEmptyPackProgress(packId);
+          }
+
+          const packProgress = { ...newProgress[packId] };
+          const dayProgress = {
+            ...createEmptyDayProgress(1),
+            completedModes: { introduction: true },
+            isCompleted: true,
+          };
+
+          packProgress.progressByDay = {
+            ...packProgress.progressByDay,
+            [1]: dayProgress,
+          };
+
+          packProgress.completedDaysCount = 1;
+          packProgress.lastStudiedDay = 1;
+          packProgress.lastStudiedAt = new Date().toISOString();
+
+          newProgress[packId] = packProgress;
+
+          console.log(`✅ Day 1 introduction completed for ${packId}`);
+          return { progress: newProgress };
+        });
       },
 
       updateSettings: (packId, newSettings) => {
-        const state = get();
-        const progress = { ...state.progress };
-        if (!progress[packId])
-          progress[packId] = createEmptyPackProgress(packId);
+        if (!packId || packId === "undefined") return;
 
-        progress[packId].settings = {
-          ...progress[packId].settings,
-          ...newSettings,
-        };
-        set({ progress });
+        set((state) => {
+          const newProgress = { ...state.progress };
+          const packProgress =
+            newProgress[packId] || createEmptyPackProgress(packId); // ✅ packId 인자 전달
+
+          newProgress[packId] = {
+            ...packProgress,
+            settings: {
+              ...createDefaultStudySettings(), // ✅ 기본값 병합
+              ...packProgress.settings,
+              ...newSettings,
+            },
+          };
+
+          return { progress: newProgress };
+        });
       },
 
-      getItemProgress: (packId, day, itemId) => {
-        const state = get();
-        const dayProgress = state.getDayProgress(packId, day);
-        return dayProgress.completedItems[itemId] || null;
-      },
-
-      isModeAvailable: (packId, day, mode) => {
-        const state = get();
-        const dayProgress = state.getDayProgress(packId, day);
-        switch (mode) {
-          case "vocab":
-            return true;
-          case "sentence":
-            return !!(dayProgress.vocabDone || dayProgress.sentenceDone);
-          case "workbook":
-            return !!(
-              (dayProgress.vocabDone && dayProgress.sentenceDone) ||
-              dayProgress.workbookDone
-            );
-          default:
-            return false;
+      debugProgress: (packId) => {
+        if (!packId) {
+          console.log(
+            "📊 All Progress:",
+            JSON.stringify(get().progress, null, 2)
+          );
+          return;
         }
+
+        const progress = get().progress[packId];
+        console.log(
+          `📊 Debug Progress for ${packId}:`,
+          JSON.stringify(progress, null, 2)
+        );
+        console.log(
+          `🔍 localStorage data:`,
+          localStorage.getItem("study-progress-v3")
+        );
       },
     }),
     {
-      name: "study-progress",
+      name: "study-progress-v3",
       storage: createJSONStorage(() => localStorage),
-      version: 2,
-      // 안전 마이그레이션: 데이터 정규화
-      migrate: (persisted: any) => {
-        try {
-          const normalized = normalizeProgress(persisted?.progress || {}, 14);
-          return { ...persisted, progress: normalized };
-        } catch (e) {
-          console.warn("migrate normalize failed", e);
-          return persisted || { progress: {} };
+
+      // [중요] hydration 완료 시 상태 업데이트
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error("💥 Hydration failed:", error);
+        } else {
+          console.log("✅ Hydration completed successfully");
+          if (state) {
+            state.setHasHydrated(true);
+          }
         }
+      },
+
+      partialize: (state) => {
+        console.log(
+          `💾 Persisting state:`,
+          JSON.stringify(state.progress, null, 2)
+        );
+        return { progress: state.progress };
       },
     }
   )

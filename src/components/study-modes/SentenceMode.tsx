@@ -1,5 +1,4 @@
 // src/components/study-modes/SentenceMode.tsx
-
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   ArrowLeft,
@@ -7,10 +6,19 @@ import {
   Volume2,
   CheckCircle,
   RotateCcw,
+  Brain,
+  Lightbulb,
+  Eye,
+  EyeOff,
+  Zap,
   Target,
+  X,
+  Play,
+  Pause,
   ChevronLeft,
   ChevronRight,
   Check,
+  MessageSquare,
 } from "lucide-react";
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
@@ -18,20 +26,17 @@ import { useDayProgress, useStudySettings } from "@/shared/hooks/useAppHooks";
 import { StudySettingsPanel } from "@/shared/components/StudySettingsPanel";
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
 
-interface SentenceItem {
-  id?: string;
-  text: string;
-  translation: string;
-  targetWords?: string[];
-  situation?: string;
-}
-
 interface SentenceModeProps {
-  items: SentenceItem[];
+  items: any[];
   dayNumber: number;
   category: string;
   packId: string;
-  onComplete?: () => void;
+  settings?: any;
+  getItemProgress?: (itemId: string) => {
+    isCompleted: boolean;
+    lastStudied?: string | null;
+  };
+  onComplete: () => void;
 }
 
 export const SentenceMode: React.FC<SentenceModeProps> = ({
@@ -39,6 +44,8 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   dayNumber,
   category,
   packId,
+  settings: propsSettings = {}, // [수정] props settings를 propsSettings로 변경
+  getItemProgress = () => ({ isCompleted: false }),
   onComplete,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -46,10 +53,21 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   const [studiedCards, setStudiedCards] = useState<Set<number>>(new Set());
   const [masteredCards, setMasteredCards] = useState<Set<number>>(new Set());
 
+  // [수정] 훅에서 받는 settings는 그대로 사용
   const { settings, updateSetting } = useStudySettings(packId);
   const { speak, isSpeaking } = useTTS();
   const { markModeCompleted } = useDayProgress(packId, dayNumber);
-  const { setItemCompleted, getItemProgress } = useStudyProgressStore();
+  const { setItemCompleted, getItemProgress: storeGetItemProgress } =
+    useStudyProgressStore();
+
+  // [수정] 최종 settings는 hook settings와 props settings를 합성
+  const finalSettings = useMemo(
+    () => ({
+      ...propsSettings,
+      ...settings,
+    }),
+    [propsSettings, settings]
+  );
 
   const currentItem = useMemo(() => items[currentIndex], [items, currentIndex]);
   const progress = useMemo(
@@ -61,13 +79,28 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
     [masteredCards.size, items.length]
   );
 
+  // [수정] 안전한 getItemProgress 사용
+  const safeGetItemProgress = useCallback(
+    (itemId: string) => {
+      if (typeof getItemProgress === "function") {
+        return getItemProgress(itemId);
+      }
+      if (typeof storeGetItemProgress === "function") {
+        return storeGetItemProgress(packId, dayNumber, itemId);
+      }
+      console.warn("getItemProgress is not available, using default");
+      return { isCompleted: false };
+    },
+    [getItemProgress, storeGetItemProgress, packId, dayNumber]
+  );
+
   useEffect(() => {
     const masteredSet = new Set<number>();
     const studiedSet = new Set<number>();
     items.forEach((sentence, index) => {
       if (sentence.id) {
-        const progress = getItemProgress(packId, dayNumber, sentence.id);
-        if (progress?.completed) {
+        const progress = safeGetItemProgress(sentence.id);
+        if (progress?.completed || progress?.isCompleted) {
           masteredSet.add(index);
           studiedSet.add(index);
         }
@@ -79,8 +112,9 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
       packId,
       dayNumber,
       masteredCount: masteredSet.size,
+      studiedCount: studiedSet.size,
     });
-  }, [items, getItemProgress, packId, dayNumber]);
+  }, [items, safeGetItemProgress, packId, dayNumber]);
 
   const handleModeChange = useCallback(
     (mode: "immersive" | "assisted") => {
@@ -105,7 +139,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   );
 
   const handleToggleTranslation = useCallback(() => {
-    if (!settings.showMeaningEnabled) return;
+    if (!finalSettings.showMeaningEnabled) return;
     setShowTranslation((prev) => !prev);
     if (!showTranslation) {
       const s = new Set(studiedCards);
@@ -113,7 +147,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
       setStudiedCards(s);
     }
   }, [
-    settings.showMeaningEnabled,
+    finalSettings.showMeaningEnabled,
     showTranslation,
     studiedCards,
     currentIndex,
@@ -121,20 +155,30 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
 
   const handleMarkAsMastered = useCallback(() => {
     const currentSentence = items[currentIndex];
-    if (!currentSentence?.id) return;
+    if (!currentSentence?.id) {
+      console.warn("[SentenceMode] 문장 ID가 없습니다:", currentSentence);
+      return;
+    }
     const m = new Set(masteredCards);
     m.add(currentIndex);
     setMasteredCards(m);
     const s = new Set(studiedCards);
     s.add(currentIndex);
     setStudiedCards(s);
-    setItemCompleted(packId, dayNumber, currentSentence.id, true);
+
+    // [수정] setItemCompleted 안전하게 호출
+    if (typeof setItemCompleted === "function") {
+      setItemCompleted(packId, dayNumber, currentSentence.id, true);
+    }
+
     console.debug("[SentenceMode] 문장 완료 처리:", {
       packId,
       dayNumber,
       sentenceId: currentSentence.id,
+      text: currentSentence.text,
     });
-    if (settings.autoProgressEnabled && currentIndex < items.length - 1) {
+
+    if (finalSettings.autoProgressEnabled && currentIndex < items.length - 1) {
       setTimeout(() => {
         setCurrentIndex((prev) => prev + 1);
         setShowTranslation(false);
@@ -148,7 +192,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
     setItemCompleted,
     packId,
     dayNumber,
-    settings.autoProgressEnabled,
+    finalSettings.autoProgressEnabled,
   ]);
 
   const handleMarkAsNotMastered = useCallback(() => {
@@ -157,11 +201,17 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
     const m = new Set(masteredCards);
     m.delete(currentIndex);
     setMasteredCards(m);
-    setItemCompleted(packId, dayNumber, currentSentence.id, false);
+
+    // [수정] setItemCompleted 안전하게 호출
+    if (typeof setItemCompleted === "function") {
+      setItemCompleted(packId, dayNumber, currentSentence.id, false);
+    }
+
     console.debug("[SentenceMode] 문장 완료 취소:", {
       packId,
       dayNumber,
       sentenceId: currentSentence.id,
+      text: currentSentence.text,
     });
   }, [items, currentIndex, masteredCards, setItemCompleted, packId, dayNumber]);
 
@@ -185,36 +235,27 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   });
 
   const handleComplete = useCallback(() => {
-    markModeCompleted("sentence");
+    if (typeof markModeCompleted === "function") {
+      markModeCompleted(packId, "sentence");
+    }
     onComplete?.();
-  }, [markModeCompleted, onComplete]);
+  }, [markModeCompleted, packId, onComplete]);
 
+  // 문장에서 타겟 단어를 하이라이트하는 함수
   const renderHighlightedSentence = useCallback(
-    (text: string, targetWords?: string[]) => {
-      if (!targetWords || targetWords.length === 0) {
-        return text;
-      }
-      const allTargets = targetWords.join("|");
-      const parts = text.split(new RegExp(`(${allTargets})`, "gi"));
-      return (
-        <>
-          {parts.map((part, index) => {
-            const isTarget = targetWords.some(
-              (target) => part.toLowerCase() === target.toLowerCase()
-            );
-            return isTarget ? (
-              <span
-                key={index}
-                className="font-bold text-indigo-600 underline decoration-2 underline-offset-2"
-              >
-                {part}
-              </span>
-            ) : (
-              part
-            );
-          })}
-        </>
-      );
+    (text: string, targetWords: string[] = []) => {
+      if (!targetWords.length) return text;
+
+      let highlightedText = text;
+      targetWords.forEach((word) => {
+        const regex = new RegExp(`\\b(${word})\\b`, "gi");
+        highlightedText = highlightedText.replace(
+          regex,
+          '<mark class="bg-indigo-100 text-indigo-800 px-1 py-0.5 rounded">$1</mark>'
+        );
+      });
+
+      return <span dangerouslySetInnerHTML={{ __html: highlightedText }} />;
     },
     []
   );
@@ -222,7 +263,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   if (!items.length) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
-        <Target className="w-16 h-16 text-gray-300 mb-4" />
+        <MessageSquare className="w-16 h-16 text-gray-300 mb-4" />
         <h2 className="text-xl font-bold text-gray-700">
           학습할 문장이 없습니다
         </h2>
@@ -269,7 +310,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
           className="flex-1 flex flex-col justify-center items-center p-4 overflow-y-auto"
           {...swipeHandlers}
         >
-          <div className="w-full max-w-lg">
+          <div className="w-full max-w-2xl">
             <div className="flex items-center justify-center gap-1.5 mb-4">
               {items.map((_, idx) => (
                 <button
@@ -298,41 +339,49 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
                   학습 완료
                 </div>
               )}
+
+              {/* 문장 상황 표시 (있을 경우) */}
               {currentItem.situation && (
-                <p className="text-sm text-gray-500 mb-4 font-semibold">
+                <div className="text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full inline-block mb-4">
                   [{currentItem.situation}]
-                </p>
+                </div>
               )}
-              <div className="min-h-[100px] flex items-center justify-center">
-                <p className="text-2xl font-medium text-gray-800 leading-relaxed">
-                  {renderHighlightedSentence(
-                    currentItem.text,
-                    currentItem.targetWords
-                  )}
-                </p>
-              </div>
+
+              {/* 영어 문장 */}
+              <h2 className="text-2xl font-bold text-gray-800 leading-relaxed my-4">
+                {renderHighlightedSentence(
+                  currentItem.text,
+                  currentItem.targetWords
+                )}
+              </h2>
+
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handleSpeak(currentItem.text);
                 }}
                 disabled={isSpeaking}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700 rounded-full text-sm font-medium transition-all disabled:opacity-50 mt-6"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700 rounded-full text-sm font-medium transition-all disabled:opacity-50 mb-6"
               >
                 <Volume2 className="w-4 h-4" />
                 {isSpeaking ? "재생중..." : "발음 듣기"}
               </button>
 
-              <div className="h-20 mt-6 pt-6 border-t border-gray-200 flex flex-col justify-center">
-                {settings.showMeaningEnabled && showTranslation ? (
+              <div className="h-20 pt-6 border-t border-gray-200 flex flex-col justify-center">
+                {finalSettings.showMeaningEnabled && showTranslation ? (
                   <div className="animate-in fade-in">
-                    <p className="text-lg font-semibold text-gray-700">
+                    <p className="text-xl font-semibold text-gray-800">
                       {currentItem.translation}
                     </p>
+                    {currentItem.usage && (
+                      <p className="text-sm text-gray-500 mt-2 italic">
+                        "{currentItem.usage}"
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400">
-                    {settings.studyMode === "immersive"
+                    {finalSettings.studyMode === "immersive"
                       ? "영어로 의미를 생각해보세요"
                       : "탭하여 번역 보기"}
                   </p>
@@ -444,7 +493,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
 
           <div className="pt-6 border-t border-gray-200">
             <StudySettingsPanel
-              settings={settings}
+              settings={finalSettings}
               handleModeChange={handleModeChange}
               handleAutoProgressChange={handleAutoProgressChange}
             />

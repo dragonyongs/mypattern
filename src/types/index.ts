@@ -1,42 +1,89 @@
 // src/types/index.ts
 
+// =================================================================
+// 1. 기본 엔티티 타입
+// =================================================================
+export interface User {
+  id: string;
+  name: string | null;
+  email: string | null;
+  avatarUrl?: string;
+}
+
 export interface StudySettings {
+  ttsRate?: number;
+  autoAdvance?: boolean;
   showMeaningEnabled: boolean;
   autoProgressEnabled: boolean;
   studyMode: "immersive" | "assisted";
 }
 
-export interface User {
+// =================================================================
+// 2. 새로운 Pack 데이터 구조 (핵심 개선 사항)
+// =================================================================
+
+// 2-1. 콘텐츠 아이템 타입
+// -----------------------------------------------------------------
+
+export interface BaseContent {
   id: string;
-  email: string;
-  name: string;
-  createdAt: string;
+  type:
+    | "vocabulary"
+    | "sentence"
+    | "workbook"
+    | "illustration"
+    | "audio"
+    | "introduction";
+  page?: number;
+  tags?: string[];
 }
 
-export interface VocabItem {
-  id: string;
+export interface VocabularyItem extends BaseContent {
+  type: "vocabulary";
   word: string;
   meaning: string;
-  emoji: string;
   pronunciation?: string;
-  usage?: string;
+  emoji?: string;
 }
 
-export interface SentenceItem {
-  id: string;
+export interface SentenceItem extends BaseContent {
+  type: "sentence";
   text: string;
   translation: string;
-  targetWords: string[];
-  situation?: string;
+  targetWords?: string[];
+  relatedVocabIds?: string[];
 }
 
-export interface WorkbookItem {
-  id: string;
-  type: "fill-blank" | "multiple-choice";
-  sentence: string;
+export interface WorkbookItem extends BaseContent {
+  type: "workbook";
+  question: string;
   options: string[];
   correctAnswer: string;
-  explanation: string;
+  explanation?: string;
+  relatedSentenceId?: string;
+}
+
+export type ContentItem = VocabularyItem | SentenceItem | WorkbookItem;
+
+// 2-2. 학습 계획 타입
+// -----------------------------------------------------------------
+
+export interface LearningMode {
+  type: string;
+  displayName: string;
+  contentIds: string[];
+  icon?: string;
+}
+
+export interface DayPlan {
+  day: number;
+  title: string;
+  modes: LearningMode[];
+}
+
+export interface LearningPlan {
+  totalDays: number;
+  days: DayPlan[];
 }
 
 export interface LearningMethod {
@@ -47,61 +94,37 @@ export interface LearningMethod {
   days: string;
 }
 
-// export interface DayContent {
-//   introduction?: boolean;
-//   learningGuide?: Record<string, string>;
-//   targetWords?: string[];
-//   vocabulary?: VocabItem[];
-//   sentences?: SentenceItem[];
-//   workbook?: WorkbookItem[];
-// }
-
-export interface DayData {
-  day: number;
-  type: "introduction" | "vocabularies";
-  category?: string;
-  page?: number;
-  title: string;
-  methods: string[];
-  vocabularies: VocabItem[]; // ✅ 직접 접근
-  sentences: SentenceItem[]; // ✅ 직접 접근
-  workbook: WorkbookItem[]; // ✅ 직접 접근
-  // Day 1 전용 필드들
-  introduction?: boolean;
-  learningGuide?: Record<string, string>;
-  targetWords?: string[];
-}
+// 2-3. 학습 팩 전체 데이터 타입
+// -----------------------------------------------------------------
 
 export interface PackData {
   id: string;
   title: string;
-  subtitle: string;
-  totalDays: number;
-  learningMethods: LearningMethod[];
-  categories: Array<{
-    name: string;
-    page: number;
-  }>;
-  days: DayData[];
+  subtitle?: string;
+  description?: string;
+  level?: "beginner" | "intermediate" | "advanced";
+  tags?: string[];
+  contents: ContentItem[];
+  learningPlan: LearningPlan;
 }
 
-export type StudyMode = "vocab" | "sentence" | "workbook";
+// =================================================================
+// 3. 학습 진행률 상태 타입 (Zustand Store용)
+// =================================================================
 
-export interface DayProgress {
-  vocab: boolean;
-  sentence: boolean;
-  workbook: boolean;
-  completed: boolean;
+interface DayProgress {
+  day: number;
+  completedModes: Record<string, boolean>; // 기존 모드 완료
+  completedItems: Record<string, boolean>; // ✅ 개별 아이템 완료
+  isCompleted: boolean;
+  lastStudiedAt?: string;
 }
 
-export interface AppState {
-  user: User | null;
-  isAuthenticated: boolean;
-  loading: boolean;
-  selectedPackId: string | null;
-  selectedPackData: PackData | null;
-  currentDay: number;
-  studyStartDate: string | null;
-  completedDays: number[];
-  dayProgress: Record<number, DayProgress>;
+export interface PackProgress {
+  packId: string;
+  lastStudiedDay: number;
+  completedDaysCount: number;
+  progressByDay: Record<number, DayProgress>; // { 1: DayProgress, ... }
+  lastStudiedAt?: string;
+  settings?: StudySettings;
 }
