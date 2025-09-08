@@ -1,4 +1,5 @@
 // src/components/StudyInterface.tsx
+
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   ArrowLeft,
@@ -6,6 +7,9 @@ import {
   Book,
   MessageSquare,
   PenTool,
+  Image,
+  Search,
+  Mic,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { VocabularyMode } from "./study-modes/VocabularyMode";
@@ -19,9 +23,17 @@ import { packDataService } from "@/shared/services/packDataService";
 import type { PackData } from "@/types";
 import { CompletionModal } from "@/shared/components/CompletionModal";
 
-type StudyMode = "vocab" | "sentence" | "workbook";
+type StudyMode =
+  | "introduction"
+  | "imagination-vocab"
+  | "skimming-vocab"
+  | "skimming-sentence"
+  | "speaking-vocab"
+  | "speaking-sentence"
+  | "workbook";
 
 export const StudyInterface: React.FC = () => {
+  // ✅ 모든 hooks를 최상단에 한번에 호출
   const navigate = useNavigate();
   const { day: dayParam } = useParams<{ day: string }>();
   const currentDay = parseInt(dayParam || "1", 10);
@@ -36,6 +48,16 @@ export const StudyInterface: React.FC = () => {
     packData ? state.progress[packData.id]?.progressByDay[currentDay] : null
   );
 
+  const labelMap: Record<StudyMode, string> = {
+    introduction: "소개",
+    "imagination-vocab": "단어",
+    "skimming-vocab": "단어",
+    "skimming-sentence": "문장",
+    "speaking-vocab": "단어",
+    "speaking-sentence": "문장",
+    workbook: "워크북",
+  };
+
   const packId = packData?.id;
   const settings = useMemo(
     () => (packData ? getSettings(packData.id) : {}),
@@ -47,27 +69,14 @@ export const StudyInterface: React.FC = () => {
     return packData.learningPlan.days.find((d) => d.day === currentDay);
   }, [packData, currentDay]);
 
-  const toStudyModeKey = useCallback((t: string): StudyMode | null => {
-    if (t.includes("vocab")) return "vocab";
-    if (t.includes("sentence")) return "sentence";
-    if (t.includes("workbook")) return "workbook";
-    return null;
-  }, []);
-
   const availableModeKeys = useMemo<StudyMode[]>(() => {
     if (!dayPlan) return [];
     return dayPlan.modes
-      .map((m) => toStudyModeKey(m.type))
-      .filter((v): v is StudyMode => Boolean(v));
-  }, [dayPlan, toStudyModeKey]);
+      .map((m) => m.type as StudyMode)
+      .filter((type): type is StudyMode => Boolean(type));
+  }, [dayPlan]);
 
-  const [currentMode, setCurrentMode] = useState<StudyMode>("vocab");
-  useEffect(() => {
-    if (availableModeKeys.length && !availableModeKeys.includes(currentMode)) {
-      setCurrentMode(availableModeKeys[0]);
-    }
-  }, [availableModeKeys, currentMode]);
-
+  const [currentMode, setCurrentMode] = useState<StudyMode | null>(null);
   const [completion, setCompletion] = useState<{
     open: boolean;
     completed: StudyMode | null;
@@ -76,31 +85,32 @@ export const StudyInterface: React.FC = () => {
     completed: null,
   });
 
-  const typeFor = useCallback(
-    (mode: StudyMode): string | undefined => {
-      return dayPlan?.modes.find((m) => {
-        if (mode === "vocab") return m.type.includes("vocab");
-        if (mode === "sentence") return m.type.includes("sentence");
-        if (mode === "workbook") return m.type.includes("workbook");
-        return false;
-      })?.type;
-    },
-    [dayPlan]
-  );
+  // ✅ 모든 useCallback과 useMemo를 조건부 렌더링 이전에 호출
+  const getLearningMethod = useCallback((mode: StudyMode) => {
+    if (mode.includes("imagination")) return "imagine";
+    if (mode.includes("skimming")) return "skim";
+    if (mode.includes("speaking")) return "speak";
+    if (mode === "workbook") return "check";
+    return "default";
+  }, []);
 
-  // ✅ 개선된 데이터 처리: 하나의 컨텐츠 풀에서 모드별로 변환
+  const getContentType = useCallback((mode: StudyMode) => {
+    if (mode.includes("vocab")) return "vocab";
+    if (mode.includes("sentence")) return "sentence";
+    if (mode === "workbook") return "workbook";
+    return "unknown";
+  }, []);
+
   const getSharedContent = useCallback(() => {
     if (!packData || !dayPlan)
       return { vocab: [], sentences: [], workbook: [] };
 
-    // 모든 컨텐츠 ID 수집
     const allContentIds = dayPlan.modes.flatMap((mode) => mode.contentIds);
     const allContents = packDataService.getContentsByIds(
       packData,
       allContentIds
     );
 
-    // 타입별로 분류
     const vocab = allContents.filter((item) => item.type === "vocabulary");
     const sentences = allContents.filter((item) => item.type === "sentence");
     const workbook = allContents.filter((item) => item.type === "workbook");
@@ -108,30 +118,23 @@ export const StudyInterface: React.FC = () => {
     return { vocab, sentences, workbook };
   }, [packData, dayPlan]);
 
-  // ✅ 모드별 데이터 변환 (중복 없이)
   const getModeData = useCallback(
     (mode: StudyMode) => {
-      const { vocab, sentences, workbook } = getSharedContent();
-
-      switch (mode) {
-        case "vocab":
-          return vocab; // 단어 중심 보기
-        case "sentence":
-          return sentences; // 문장 중심 보기 (targetWords 강조)
-        case "workbook":
-          return workbook; // 빈칸 문제 보기
-        default:
-          return [];
-      }
+      if (!dayPlan) return [];
+      const currentModeConfig = dayPlan.modes.find((m) => m.type === mode);
+      if (!currentModeConfig) return [];
+      const modeContents = packDataService.getContentsByIds(
+        packData!,
+        currentModeConfig.contentIds
+      );
+      return modeContents;
     },
-    [getSharedContent]
+    [packData, dayPlan]
   );
 
   const getItemProgress = useCallback(
     (itemId: string) => {
       if (!packData) return { isCompleted: false, lastStudied: null };
-
-      // 개별 아이템 완료 상태 조회
       return useStudyProgressStore
         .getState()
         .getItemProgress(packData.id, currentDay, itemId);
@@ -139,16 +142,29 @@ export const StudyInterface: React.FC = () => {
     [packData, currentDay]
   );
 
-  // ✅ 개별 아이템 완료 처리 함수 추가
   const handleItemCompleted = useCallback(
     (itemId: string, completed: boolean = true) => {
       if (!packData) return;
-
       console.log(`🎯 Item completed: ${itemId} = ${completed}`);
-
+      console.log(
+        "ㅇㅇㅇㅇㅇㅇㅇㅇㅇ",
+        packData.id,
+        currentDay,
+        itemId,
+        completed
+      );
+      // 🔥 즉시 스토어에 저장
       useStudyProgressStore
         .getState()
         .setItemCompleted(packData.id, currentDay, itemId, completed);
+
+      // 🔥 상태 업데이트 후 로그
+      setTimeout(() => {
+        const updatedProgress = useStudyProgressStore
+          .getState()
+          .getItemProgress(packData.id, currentDay, itemId);
+        console.log(`📊 Updated item progress for ${itemId}:`, updatedProgress);
+      }, 100);
     },
     [packData, currentDay]
   );
@@ -160,11 +176,7 @@ export const StudyInterface: React.FC = () => {
   const handleModeComplete = useCallback(
     (completedMode: StudyMode) => {
       if (completion.open || !packData || !dayPlan) return;
-
-      const completedType = typeFor(completedMode);
-      if (completedType) {
-        setModeCompleted(packData.id, currentDay, completedType, packData);
-      }
+      setModeCompleted(packData.id, currentDay, completedMode, packData);
 
       const seq = availableModeKeys;
       const idx = seq.indexOf(completedMode);
@@ -184,7 +196,6 @@ export const StudyInterface: React.FC = () => {
       setModeCompleted,
       settings,
       availableModeKeys,
-      typeFor,
     ]
   );
 
@@ -193,6 +204,7 @@ export const StudyInterface: React.FC = () => {
       setCompletion({ open: false, completed: null });
       return;
     }
+
     const seq = availableModeKeys;
     const idx = seq.indexOf(completion.completed);
     const next = idx >= 0 && idx < seq.length - 1 ? seq[idx + 1] : null;
@@ -222,57 +234,138 @@ export const StudyInterface: React.FC = () => {
     setCompletion({ open: false, completed: null });
   }, []);
 
-  // 검증 로직들 (기존과 동일)
-  if (!packData) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-100">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-800">
-            학습 데이터가 없습니다
-          </h2>
-          <p className="text-gray-500 mt-2">학습팩을 먼저 선택해주세요.</p>
-          <button
-            onClick={() => navigate("/")}
-            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            홈으로 이동
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // ✅ 모드별 진행률 계산 함수
+  const getModeProgress = useCallback(
+    (mode: StudyMode) => {
+      const items = getModeData(mode);
+      if (items.length === 0) return { completed: 0, total: 0, percentage: 0 };
 
-  if (!packId) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-100">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-800">
-            학습팩 ID가 없습니다
-          </h2>
-          <p className="text-gray-500 mt-2">
-            올바르지 않은 학습팩 데이터입니다.
-          </p>
-          <button
-            onClick={() => navigate("/")}
-            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            홈으로 이동
-          </button>
-        </div>
-      </div>
-    );
-  }
+      const completedCount = items.filter((item) => {
+        // ✅ currentDay와 packData.id를 함께 전달
+        const progress = getItemProgress(item.id);
+        return progress.isCompleted;
+      }).length;
 
-  if (!dayPlan) {
+      return {
+        completed: completedCount,
+        total: items.length,
+        percentage: Math.round((completedCount / items.length) * 100),
+      };
+    },
+    [getModeData, getItemProgress, currentDay, packData] // ✅ 의존성 추가
+  );
+
+  // ✅ 수정된 studyModes - progress 정보 포함
+  const studyModes = useMemo(() => {
+    const labelMap: Record<StudyMode, string> = {
+      introduction: "소개",
+      "imagination-vocab": "단어",
+      "skimming-vocab": "단어",
+      "skimming-sentence": "문장",
+      "speaking-vocab": "단어",
+      "speaking-sentence": "문장",
+      workbook: "워크북",
+    };
+
+    const iconMap: Record<StudyMode, React.ComponentType<any>> = {
+      introduction: Book,
+      "imagination-vocab": Image,
+      "skimming-vocab": Search,
+      "skimming-sentence": Search,
+      "speaking-vocab": Mic,
+      "speaking-sentence": Mic,
+      workbook: PenTool,
+    };
+
+    return availableModeKeys.map((key, idx) => {
+      const prevKey = idx > 0 ? availableModeKeys[idx - 1] : null;
+      const completed = dayProgress?.completedModes[key] ?? false;
+      const available =
+        idx === 0
+          ? true
+          : prevKey
+          ? dayProgress?.completedModes[prevKey] ?? false
+          : false;
+
+      // 🔥 개별 아이템 진행률 계산
+      const progress = getModeProgress(key);
+
+      return {
+        key,
+        label: labelMap[key] || key,
+        icon: iconMap[key] || Book,
+        completed,
+        available,
+        progress, // 🔥 progress 정보 추가
+      };
+    });
+  }, [availableModeKeys, dayProgress, getModeProgress]);
+
+  // ✅ useEffect를 마지막에 호출
+  useEffect(() => {
+    if (availableModeKeys.length && !currentMode) {
+      setCurrentMode(availableModeKeys[0]);
+    } else if (
+      availableModeKeys.length &&
+      currentMode &&
+      !availableModeKeys.includes(currentMode)
+    ) {
+      setCurrentMode(availableModeKeys[0]);
+    }
+  }, [availableModeKeys, currentMode]);
+
+  // ✅ Day 접근 권한 검증
+  const isDayAccessible = useMemo(() => {
+    if (!packData) return false;
+
+    // Day 1은 항상 접근 가능
+    if (currentDay === 1) return true;
+
+    // 이전 Day가 완료되었는지 확인
+    const previousDay = currentDay - 1;
+    const previousDayProgress = packData
+      ? useStudyProgressStore
+          .getState()
+          .getDayProgress(packData.id, previousDay)
+      : null;
+
+    return previousDayProgress?.isCompleted ?? false;
+  }, [packData, currentDay]);
+
+  // ✅ 접근 불가능한 경우 처리
+  if (!isDayAccessible) {
+    const previousDay = currentDay - 1;
+
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-100">
-        <div className="text-center">
-          <p className="text-lg font-medium text-gray-700">
-            Day {currentDay} 데이터를 찾을 수 없습니다.
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-8 h-8 text-amber-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+          </div>
+
+          <h2 className="text-xl font-bold text-gray-900 mb-2">
+            Day {currentDay} 잠김
+          </h2>
+
+          <p className="text-gray-600 mb-6">
+            Day {previousDay}를 먼저 완료해주세요.
           </p>
+
           <button
-            onClick={handleBack}
-            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            onClick={() => navigate("/calendar")}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors w-full"
           >
             달력으로 돌아가기
           </button>
@@ -281,163 +374,149 @@ export const StudyInterface: React.FC = () => {
     );
   }
 
-  // Day 1 소개 화면
-  if (currentDay === 1 && dayPlan.modes[0]?.type === "introduction") {
+  // ✅ 모든 hooks 호출 완료 후 조건부 렌더링 시작
+  if (!packData) {
     return (
-      <ErrorBoundary>
-        <LearningMethodIntro
-          methods={packData.learningMethods}
-          packId={packId}
-          onComplete={() => {
-            setCurrentDay(2);
-            navigate("/calendar");
-          }}
-        />
-      </ErrorBoundary>
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">
+          학습 데이터가 없습니다
+        </h2>
+        <p className="text-gray-600 mb-4">학습팩을 먼저 선택해주세요.</p>
+        <button
+          onClick={() => navigate("/")}
+          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          홈으로 이동
+        </button>
+      </div>
     );
   }
 
-  // ✅ 개선된 컨텐츠 렌더링: 공통 데이터를 모드별로 다르게 표현
+  if (!packId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">
+          학습팩 ID가 없습니다
+        </h2>
+        <p className="text-gray-600 mb-4">올바르지 않은 학습팩 데이터입니다.</p>
+        <button
+          onClick={() => navigate("/")}
+          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          홈으로 이동
+        </button>
+      </div>
+    );
+  }
+
+  if (!dayPlan) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">
+          Day {currentDay} 데이터를 찾을 수 없습니다.
+        </h2>
+        <button
+          onClick={() => navigate("/calendar")}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          달력으로 돌아가기
+        </button>
+      </div>
+    );
+  }
+
+  // Day 1 소개 화면
+  if (currentDay === 1 && dayPlan.modes[0]?.type === "introduction") {
+    return (
+      <LearningMethodIntro
+        methods={packData.learningMethods}
+        packId={packData.id}
+        onComplete={() => {
+          setCurrentDay(2);
+          navigate("/calendar");
+        }}
+      />
+    );
+  }
+
+  if (!currentMode) {
+    return <div>Loading...</div>;
+  }
+
+  // ✅ 컨텐츠 렌더링 함수
   const renderContent = () => {
     const items = getModeData(currentMode);
-    const sharedContent = getSharedContent(); // 전체 컨텐츠 컨텍스트 제공
+    const learningMethod = getLearningMethod(currentMode);
+    const contentType = getContentType(currentMode);
 
-    switch (currentMode) {
+    // ✅ 공통 props 정의
+    const commonProps = {
+      packId: packData.id,
+      currentDay, // ✅ 이미 있음
+      dayNumber: currentDay, // ✅ 추가 - VocabularyMode용
+      getItemProgress,
+      onItemCompleted: handleItemCompleted,
+      onComplete: () => handleModeComplete(currentMode),
+    };
+
+    // ✅ studyMode를 key로 추가하여 모드 변경 시 컴포넌트 강제 재생성
+    const componentKey = `${currentMode}-${settings.studyMode}`;
+
+    switch (contentType) {
       case "vocab":
         return (
-          <ErrorBoundary>
-            <VocabularyMode
-              items={items}
-              dayNumber={currentDay}
-              category="단어 학습"
-              packId={packData.id}
-              settings={settings}
-              getItemProgress={getItemProgress}
-              onItemCompleted={handleItemCompleted}
-              sharedContent={sharedContent} // 연관된 문장 정보도 함께 전달
-              onComplete={() => handleModeComplete("vocab")}
-            />
-          </ErrorBoundary>
+          <VocabularyMode
+            key={componentKey}
+            items={items}
+            learningMethod={learningMethod}
+            {...commonProps}
+          />
         );
       case "sentence":
         return (
-          <ErrorBoundary>
-            <SentenceMode
-              items={items}
-              dayNumber={currentDay}
-              category="문장 학습"
-              packId={packData.id}
-              settings={settings}
-              getItemProgress={getItemProgress}
-              onItemCompleted={handleItemCompleted}
-              sharedContent={sharedContent} // 연관된 단어 정보도 함께 전달
-              onComplete={() => handleModeComplete("sentence")}
-            />
-          </ErrorBoundary>
+          <SentenceMode
+            key={componentKey}
+            items={items}
+            learningMethod={learningMethod}
+            {...commonProps}
+          />
         );
       case "workbook":
         return (
-          <ErrorBoundary>
-            <WorkbookMode
-              items={items}
-              dayNumber={currentDay}
-              category="워크북"
-              packId={packData.id}
-              settings={settings}
-              getItemProgress={getItemProgress}
-              onItemCompleted={handleItemCompleted}
-              sharedContent={sharedContent} // 연관된 문장/단어 정보도 함께 전달
-              onComplete={() => handleModeComplete("workbook")}
-            />
-          </ErrorBoundary>
+          <WorkbookMode key={componentKey} items={items} {...commonProps} />
         );
       default:
         return null;
     }
   };
 
-  // 나머지 UI 코드는 기존과 동일...
-  const studyModes = useMemo(() => {
-    const labelMap: Record<StudyMode, string> = {
-      vocab: "단어",
-      sentence: "문장",
-      workbook: "워크북",
-    };
-    const iconMap: Record<StudyMode, React.ComponentType<any>> = {
-      vocab: Book,
-      sentence: MessageSquare,
-      workbook: PenTool,
-    };
-
-    return availableModeKeys.map((key, idx) => {
-      const typeInPlan =
-        dayPlan?.modes.find(
-          (m) =>
-            (key === "vocab" && m.type.includes("vocab")) ||
-            (key === "sentence" && m.type.includes("sentence")) ||
-            (key === "workbook" && m.type.includes("workbook"))
-        )?.type || "";
-
-      const prevKey = idx > 0 ? availableModeKeys[idx - 1] : null;
-      const prevTypeInPlan =
-        prevKey &&
-        (dayPlan?.modes.find(
-          (m) =>
-            (prevKey === "vocab" && m.type.includes("vocab")) ||
-            (prevKey === "sentence" && m.type.includes("sentence")) ||
-            (prevKey === "workbook" && m.type.includes("workbook"))
-        )?.type ||
-          "");
-
-      const completed = dayProgress?.completedModes[typeInPlan] ?? false;
-      const available =
-        idx === 0
-          ? true
-          : prevTypeInPlan
-          ? dayProgress?.completedModes[prevTypeInPlan] ?? false
-          : false;
-
-      return {
-        key,
-        label: labelMap[key],
-        icon: iconMap[key],
-        completed,
-        available,
-      };
-    });
-  }, [availableModeKeys, dayPlan, dayProgress]);
-
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen bg-gray-50">
         {/* 헤더 */}
-        <header className="bg-white shadow-sm border-b border-slate-200">
-          <div className="flex items-center justify-between px-4 py-3">
+        <div className="bg-white border-b border-gray-200 px-4 py-3">
+          <div className="flex items-center gap-3">
             <button
               onClick={handleBack}
-              className="flex items-center gap-2 px-2 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="text-sm font-medium">뒤로</span>
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
-            <div className="text-center">
-              <h1 className="text-lg font-bold text-slate-900">
-                Day {currentDay}
-              </h1>
-              <p className="text-xs text-slate-500">{dayPlan.title}</p>
+            <div>
+              <h1 className="font-semibold text-gray-900">Day {currentDay}</h1>
+              <p className="text-sm text-gray-600">{dayPlan.title}</p>
             </div>
-            <div className="w-16"></div>
           </div>
-        </header>
+        </div>
 
         {/* 모드 탭 */}
-        <nav className="bg-white border-b border-slate-200 px-4 py-3">
-          <div className="flex justify-center items-center gap-2 overflow-x-auto">
+        <div className="bg-white border-b border-gray-200 px-4 py-3">
+          <div className="flex gap-2 overflow-x-auto p-2">
             {studyModes.map(
-              ({ key, label, icon: Icon, completed, available }) => (
+              ({ key, label, icon: Icon, completed, available, progress }) => (
                 <button
                   key={key}
-                  onClick={() => available && setCurrentMode(key as StudyMode)}
+                  onClick={() => available && setCurrentMode(key)}
                   disabled={!available}
                   className={`
                   flex items-center gap-2.5 px-4 py-2.5 rounded-lg font-medium text-sm whitespace-nowrap
@@ -455,25 +534,42 @@ export const StudyInterface: React.FC = () => {
                 >
                   <Icon className="w-4 h-4" />
                   <span>{label}</span>
-                  {completed && (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  {/* 🔥 개별 아이템 진행률 표시 */}
+                  {progress && progress.total > 0 && (
+                    <span className="text-xs opacity-75">
+                      ({progress.completed}/{progress.total})
+                    </span>
                   )}
+                  {completed && <CheckCircle2 className="w-4 h-4" />}
                 </button>
               )
             )}
           </div>
-        </nav>
+        </div>
 
         {/* 컨텐츠 영역 */}
-        <main className="flex-1 bg-slate-50">{renderContent()}</main>
+        <div className="flex-1">{renderContent()}</div>
 
         {/* 완료 모달 */}
         <CompletionModal
-          isOpen={completion.open}
-          onClose={handleCloseModal}
+          key={`${completion.completed}-${currentDay}`} // ✅ 핵심 수정: 완료된 모드별로 새 모달 생성
+          open={completion.open}
+          title={
+            completion.completed
+              ? `${
+                  labelMap[completion.completed] || completion.completed
+                } 완료!`
+              : "완료!"
+          }
+          description={
+            completion.completed
+              ? `Day ${currentDay}의 ${
+                  labelMap[completion.completed]
+                } 학습을 완료했습니다.`
+              : undefined
+          }
           onConfirm={handleConfirmNext}
-          title="학습 완료!"
-          message="다음 단계로 이동하시겠습니까?"
+          onClose={handleCloseModal}
         />
       </div>
     </ErrorBoundary>

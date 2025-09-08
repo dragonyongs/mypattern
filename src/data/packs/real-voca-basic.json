@@ -1,0 +1,355 @@
+{
+    "id": "real-voca-basic",
+    "title": "Real VOCA Basic",
+    "subtitle": "14일이면 한 권을 충분히 볼 수 있습니다.",
+    "totalDays": 14,
+    "learningMethods": [
+        {
+            "phase": 1,
+            "name": "상상하고",
+            "icon": "Image",
+            "description": "단어 리스트를 보면서 의미를 생각해봅니다. Target Words를 중심으로 그림을 통해 상황을 연상하면서 단어의 의미를 이미지로 기억합니다."
+        },
+        {
+            "phase": 2,
+            "name": "훑어보고",
+            "icon": "Search",
+            "description": "내가 원래 알고 있었던 단어, 뜻은 아는데 정작 사용할 줄 몰랐던 단어, 알듯 말듯한 표현 등을 점검하면서 전체 내용을 훑어봅니다."
+        },
+        {
+            "phase": 3,
+            "name": "말해보고",
+            "icon": "Mic",
+            "description": "문장 속에 있는 단어를 유심히 살피면서 소리 내어 읽어봅니다. MP3를 들으면서 따라해 보는 것도 적극 추천합니다."
+        },
+        {
+            "phase": 4,
+            "name": "확인하고",
+            "icon": "CheckSquare",
+            "description": "워크북의 빈칸을 채워보세요. 손으로 써 봐도 좋고, 소리 내어 말해보는 것도 괜찮아요."
+        }
+    ],
+    "categories": [
+        {
+            "name": "Wake up",
+            "page": 28
+        },
+        {
+            "name": "Breakfast",
+            "page": 34
+        },
+        {
+            "name": "Washing up",
+            "page": 40
+        },
+        {
+            "name": "Skin Care",
+            "page": 46
+        },
+        {
+            "name": "What to wear",
+            "page": 52
+        },
+        {
+            "name": "Going to work",
+            "page": 58
+        },
+        {
+            "name": "At work",
+            "page": 64
+        },
+        {
+            "name": "At a bar",
+            "page": 70
+        },
+        {
+            "name": "Shopping for jeans",
+            "page": 76
+        },
+        {
+            "name": "Shopping for shoes",
+            "page": 82
+        },
+        {
+            "name": "Having a meal",
+            "page": 88
+        },
+        {
+            "name": "Coffee time",
+            "page": 94
+        },
+        {
+            "name": "Shopping at Costco",
+            "page": 100
+        },
+        {
+            "name": "Watching TV",
+            "page": 106
+        },
+        {
+            "name": "Cleaning a room",
+            "page": 112
+        },
+        {
+            "name": "Doing the laundry",
+            "page": 118
+        },
+        {
+            "name": "Cooking",
+            "page": 124
+        },
+        {
+            "name": "A fall",
+            "page": 130
+        },
+        {
+            "name": "Getting ready for bed",
+            "page": 136
+        }
+    ],
+    "contents": [
+        {
+            "id": "v-d2-1",
+            "type": "vocabulary",
+            "word": "hear",
+            "meaning": "듣다",
+            "emoji": "👂",
+            "pronunciation": "/hɪr/"
+        },
+        {
+            "id": "v-d2-2",
+            "type": "vocabulary",
+            "word": "going off",
+            "meaning": "(알람이) 울리다",
+            "emoji": "⏰",
+            "pronunciation": "/ˈɡoʊɪŋ ɔf/"
+        },
+        {
+            "id": "v-d2-3",
+            "type": "vocabulary",
+            "word": "asleep",
+            "meaning": "잠든",
+            "emoji": "😴",
+            "pronunciation": "/əˈslip/"
+        },
+        {
+            "id": "v-d2-4",
+            "type": "vocabulary",
+            "word": "hide",
+            "meaning": "숨기다",
+            "emoji": "🙈",
+            "pronunciation": "/haɪd/"
+        },
+        {
+            "id": "v-d2-5",
+            "type": "vocabulary",
+            "word": "wake up",
+            "meaning": "일어나다, 깨우다",
+            "emoji": "🌅",
+            "pronunciation": "/weɪk ʌp/"
+        },
+        {
+            "id": "v-d2-6",
+            "type": "vocabulary",
+            "word": "oversleep",
+            "meaning": "늦잠자다",
+            "emoji": "😪",
+            "pronunciation": "/ˌoʊvərˈslip/"
+        },
+        {
+            "id": "v-d2-7",
+            "type": "vocabulary",
+            "word": "stretch",
+            "meaning": "기지개를 켜다",
+            "emoji": "🤸",
+            "pronunciation": "/stretʃ/"
+        },
+        {
+            "id": "v-d2-8",
+            "type": "vocabulary",
+            "word": "make my bed",
+            "meaning": "침대를 정리하다",
+            "emoji": "🛏️",
+            "pronunciation": "/meɪk maɪ bed/"
+        },
+        {
+            "id": "s-d2-1",
+            "type": "sentence",
+            "text": "I hear a noise.",
+            "translation": "나는 소리를 듣는다.",
+            "targetWords": [
+                "hear"
+            ],
+            "relatedVocabIds": [
+                "v-d2-1"
+            ]
+        },
+        {
+            "id": "s-d2-2",
+            "type": "sentence",
+            "text": "It's my alarm clock going off.",
+            "translation": "내 알람시계가 울리고 있다.",
+            "targetWords": [
+                "going off"
+            ],
+            "relatedVocabIds": [
+                "v-d2-2"
+            ]
+        },
+        {
+            "id": "s-d2-3",
+            "type": "sentence",
+            "text": "The alarm clock goes off at 7 o'clock.",
+            "translation": "알람시계가 7시에 울린다.",
+            "targetWords": [
+                "at 7 o'clock"
+            ],
+            "relatedVocabIds": [
+                "v-d2-2"
+            ]
+        },
+        {
+            "id": "s-d2-4",
+            "type": "sentence",
+            "text": "I'm still asleep in my cozy bed.",
+            "translation": "나는 여전히 아늑한 침대에서 자고 있다.",
+            "targetWords": [
+                "asleep"
+            ],
+            "relatedVocabIds": [
+                "v-d2-3"
+            ]
+        },
+        {
+            "id": "w-d2-1",
+            "type": "workbook",
+            "question": "I _____ a noise.",
+            "options": [
+                "hear",
+                "listen",
+                "sound",
+                "voice"
+            ],
+            "correctAnswer": "hear",
+            "explanation": "'hear'는 자연스럽게 들리는 소리를 듣는다는 의미입니다.",
+            "relatedSentenceId": "s-d2-1"
+        },
+        {
+            "id": "w-d2-2",
+            "type": "workbook",
+            "question": "The alarm clock is _____ at 7 o'clock.",
+            "options": [
+                "going off",
+                "ringing",
+                "making noise",
+                "sounding"
+            ],
+            "correctAnswer": "going off",
+            "explanation": "'going off'는 알람이 설정된 시간에 울리기 시작한다는 의미입니다.",
+            "relatedSentenceId": "s-d2-3"
+        }
+    ],
+    "learningPlan": {
+        "totalDays": 14,
+        "days": [
+            {
+                "day": 1,
+                "title": "학습 방법 소개",
+                "modes": [
+                    {
+                        "type": "introduction",
+                        "contentIds": []
+                    }
+                ]
+            },
+            {
+                "day": 2,
+                "title": "Wake up (훑어보기)",
+                "pageRange": "28_141",
+                "learningMethod": "skim",
+                "modes": [
+                    {
+                        "type": "skimming-vocab",
+                        "displayName": "단어",
+                        "contentIds": [
+                            "v-d2-1",
+                            "v-d2-2",
+                            "v-d2-3",
+                            "v-d2-4",
+                            "v-d2-5",
+                            "v-d2-6",
+                            "v-d2-7",
+                            "v-d2-8"
+                        ]
+                    },
+                    {
+                        "type": "skimming-sentence",
+                        "displayName": "문장",
+                        "contentIds": [
+                            "s-d2-1",
+                            "s-d2-2",
+                            "s-d2-3",
+                            "s-d2-4"
+                        ]
+                    }
+                ]
+            },
+            {
+                "day": 3,
+                "title": "훑어보기 (28-75p)",
+                "pageRange": "28_75",
+                "learningMethod": "skim",
+                "modes": [
+                    {
+                        "type": "skimming-vocab",
+                        "displayName": "단어",
+                        "contentIds": []
+                    },
+                    {
+                        "type": "skimming-sentence",
+                        "displayName": "문장",
+                        "contentIds": []
+                    }
+                ]
+            },
+            {
+                "day": 6,
+                "title": "Wake up (말해보기)",
+                "modes": [
+                    {
+                        "type": "speaking-vocab",
+                        "displayName": "단어 말하기",
+                        "contentIds": [
+                            "v-d2-1",
+                            "v-d2-2",
+                            "v-d2-3",
+                            "v-d2-4"
+                        ]
+                    },
+                    {
+                        "type": "speaking-sentence",
+                        "displayName": "문장 말하기",
+                        "contentIds": [
+                            "s-d2-1",
+                            "s-d2-2"
+                        ]
+                    }
+                ]
+            },
+            {
+                "day": 10,
+                "title": "Wake up (확인하기)",
+                "modes": [
+                    {
+                        "type": "workbook",
+                        "displayName": "워크북",
+                        "contentIds": [
+                            "w-d2-1",
+                            "w-d2-2"
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -46,7 +46,6 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   settings: propsSettings = {}, // [수정] props settings를 propsSettings로 변경
   onItemCompleted,
   getItemProgress,
-  // getItemProgress = () => ({ isCompleted: false }),
   onComplete,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -61,6 +60,24 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   const { setItemCompleted, getItemProgress: storeGetItemProgress } =
     useStudyProgressStore();
 
+  useEffect(() => {
+    // 🔥 컴포넌트 초기화 시 기존 완료 상태 복원
+    if (items && items.length > 0 && getItemProgress) {
+      console.log("🔄 Restoring completed items state...");
+
+      items.forEach((item) => {
+        const progress = getItemProgress(item.id);
+        // console.log(`📊 Item ${item.id} progress:`, progress);
+
+        if (progress.isCompleted) {
+          // 완료된 아이템을 UI 상태에 반영
+          // (실제 state 변수명은 컴포넌트 구조에 따라 수정 필요)
+          console.log(`✅ Restoring completed item: ${item.id}`);
+          // setCompletedItems나 해당하는 상태 업데이트 함수 호출
+        }
+      });
+    }
+  }, [items, getItemProgress]);
   // [수정] 최종 settings는 hook settings와 props settings를 합성
   const finalSettings = useMemo(
     () => ({

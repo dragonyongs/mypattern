@@ -1,5 +1,6 @@
-// src/shared/components/CompletionModal.tsx
+// CompletionModal.tsx
 import React from "react";
+import { CheckCircle2, X } from "lucide-react";
 
 interface CompletionModalProps {
   open: boolean;
@@ -8,8 +9,8 @@ interface CompletionModalProps {
   totalCount?: number;
   onConfirm: () => void;
   confirmText?: string;
-  onClose?: () => void; // 추가
-  cancelText?: string; // 추가
+  onClose?: () => void;
+  cancelText?: string;
 }
 
 export const CompletionModal: React.FC<CompletionModalProps> = ({
@@ -18,40 +19,49 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
   description,
   totalCount,
   onConfirm,
-  confirmText = "확인",
+  confirmText = "다음 단계",
   onClose,
-  cancelText = "닫기",
+  cancelText = "나중에",
 }) => {
   if (!open) return null;
 
   return (
-    <div className="z-20 fixed inset-0 grid place-items-center bg-black/30">
-      <div className="w-[320px] rounded-xl bg-white p-6 shadow-xl">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        {typeof totalCount === "number" && (
-          <p className="mt-2 text-sm text-gray-600">
-            총 {totalCount}개 학습했습니다.
-          </p>
-        )}
-        {description && (
-          <p className="mt-1 text-sm text-gray-600">{description}</p>
-        )}
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
+        {/* ✅ 성공 아이콘 추가 */}
+        <div className="flex flex-col items-center text-center">
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+            <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+          </div>
 
-        <div className="mt-6 flex justify-end gap-2">
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded border text-gray-700"
-            >
-              {cancelText}
-            </button>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">{title}</h2>
+
+          {typeof totalCount === "number" && (
+            <p className="text-emerald-600 font-semibold mb-2">
+              총 {totalCount}개 학습 완료! 🎉
+            </p>
           )}
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 rounded bg-blue-600 text-white"
-          >
-            {confirmText}
-          </button>
+
+          {description && <p className="text-gray-600 mb-6">{description}</p>}
+
+          {/* ✅ 버튼 레이아웃 개선 */}
+          <div className="flex gap-3 w-full">
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                {cancelText}
+              </button>
+            )}
+
+            <button
+              onClick={onConfirm}
+              className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+            >
+              {confirmText}
+            </button>
+          </div>
         </div>
       </div>
     </div>

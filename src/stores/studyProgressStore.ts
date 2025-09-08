@@ -134,33 +134,32 @@ export const useStudyProgressStore = create<
           console.log(
             `🔥 setItemCompleted: ${packId}, day ${day}, item ${itemId} = ${completed}`
           );
-
           const newProgress = { ...state.progress };
 
-          // PackProgress 초기화
           if (!newProgress[packId]) {
             newProgress[packId] = createEmptyPackProgress(packId);
           }
 
           const packProgress = { ...newProgress[packId] };
 
-          // DayProgress 초기화
           if (!packProgress.progressByDay[day]) {
             packProgress.progressByDay[day] = createEmptyDayProgress(day);
           }
 
           const dayProgress = { ...packProgress.progressByDay[day] };
 
-          // 개별 아이템 완료 상태 업데이트
+          // ✅ 개별 아이템 완료 상태를 객체로 저장
           dayProgress.completedItems = {
             ...dayProgress.completedItems,
-            [itemId]: completed,
+            [itemId]: {
+              isCompleted: completed,
+              lastStudied: new Date().toISOString(), // 🔥 개별 아이템별 시간
+            },
           };
 
-          // 마지막 학습 시간 업데이트
+          // 전체 day 학습 시간도 업데이트
           dayProgress.lastStudiedAt = new Date().toISOString();
 
-          // 상태 저장
           packProgress.progressByDay[day] = dayProgress;
           newProgress[packId] = packProgress;
 
@@ -168,7 +167,7 @@ export const useStudyProgressStore = create<
         });
       },
 
-      // ✅ 개별 아이템 진행도 조회
+      // ✅ 수정된 getItemProgress
       getItemProgress: (packId, day, itemId) => {
         if (!packId || packId === "undefined") {
           return { isCompleted: false, lastStudied: null };
@@ -176,11 +175,17 @@ export const useStudyProgressStore = create<
 
         const state = get();
         const dayProgress = state.progress[packId]?.progressByDay[day];
+        const itemProgress = dayProgress?.completedItems?.[itemId];
 
-        return {
-          isCompleted: dayProgress?.completedItems?.[itemId] || false,
-          lastStudied: dayProgress?.lastStudiedAt || null,
-        };
+        // 🔥 구조 확인 - 기존 boolean 데이터와 새 객체 데이터 호환
+        if (typeof itemProgress === "boolean") {
+          return {
+            isCompleted: itemProgress,
+            lastStudied: dayProgress?.lastStudiedAt || null,
+          };
+        }
+
+        return itemProgress || { isCompleted: false, lastStudied: null };
       },
 
       setModeCompleted: (packId, day, modeType, packData) => {

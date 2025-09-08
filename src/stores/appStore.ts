@@ -4,7 +4,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { PackData } from "@/types";
 
 // 실제 팩 데이터 import (경로 수정)
-import realVocaBasicData from "../../public/data/packs/real-voca-basic.json";
+import realVocaBasicData from "../data/packs/real-voca-basic.json";
 
 interface AppState {
   // 인증 상태

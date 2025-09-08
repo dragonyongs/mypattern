@@ -5,7 +5,7 @@ import { ArrowLeft, BookOpen, Calendar, User } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 
 // 실제 팩 데이터 import
-import realVocaBasicData from "../../public/data/packs/real-voca-basic.json";
+import realVocaBasicData from "../data/packs/real-voca-basic.json";
 import type { PackData } from "@/types";
 
 export default function PackSelectPage() {

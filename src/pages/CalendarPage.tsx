@@ -182,20 +182,28 @@ const DayCard = React.memo(DayCardInner);
 export default function CalendarPage(): JSX.Element {
   const navigate = useNavigate();
 
+  // ✅ 모든 Hook을 컴포넌트 최상위에 배치
   const currentDay = useAppStore((state) => state.currentDay);
   const setCurrentDay = useAppStore((state) => state.setCurrentDay);
   const selectedPackData = useAppStore((state) => state.selectedPackData);
 
-  // [중요] hydration 상태 확인
+  // [중요] hydration 상태 확인 - 항상 호출
   const hasHydrated = useStudyProgressStore((state) => state._hasHydrated);
 
-  const packId = selectedPackData?.id;
   const getDayProgress = useStudyProgressStore((state) => state.getDayProgress);
   const getPackProgress = useStudyProgressStore(
     (state) => state.getPackProgress
   );
 
-  // [중요] packId 유효성 검사
+  // [추가] 디버깅 버튼 (개발 중에만 사용) - 항상 호출
+  const debugProgress = useStudyProgressStore((state) => state.debugProgress);
+
+  // packId 계산을 useMemo로 처리
+  const packId = useMemo(() => {
+    return selectedPackData?.id;
+  }, [selectedPackData]);
+
+  // [중요] packId 유효성 검사 - useEffect는 항상 호출
   React.useEffect(() => {
     console.log("📋 CalendarPage - packId:", packId);
     console.log("📋 CalendarPage - selectedPackData:", selectedPackData);
@@ -204,41 +212,7 @@ export default function CalendarPage(): JSX.Element {
     }
   }, [packId, selectedPackData]);
 
-  // hydration 완료 전에는 로딩 표시
-  if (!hasHydrated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-lg font-medium text-gray-700">
-            학습 데이터 로딩 중...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // packData가 없으면 에러 처리
-  if (!selectedPackData || !packId) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-800">
-            학습팩 정보가 없습니다
-          </h2>
-          <p className="mt-2 text-gray-500">학습팩을 먼저 선택해주세요.</p>
-          <button
-            onClick={() => navigate("/")}
-            className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded-lg"
-          >
-            홈으로 이동
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // 나머지 코드는 동일하지만 getDayStatus에서 packId 검증 추가
+  // getDayStatus - 항상 호출하되 내부에서 조건 처리
   const getDayStatus = useCallback(
     (dayNumber: number): "current" | "completed" | "locked" | "available" => {
       if (!packId || packId === "undefined") {
@@ -274,16 +248,15 @@ export default function CalendarPage(): JSX.Element {
     },
     [packId, getPackProgress]
   );
-  // [추가] 디버깅 버튼 (개발 중에만 사용)
-  const debugProgress = useStudyProgressStore((state) => state.debugProgress);
 
-  // JSX에 디버깅 버튼 추가 (개발용)
-  const handleDebug = () => {
+  // JSX에 디버깅 버튼 추가 (개발용) - useCallback은 항상 호출
+  const handleDebug = useCallback(() => {
     if (packId) {
       debugProgress(packId);
     }
-  };
+  }, [packId, debugProgress]);
 
+  // calendarData - 항상 호출하되 내부에서 조건 처리
   const calendarData = useMemo(() => {
     if (!selectedPackData) return null;
 
@@ -365,7 +338,7 @@ export default function CalendarPage(): JSX.Element {
     };
   }, [selectedPackData, getDayProgress]);
 
-  // [수정] 더 단순하고 명확한 Day 선택 로직
+  // [수정] 더 단순하고 명확한 Day 선택 로직 - 항상 호출
   const handleDaySelect = useCallback(
     (day: any) => {
       const status = getDayStatus(day.day);
@@ -391,6 +364,41 @@ export default function CalendarPage(): JSX.Element {
   );
 
   const handleBack = useCallback(() => navigate("/"), [navigate]);
+
+  // ✅ 조건부 렌더링은 모든 Hook 호출 후에
+  // hydration 완료 전에는 로딩 표시
+  if (!hasHydrated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-lg font-medium text-gray-700">
+            학습 데이터 로딩 중...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // packData가 없으면 에러 처리
+  if (!selectedPackData || !packId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-800">
+            학습팩 정보가 없습니다
+          </h2>
+          <p className="mt-2 text-gray-500">학습팩을 먼저 선택해주세요.</p>
+          <button
+            onClick={() => navigate("/")}
+            className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded-lg"
+          >
+            홈으로 이동
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!calendarData || !selectedPackData) {
     return (
