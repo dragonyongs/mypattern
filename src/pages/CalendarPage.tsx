@@ -73,9 +73,7 @@ const DayCardInner: React.FC<DayCardProps> = ({
       )
     : false;
 
-  const isDay1Introduction =
-    day.day === 1 &&
-    (day.type === "introduction" || day.modes?.[0]?.type === "introduction");
+  const isDay1Introduction = day.day === 1 && day.type === "introduction";
 
   const handleClick = () => {
     if (status === "locked") return;
@@ -107,71 +105,74 @@ const DayCardInner: React.FC<DayCardProps> = ({
       </div>
 
       <div className="mb-2">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex justify-between items-center gap-2 mb-1">
           <span className="text-lg font-bold text-gray-800">Day {day.day}</span>
-          {status === "current" && (
-            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
-              진행중
-            </span>
-          )}
         </div>
-        <h3 className="text-sm font-medium text-gray-700 mb-2">{day.title}</h3>
+        {/* 제목을 2줄로 제한하고 말줄임표 처리 */}
+        <h3 className="text-sm font-medium text-gray-700 mb-2 line-clamp-2 overflow-hidden">
+          {day.title}
+        </h3>
       </div>
 
-      {!isDay1Introduction && (
-        <div className="flex gap-2 mb-3">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              vocabCompleted ? "bg-green-500" : "bg-gray-200"
-            }`}
-            title="단어 학습"
-          />
-          <div
-            className={`w-2 h-2 rounded-full ${
-              sentenceCompleted ? "bg-blue-500" : "bg-gray-200"
-            }`}
-            title="문장 학습"
-          />
-          <div
-            className={`w-2 h-2 rounded-full ${
-              workbookCompleted ? "bg-purple-500" : "bg-gray-200"
-            }`}
-            title="워크북"
-          />
-        </div>
-      )}
-
-      {isDay1Introduction && (
+      {/* Day 1 특별 표시 */}
+      {isDay1Introduction ? (
         <div className="flex items-center gap-1 mb-3 text-xs text-gray-500">
           <Lightbulb className="w-3 h-3" />
           <span>학습 방법 소개</span>
-          <CheckCircle className="w-3 h-3 text-green-500 ml-auto" />
+        </div>
+      ) : (
+        /* 일반 학습 단계는 도트 + 카운트로 간결하게 */
+        <div className="space-y-2">
+          {/* 학습 진행 상태 도트 */}
+          {(day.showVocab || day.showSentence || day.showWorkbook) && (
+            <div className="flex gap-2">
+              {day.showVocab && (
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    vocabCompleted ? "bg-green-500" : "bg-gray-200"
+                  }`}
+                  title="단어 학습"
+                />
+              )}
+              {day.showSentence && (
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    sentenceCompleted ? "bg-blue-500" : "bg-gray-200"
+                  }`}
+                  title="문장 학습"
+                />
+              )}
+              {day.showWorkbook && (
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    workbookCompleted ? "bg-purple-500" : "bg-gray-200"
+                  }`}
+                  title="워크북"
+                />
+              )}
+            </div>
+          )}
+
+          {/* 콘텐츠 정보를 한 줄로 간결하게 */}
+          <div className="flex gap-2 text-xs text-gray-500">
+            {day.showVocab && day.vocabCount > 0 && (
+              <span>단어 {day.vocabCount}</span>
+            )}
+            {day.showSentence && day.sentenceCount > 0 && (
+              <span>문장 {day.sentenceCount}</span>
+            )}
+            {day.showWorkbook && day.workbookCount > 0 && (
+              <span>문제 {day.workbookCount}</span>
+            )}
+          </div>
         </div>
       )}
 
-      <div className="space-y-1 text-xs text-gray-500">
-        {day.vocabCount > 0 && (
-          <div className="flex items-center gap-1">
-            <BookOpen className="w-3 h-3" />
-            <span>단어 {day.vocabCount}개</span>
-          </div>
-        )}
-        {day.sentenceCount > 0 && (
-          <div className="flex items-center gap-1">
-            <MessageSquare className="w-3 h-3" />
-            <span>문장 {day.sentenceCount}개</span>
-          </div>
-        )}
-        {day.workbookCount > 0 && (
-          <div className="flex items-center gap-1">
-            <PenTool className="w-3 h-3" />
-            <span>문제 {day.workbookCount}개</span>
-          </div>
-        )}
-      </div>
-
+      {/* 페이지 범위 */}
       {day.pageRange && (
-        <div className="mt-2 text-xs text-gray-400">{day.pageRange}</div>
+        <div className="mt-2 text-xs text-gray-400">
+          p.{day.pageRange.replace("_", "-")}
+        </div>
       )}
     </div>
   );
@@ -194,9 +195,6 @@ export default function CalendarPage(): JSX.Element {
   const getPackProgress = useStudyProgressStore(
     (state) => state.getPackProgress
   );
-
-  // [추가] 디버깅 버튼 (개발 중에만 사용) - 항상 호출
-  const debugProgress = useStudyProgressStore((state) => state.debugProgress);
 
   // packId 계산을 useMemo로 처리
   const packId = useMemo(() => {
@@ -249,49 +247,97 @@ export default function CalendarPage(): JSX.Element {
     [packId, getPackProgress]
   );
 
-  // JSX에 디버깅 버튼 추가 (개발용) - useCallback은 항상 호출
-  const handleDebug = useCallback(() => {
-    if (packId) {
-      debugProgress(packId);
-    }
-  }, [packId, debugProgress]);
-
-  // calendarData - 항상 호출하되 내부에서 조건 처리
+  // calendarData useMemo 부분 수정
   const calendarData = useMemo(() => {
     if (!selectedPackData) return null;
 
-    const { learningPlan, contents } = selectedPackData;
+    const { learningPlan, contents, categories } = selectedPackData;
     const totalDays = learningPlan?.totalDays || 14;
 
     let completedDaysCount = 0;
     const allDays: any[] = [];
 
+    // 페이지별 대표 카테고리 1-2개만 선택하는 헬퍼 함수
+    const getMainCategoriesForPageRange = (pageRange: string) => {
+      if (!pageRange || !categories) return [];
+      const [startPage, endPage] = pageRange.split("_").map(Number);
+      const pageCategories = categories.filter(
+        (cat) => cat.page >= startPage && cat.page <= endPage
+      );
+
+      // 최대 2개의 주요 카테고리만 반환
+      return pageCategories.slice(0, 2);
+    };
+
+    // 각 day의 modes에서 콘텐츠 카운트를 정확히 계산하는 함수
+    const getContentCounts = (dayPlan: any) => {
+      let vocabCount = 0,
+        sentenceCount = 0,
+        workbookCount = 0;
+
+      if (dayPlan.modes) {
+        dayPlan.modes.forEach((mode: any) => {
+          const contentIds = mode.contentIds || [];
+          const modeType = mode.type || "";
+
+          if (modeType.includes("vocab")) {
+            vocabCount += contentIds.length;
+          } else if (modeType.includes("sentence")) {
+            sentenceCount += contentIds.length;
+          } else if (modeType.includes("workbook")) {
+            workbookCount += contentIds.length;
+          }
+        });
+      }
+
+      return { vocabCount, sentenceCount, workbookCount };
+    };
+
     for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
       const dayPlan = learningPlan?.days?.find((d) => d.day === dayNum);
 
       if (dayPlan) {
-        let vocabCount = 0,
-          sentenceCount = 0,
-          workbookCount = 0;
+        const { vocabCount, sentenceCount, workbookCount } =
+          getContentCounts(dayPlan);
 
-        dayPlan.modes?.forEach((mode) => {
-          const items =
-            mode.contentIds
-              ?.map((id) => contents?.find((c) => c.id === id))
-              .filter(Boolean) || [];
-          items.forEach((item) => {
-            if (item?.type === "vocabulary") vocabCount++;
-            else if (item?.type === "sentence") sentenceCount++;
-            else if (item?.type === "workbook") workbookCount++;
-          });
-        });
+        // 학습 단계별 특별 처리
+        let learningPhase = "";
+        let hasContent = true;
+        let displayTitle = dayPlan.title;
 
-        const hasContent =
-          dayPlan.type === "introduction" ||
-          vocabCount > 0 ||
-          sentenceCount > 0 ||
-          workbookCount > 0;
+        if (dayNum === 1) {
+          learningPhase = "introduction";
+          hasContent = true;
+        } else if (dayNum >= 2 && dayNum <= 5) {
+          learningPhase = "skimming";
+          hasContent = vocabCount > 0 || sentenceCount > 0;
 
+          // 모든 훑어보기 단계를 일관되게 표시
+          if (dayPlan.pageRange) {
+            const pageStart = dayPlan.pageRange.split("_")[0];
+            const pageEnd = dayPlan.pageRange.split("_")[1];
+
+            if (dayNum === 2) {
+              // Day 2는 전체 범위
+              displayTitle = `훑어보기 (${pageStart}-${pageEnd}p)`;
+            } else {
+              // Day 3-5는 대표 카테고리 1개만 + 페이지 범위
+              const mainCategories = getMainCategoriesForPageRange(
+                dayPlan.pageRange
+              );
+              const categoryName = mainCategories[0]?.name || `${pageStart}p~`;
+              displayTitle = `${categoryName} (훑어보기)`;
+            }
+          }
+        } else if (dayNum >= 6 && dayNum <= 9) {
+          learningPhase = "speaking";
+          hasContent = vocabCount > 0 || sentenceCount > 0;
+        } else if (dayNum >= 10 && dayNum <= 14) {
+          learningPhase = "checking";
+          hasContent = workbookCount > 0 || dayNum === 14;
+        }
+
+        // 완료 상태 확인
         let isCompleted = false;
         try {
           const dp = getDayProgress(selectedPackData.id, dayNum);
@@ -303,17 +349,22 @@ export default function CalendarPage(): JSX.Element {
 
         allDays.push({
           day: dayNum,
-          title: dayPlan.title,
-          type: dayPlan.type || "vocabulary",
-          modes: dayPlan.modes,
+          title: displayTitle,
+          type: learningPhase,
+          pageRange: dayPlan.pageRange || null,
           hasContent,
           isCompleted,
           vocabCount,
           sentenceCount,
           workbookCount,
-          pageRange: null,
+          learningMethod: dayPlan.learningMethod || "introduction",
+          // 표시 여부 플래그 추가
+          showVocab: vocabCount > 0,
+          showSentence: sentenceCount > 0,
+          showWorkbook: workbookCount > 0,
         });
       } else {
+        // JSON 데이터가 완전하지 않은 경우 기본값 생성
         allDays.push({
           day: dayNum,
           type: "locked",
@@ -324,6 +375,9 @@ export default function CalendarPage(): JSX.Element {
           sentenceCount: 0,
           workbookCount: 0,
           pageRange: null,
+          showVocab: false,
+          showSentence: false,
+          showWorkbook: false,
         });
       }
     }
@@ -453,12 +507,6 @@ export default function CalendarPage(): JSX.Element {
             <div className="w-24 text-right">
               <Calendar className="h-6 w-6 text-slate-400 inline-block" />
             </div>
-            <button
-              onClick={handleDebug}
-              className="px-2 py-1 text-xs bg-red-500 text-white rounded"
-            >
-              Debug
-            </button>
           </div>
         </div>
       </header>

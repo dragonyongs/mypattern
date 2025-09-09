@@ -1,5 +1,4 @@
 // src/stores/studyProgressStore.ts
-
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type {
@@ -8,6 +7,8 @@ import type {
   PackData,
   StudySettings,
 } from "@/types";
+
+const STORAGE_KEY = "study-progress-v5";
 
 interface StudyProgressState {
   progress: Record<string, PackProgress>;
@@ -22,7 +23,6 @@ interface StudyProgressActions {
     packData: PackData
   ) => void;
 
-  // ✅ 개별 아이템 완료 상태 관리 추가
   setItemCompleted: (
     packId: string,
     day: number,
@@ -41,32 +41,35 @@ interface StudyProgressActions {
   updateSettings: (packId: string, newSettings: Partial<StudySettings>) => void;
   getSettings: (packId: string) => StudySettings;
   completeDay1Introduction: (packId: string) => void;
-  debugProgress: (packId: string) => void;
   setHasHydrated: (state: boolean) => void;
+
+  // 간단한 유틸리티 메서드
+  clearPackProgress: (packId: string) => void;
+  validateProgressForContent: (packId: string, contentIds: string[]) => void;
 }
 
-// ✅ StudySettings 기본값 생성 함수
+// 기본값 생성 함수들
 const createDefaultStudySettings = (): StudySettings => ({
   showMeaningEnabled: true,
   autoProgressEnabled: true,
-  studyMode: "immersive",
+  studyMode: "assisted",
 });
 
-// ✅ 개선된 DayProgress 생성 - 개별 아이템 완료 상태 포함
 const createEmptyDayProgress = (day: number): DayProgress => ({
   day,
   completedModes: {},
-  completedItems: {}, // ✅ 개별 아이템 완료 상태 추가
+  completedItems: {},
   isCompleted: false,
+  lastStudiedAt: null,
 });
 
-// ✅ 수정된 PackProgress 생성 - packId 인자 필수
 const createEmptyPackProgress = (packId: string): PackProgress => ({
   packId,
   lastStudiedDay: 1,
   completedDaysCount: 0,
   progressByDay: {},
-  settings: createDefaultStudySettings(), // ✅ 기본 설정 제공
+  settings: createDefaultStudySettings(),
+  lastStudiedAt: null,
 });
 
 export const useStudyProgressStore = create<
@@ -74,13 +77,65 @@ export const useStudyProgressStore = create<
 >()(
   persist(
     (set, get) => ({
-      // --- 상태 (State) ---
+      // --- 상태 ---
       progress: {},
       _hasHydrated: false,
 
-      // --- 액션 (Actions) ---
+      // --- 액션 ---
       setHasHydrated: (state) => {
         set({ _hasHydrated: state });
+      },
+
+      // 특정 팩의 진행 상황 초기화
+      clearPackProgress: (packId) => {
+        if (!packId || packId === "undefined") return;
+
+        set((state) => {
+          const newProgress = { ...state.progress };
+          delete newProgress[packId];
+          console.log(`🔄 Cleared progress for pack: ${packId}`);
+          return { progress: newProgress };
+        });
+      },
+
+      // 유효하지 않은 콘텐츠 ID 진행 상황 정리
+      validateProgressForContent: (packId, contentIds) => {
+        if (!packId || packId === "undefined" || !contentIds.length) return;
+
+        set((state) => {
+          const packProgress = state.progress[packId];
+          if (!packProgress) return state;
+
+          const newProgress = { ...state.progress };
+          const updatedPack = { ...packProgress };
+          let hasChanges = false;
+
+          // 각 날짜별 진행 상황 검증
+          Object.keys(updatedPack.progressByDay).forEach((dayKey) => {
+            const dayProgress = { ...updatedPack.progressByDay[dayKey] };
+            const validItems = {};
+
+            // 유효한 콘텐츠 ID만 유지
+            Object.keys(dayProgress.completedItems || {}).forEach((itemId) => {
+              if (contentIds.includes(itemId)) {
+                validItems[itemId] = dayProgress.completedItems[itemId];
+              } else {
+                hasChanges = true;
+                console.log(`🔄 Removing invalid item progress: ${itemId}`);
+              }
+            });
+
+            dayProgress.completedItems = validItems;
+            updatedPack.progressByDay[dayKey] = dayProgress;
+          });
+
+          if (hasChanges) {
+            newProgress[packId] = updatedPack;
+            return { progress: newProgress };
+          }
+
+          return state;
+        });
       },
 
       getPackProgress: (packId) => {
@@ -99,10 +154,9 @@ export const useStudyProgressStore = create<
           console.warn("⚠️ Invalid packId provided to getDayProgress:", packId);
           return null;
         }
-        return get().progress[packId]?.progressByDay[day] || null;
+        return get().progress[packId]?.progressByDay?.[day] || null;
       },
 
-      // ✅ 수정된 getSettings - 올바른 타입 반환
       getSettings: (packId): StudySettings => {
         if (!packId || packId === "undefined") {
           return createDefaultStudySettings();
@@ -113,14 +167,12 @@ export const useStudyProgressStore = create<
           return createDefaultStudySettings();
         }
 
-        // 기본값과 저장된 설정 병합
         return {
           ...createDefaultStudySettings(),
           ...packProgress.settings,
         };
       },
 
-      // ✅ 개별 아이템 완료 상태 설정
       setItemCompleted: (packId, day, itemId, completed) => {
         if (!packId || packId === "undefined") {
           console.error(
@@ -131,9 +183,6 @@ export const useStudyProgressStore = create<
         }
 
         set((state) => {
-          console.log(
-            `🔥 setItemCompleted: ${packId}, day ${day}, item ${itemId} = ${completed}`
-          );
           const newProgress = { ...state.progress };
 
           if (!newProgress[packId]) {
@@ -148,18 +197,15 @@ export const useStudyProgressStore = create<
 
           const dayProgress = { ...packProgress.progressByDay[day] };
 
-          // ✅ 개별 아이템 완료 상태를 객체로 저장
           dayProgress.completedItems = {
             ...dayProgress.completedItems,
             [itemId]: {
               isCompleted: completed,
-              lastStudied: new Date().toISOString(), // 🔥 개별 아이템별 시간
+              lastStudied: new Date().toISOString(),
             },
           };
 
-          // 전체 day 학습 시간도 업데이트
           dayProgress.lastStudiedAt = new Date().toISOString();
-
           packProgress.progressByDay[day] = dayProgress;
           newProgress[packId] = packProgress;
 
@@ -167,17 +213,15 @@ export const useStudyProgressStore = create<
         });
       },
 
-      // ✅ 수정된 getItemProgress
       getItemProgress: (packId, day, itemId) => {
         if (!packId || packId === "undefined") {
           return { isCompleted: false, lastStudied: null };
         }
 
         const state = get();
-        const dayProgress = state.progress[packId]?.progressByDay[day];
+        const dayProgress = state.progress[packId]?.progressByDay?.[day];
         const itemProgress = dayProgress?.completedItems?.[itemId];
 
-        // 🔥 구조 확인 - 기존 boolean 데이터와 새 객체 데이터 호환
         if (typeof itemProgress === "boolean") {
           return {
             isCompleted: itemProgress,
@@ -189,7 +233,6 @@ export const useStudyProgressStore = create<
       },
 
       setModeCompleted: (packId, day, modeType, packData) => {
-        // [중요] packId 유효성 검사
         if (!packId || packId === "undefined") {
           console.error(
             "❌ Invalid packId provided to setModeCompleted:",
@@ -199,13 +242,8 @@ export const useStudyProgressStore = create<
         }
 
         set((state) => {
-          console.log(
-            `🔥 setModeCompleted: ${packId}, day ${day}, mode ${modeType}`
-          );
-
           const newProgress = { ...state.progress };
 
-          // ✅ 수정된 부분 - packId 인자 전달
           if (!newProgress[packId]) {
             newProgress[packId] = createEmptyPackProgress(packId);
           }
@@ -229,12 +267,13 @@ export const useStudyProgressStore = create<
             );
 
             if (dayPlan) {
-              const allModesCompleted = dayPlan.modes.every(
+              const allModesCompleted = dayPlan.modes?.every(
                 (m) => dayProgress.completedModes[m.type]
               );
 
               if (allModesCompleted && !dayProgress.isCompleted) {
                 dayProgress.isCompleted = true;
+                dayProgress.lastStudiedAt = new Date().toISOString();
 
                 packProgress.progressByDay = {
                   ...packProgress.progressByDay,
@@ -272,11 +311,8 @@ export const useStudyProgressStore = create<
         }
 
         set((state) => {
-          console.log(`🔥 Completing Day 1 introduction for ${packId}`);
-
           const newProgress = { ...state.progress };
 
-          // ✅ 수정된 부분 - packId 인자 전달
           if (!newProgress[packId]) {
             newProgress[packId] = createEmptyPackProgress(packId);
           }
@@ -286,6 +322,7 @@ export const useStudyProgressStore = create<
             ...createEmptyDayProgress(1),
             completedModes: { introduction: true },
             isCompleted: true,
+            lastStudiedAt: new Date().toISOString(),
           };
 
           packProgress.progressByDay = {
@@ -293,13 +330,14 @@ export const useStudyProgressStore = create<
             [1]: dayProgress,
           };
 
-          packProgress.completedDaysCount = 1;
+          packProgress.completedDaysCount = Object.values(
+            packProgress.progressByDay
+          ).filter((d) => d.isCompleted).length;
           packProgress.lastStudiedDay = 1;
           packProgress.lastStudiedAt = new Date().toISOString();
 
           newProgress[packId] = packProgress;
 
-          console.log(`✅ Day 1 introduction completed for ${packId}`);
           return { progress: newProgress };
         });
       },
@@ -310,12 +348,12 @@ export const useStudyProgressStore = create<
         set((state) => {
           const newProgress = { ...state.progress };
           const packProgress =
-            newProgress[packId] || createEmptyPackProgress(packId); // ✅ packId 인자 전달
+            newProgress[packId] || createEmptyPackProgress(packId);
 
           newProgress[packId] = {
             ...packProgress,
             settings: {
-              ...createDefaultStudySettings(), // ✅ 기본값 병합
+              ...createDefaultStudySettings(),
               ...packProgress.settings,
               ...newSettings,
             },
@@ -324,32 +362,11 @@ export const useStudyProgressStore = create<
           return { progress: newProgress };
         });
       },
-
-      debugProgress: (packId) => {
-        if (!packId) {
-          console.log(
-            "📊 All Progress:",
-            JSON.stringify(get().progress, null, 2)
-          );
-          return;
-        }
-
-        const progress = get().progress[packId];
-        console.log(
-          `📊 Debug Progress for ${packId}:`,
-          JSON.stringify(progress, null, 2)
-        );
-        console.log(
-          `🔍 localStorage data:`,
-          localStorage.getItem("study-progress-v3")
-        );
-      },
     }),
     {
-      name: "study-progress-v3",
+      name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
 
-      // [중요] hydration 완료 시 상태 업데이트
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           console.error("💥 Hydration failed:", error);
@@ -361,13 +378,9 @@ export const useStudyProgressStore = create<
         }
       },
 
-      partialize: (state) => {
-        console.log(
-          `💾 Persisting state:`,
-          JSON.stringify(state.progress, null, 2)
-        );
-        return { progress: state.progress };
-      },
+      partialize: (state) => ({
+        progress: state.progress,
+      }),
     }
   )
 );

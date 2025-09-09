@@ -1,13 +1,14 @@
 // src/App.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useAppStore } from "@/stores/appStore";
+import { useStudyProgressStore } from "@/stores/studyProgressStore";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LandingPage } from "@/pages/LandingPage";
 import PackSelectPage from "@/pages/PackSelectPage";
 import CalendarPage from "@/pages/CalendarPage";
 import { StudyInterface } from "@/components/StudyInterface";
-import { useParams } from "react-router-dom";
 import { useHydration } from "@/hooks/useHydration";
 
 function StudyPage() {
@@ -59,6 +60,23 @@ function StudyPage() {
 
 function App() {
   const hydrated = useHydration();
+  const { selectedPackData, _hasHydrated: appHydrated } = useAppStore();
+  const { validateProgressForContent, _hasHydrated: progressHydrated } =
+    useStudyProgressStore();
+
+  // 두 store 모두 hydration 완료 후 진행 상황 검증
+  useEffect(() => {
+    if (appHydrated && progressHydrated && selectedPackData?.contents) {
+      const contentIds = selectedPackData.contents.map((item) => item.id);
+      validateProgressForContent(selectedPackData.id, contentIds);
+      console.log(`✅ Progress validated for ${selectedPackData.id}`);
+    }
+  }, [
+    appHydrated,
+    progressHydrated,
+    selectedPackData,
+    validateProgressForContent,
+  ]);
 
   if (!hydrated) {
     return (
