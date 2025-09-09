@@ -569,7 +569,9 @@ export const StudyInterface: React.FC = () => {
     };
 
     // ✅ studyMode를 key로 추가하여 모드 변경 시 컴포넌트 강제 재생성
-    const componentKey = `${currentMode}-${settings.studyMode}-${initialItemIndex}`;
+    const componentKey = `${currentMode}-${
+      packData.id
+    }-${currentDay}-${Date.now()}`;
 
     switch (contentType) {
       case "vocab":
@@ -592,7 +594,15 @@ export const StudyInterface: React.FC = () => {
         );
       case "workbook":
         return (
-          <WorkbookMode key={componentKey} items={items} {...commonProps} />
+          <WorkbookMode
+            key={componentKey}
+            items={items}
+            dayNumber={currentDay}
+            packId={packData.id}
+            onComplete={() => handleModeComplete(currentMode)}
+            onItemCompleted={handleItemCompleted}
+            initialItemIndex={initialItemIndex}
+          />
         );
       default:
         return null;

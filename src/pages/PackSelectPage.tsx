@@ -1,36 +1,53 @@
 // src/pages/PackSelectPage.tsx
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, BookOpen, Calendar, User } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
-
-// 실제 팩 데이터 import
-import realVocaBasicData from "../data/packs/real-voca-basic.json";
 import type { PackData } from "@/types";
+
+// 팩 데이터 로딩
+const packModules = import.meta.glob<PackData>("@/data/packs/*.json", {
+  eager: true,
+  import: "default",
+});
+
+function getAllPacks(): PackData[] {
+  const packs = Object.values(packModules);
+  console.log("🔍 Loaded packs:", packs); // 디버깅용
+  return packs;
+}
 
 export default function PackSelectPage() {
   const navigate = useNavigate();
 
-  // [중요] 개별적으로 액션 가져오기
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
   const user = useAppStore((state) => state.user);
   const setSelectedPackData = useAppStore((state) => state.setSelectedPackData);
   const logout = useAppStore((state) => state.logout);
   const hasHydrated = useAppStore((state) => state._hasHydrated);
 
-  // [디버깅] 액션 함수 상태 확인
+  const [packs, setPacks] = useState<PackData[]>([]);
+
   useEffect(() => {
-    console.log("🔍 PackSelectPage - Actions debug:");
-    console.log("  - isAuthenticated:", isAuthenticated);
-    console.log("  - user:", user);
-    console.log(
-      "  - setSelectedPackData:",
-      typeof setSelectedPackData,
-      setSelectedPackData
-    );
-    console.log("  - logout:", typeof logout, logout);
-    console.log("  - hasHydrated:", hasHydrated);
-  }, [isAuthenticated, user, setSelectedPackData, logout, hasHydrated]);
+    const loadedPacks = getAllPacks();
+    console.log("📦 Setting packs:", loadedPacks);
+    setPacks(loadedPacks);
+  }, []);
+
+  // 디버깅: packs 상태 확인
+  useEffect(() => {
+    console.log("📊 Current packs state:", packs);
+    console.log("📊 Packs length:", packs.length);
+    console.log("📊 Is array:", Array.isArray(packs));
+  }, [packs]);
+
+  // 인증 확인
+  useEffect(() => {
+    if (!isAuthenticated) {
+      console.log("⚠️ Not authenticated, redirecting to landing");
+      navigate("/", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   // hydration 완료 전에는 로딩 표시
   if (!hasHydrated) {
@@ -46,32 +63,18 @@ export default function PackSelectPage() {
     );
   }
 
-  // 인증 확인
-  useEffect(() => {
-    if (!isAuthenticated) {
-      console.log("⚠️ Not authenticated, redirecting to landing");
-      navigate("/", { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
-
   const handlePackSelect = (packData: PackData) => {
-    console.log("🔥 Pack selection attempt:", packData?.title);
-    console.log("🔍 setSelectedPackData function:", typeof setSelectedPackData);
+    console.log("🔥 Pack selection attempt:", packData);
 
-    // [중요] 함수 존재 여부 확인
     if (typeof setSelectedPackData !== "function") {
       console.error("❌ setSelectedPackData is not a function!");
-      console.error(
-        "Available store methods:",
-        Object.keys(useAppStore.getState())
-      );
       alert("앱 상태 오류가 발생했습니다. 페이지를 새로고침해주세요.");
       return;
     }
 
     try {
       setSelectedPackData(packData);
-      console.log("✅ Pack selected successfully");
+      console.log("✅ Pack selected successfully:", packData.title);
       navigate("/calendar");
     } catch (error) {
       console.error("❌ Error selecting pack:", error);
@@ -145,49 +148,70 @@ export default function PackSelectPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* Real VOCA Basic 팩 */}
-          <div
-            onClick={() => handlePackSelect(realVocaBasicData as PackData)}
-            className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 cursor-pointer transition-all duration-200 hover:shadow-md hover:border-indigo-300 group"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
-                <BookOpen className="w-6 h-6 text-indigo-600" />
-              </div>
-              <span className="text-sm text-slate-500">기초</span>
-            </div>
-
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">
-              {realVocaBasicData.title}
+        {/* 팩이 없는 경우 */}
+        {!Array.isArray(packs) || packs.length === 0 ? (
+          <div className="text-center py-12">
+            <BookOpen className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-slate-900 mb-2">
+              표시할 학습팩이 없습니다
             </h3>
-            <p className="text-sm text-slate-600 mb-4">
-              {realVocaBasicData.subtitle}
+            <p className="text-slate-600 mb-4">
+              src/data/packs 폴더에 JSON 팩 파일을 추가해 주세요.
             </p>
+            <p className="text-sm text-slate-500">
+              로드된 팩 수: {packs?.length || 0}
+            </p>
+          </div>
+        ) : (
+          /* 팩 카드들 */
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {packs.map((pack, index) => (
+              <div
+                key={pack.id || pack.title || `pack-${index}`}
+                onClick={() => handlePackSelect(pack)}
+                className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 cursor-pointer transition-all duration-200 hover:shadow-md hover:border-indigo-300 group"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
+                    <BookOpen className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <span className="text-sm text-slate-500">
+                    {pack.level || "기초"}
+                  </span>
+                </div>
 
-            <div className="flex items-center gap-4 text-xs text-slate-500">
-              <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                <span>{realVocaBasicData.totalDays}일 과정</span>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                  {pack.title || "제목 없음"}
+                </h3>
+                <p className="text-sm text-slate-600 mb-4">
+                  {pack.subtitle || "설명 없음"}
+                </p>
+
+                <div className="flex items-center gap-4 text-xs text-slate-500">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    <span>{pack.totalDays || 14}일 과정</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <BookOpen className="w-3 h-3" />
+                    <span>{pack.level || "기초"} 레벨</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <BookOpen className="w-3 h-3" />
-                <span>기초 레벨</span>
+            ))}
+
+            {/* 플레이스홀더 카드 */}
+            <div className="bg-slate-100 rounded-xl border-2 border-dashed border-slate-300 p-6 flex flex-col items-center justify-center text-center">
+              <div className="p-3 bg-slate-200 rounded-lg mb-4">
+                <BookOpen className="w-6 h-6 text-slate-400" />
               </div>
+              <h3 className="text-lg font-medium text-slate-500 mb-2">
+                새로운 팩
+              </h3>
+              <p className="text-sm text-slate-400">곧 추가될 예정입니다</p>
             </div>
           </div>
-
-          {/* 다른 팩들을 위한 플레이스홀더 */}
-          <div className="bg-slate-100 rounded-xl border-2 border-dashed border-slate-300 p-6 flex flex-col items-center justify-center text-center">
-            <div className="p-3 bg-slate-200 rounded-lg mb-4">
-              <BookOpen className="w-6 h-6 text-slate-400" />
-            </div>
-            <h3 className="text-lg font-medium text-slate-500 mb-2">
-              새로운 팩
-            </h3>
-            <p className="text-sm text-slate-400">곧 추가될 예정입니다</p>
-          </div>
-        </div>
+        )}
       </main>
     </div>
   );

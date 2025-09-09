@@ -28,7 +28,7 @@ export const useAvailablePacks = () => {
 
       // 중요: 이제 loadPackList 대신, 우리가 알고 있는 팩 ID 목록을 직접 사용합니다.
       // 향후 이 부분은 API 호출로 대체될 수 있습니다.
-      const availablePackIds = ["real-voca-basic"]; // 예: "real-voca-advanced" 등 추가
+      const availablePackIds = ["real-voca-basic", "everyday-convo-3days"]; // 예: "real-voca-advanced" 등 추가
 
       if (availablePackIds.length === 0) {
         setPacks([]);

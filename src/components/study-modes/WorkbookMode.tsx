@@ -1,7 +1,12 @@
 // src/components/study-modes/WorkbookMode.tsx
 
-import React, { useState, useCallback, useMemo, useEffect } from "react";
-
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -44,7 +49,7 @@ interface WorkbookItem {
   options: string[];
   answer?: string;
   correctAnswer?: string;
-  explanation: string;
+  explanation?: string;
 }
 
 interface WorkbookModeProps {
@@ -71,6 +76,12 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
   const workbook = Array.isArray(rawWorkbook) ? rawWorkbook : [];
   const workbookIds = useMemo(() => workbook.map((w) => w.id), [workbook]);
 
+  // 🔥 강제 리렌더링을 위한 키
+  const componentKey = useMemo(
+    () => `${packId}-${dayNumber}-${workbook.length}`,
+    [packId, dayNumber, workbook.length]
+  );
+
   // 상태 관리
   const [currentIndex, setCurrentIndex] = useState(initialItemIndex);
   const [selectedAnswers, setSelectedAnswers] = useState<
@@ -92,9 +103,18 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
   const { setItemCompleted, getItemProgress } = useStudyProgressStore();
   const { speak, isSpeaking } = useTTS();
 
+  const pendingSaveRef = useRef<Set<number>>(new Set()); // 저장해야 할 인덱스 모음
+
+  // 🔥 완전 초기화
   useEffect(() => {
+    console.log("🔄 WorkbookMode 초기화", { componentKey });
     setCurrentIndex(initialItemIndex);
-  }, [initialItemIndex]);
+    setSelectedAnswers({});
+    setAnsweredQuestions(new Set());
+    setCorrectAnswers(new Set());
+    setShowResult({});
+    setShowExplanation({});
+  }, [componentKey, initialItemIndex]);
 
   // 현재 문제 정보
   const currentQuestion = useMemo(
@@ -102,8 +122,14 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
     [workbook, currentIndex]
   );
 
-  const correctAnswer =
-    currentQuestion?.correctAnswer || currentQuestion?.answer || "";
+  // 🔥 정답 확인 함수 (데이터 호환성)
+  const getCorrectAnswer = useCallback((question: WorkbookItem) => {
+    return question.correctAnswer || question.answer || "";
+  }, []);
+
+  const correctAnswer = currentQuestion
+    ? getCorrectAnswer(currentQuestion)
+    : "";
 
   // 진행률 계산
   const progress = useMemo(() => {
@@ -153,10 +179,33 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
 
   // 네비게이션
   const goToNext = useCallback(() => {
+    // 저장이 필요한 항목이 있으면 먼저 저장 (항상 안전하게 한 번만 저장)
+    if (currentIndex != null && pendingSaveRef.current.has(currentIndex)) {
+      const idx = currentIndex;
+      const item = workbook[idx];
+      if (item) {
+        const wasCorrect = correctAnswers.has(idx);
+        try {
+          setItemCompleted(packId, dayNumber, item.id, wasCorrect);
+        } catch (e) {
+          console.warn("[WB] failed to save progress on goToNext", e);
+        }
+        pendingSaveRef.current.delete(idx);
+        console.debug("[WB] Saved pending progress for", idx);
+      }
+    }
+
     if (currentIndex < workbook.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     }
-  }, [currentIndex, workbook.length]);
+  }, [
+    currentIndex,
+    workbook,
+    correctAnswers,
+    packId,
+    dayNumber,
+    setItemCompleted,
+  ]);
 
   const goToPrev = useCallback(() => {
     if (currentIndex > 0) {
@@ -169,120 +218,138 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
     onSwipeRight: goToPrev,
   });
 
-  // 답안 선택 핸들러
+  // 🔥 수정된 답안 선택 핸들러
   const handleAnswerSelect = useCallback(
     (answer: string) => {
       if (isCurrentAnswered) return; // 이미 답변한 문제는 변경 불가
 
-      const newSelectedAnswers = { ...selectedAnswers };
-      newSelectedAnswers[currentIndex] = answer;
-      setSelectedAnswers(newSelectedAnswers);
+      setSelectedAnswers((prev) => ({ ...prev, [currentIndex]: answer }));
     },
-    [selectedAnswers, currentIndex, isCurrentAnswered]
+    [currentIndex, isCurrentAnswered]
   );
 
-  // 답안 확인 핸들러
+  // 🔥 수정된 답안 확인 핸들러
   const handleCheckAnswer = useCallback(() => {
     if (!selectedAnswers[currentIndex] || isCurrentAnswered) return;
 
     const selectedAnswer = selectedAnswers[currentIndex];
     const isCorrect = selectedAnswer === correctAnswer;
 
-    // 상태 업데이트
-    const newAnswered = new Set(answeredQuestions);
-    newAnswered.add(currentIndex);
-    setAnsweredQuestions(newAnswered);
+    console.log("🔥 답안 확인:", {
+      selected: selectedAnswer,
+      correct: correctAnswer,
+      isCorrect,
+    });
+
+    // 상태 업데이트 (UI만)
+    setAnsweredQuestions((prev) => {
+      const s = new Set(prev);
+      s.add(currentIndex);
+      return s;
+    });
 
     if (isCorrect) {
-      const newCorrect = new Set(correctAnswers);
-      newCorrect.add(currentIndex);
-      setCorrectAnswers(newCorrect);
+      setCorrectAnswers((prev) => {
+        const s = new Set(prev);
+        s.add(currentIndex);
+        return s;
+      });
     }
 
-    // 결과 표시
-    const newShowResult = { ...showResult };
-    newShowResult[currentIndex] = true;
-    setShowResult(newShowResult);
+    setShowResult((prev) => ({ ...prev, [currentIndex]: true }));
 
-    // Zustand 스토어에 저장
-    if (currentQuestion) {
-      setItemCompleted(packId, dayNumber, currentQuestion.id, isCorrect);
-    }
+    // ← 여기서 즉시 스토어 저장을 하지 않고, pending에 추가
+    pendingSaveRef.current.add(currentIndex);
 
-    // 자동 진행이 설정되어 있으면 다음으로 이동
-    if (settings.autoProgressEnabled && currentIndex < workbook.length - 1) {
-      setTimeout(() => {
-        goToNext();
-      }, 2000); // 2초 후 자동 이동
-    }
+    // (옵션) 디버그
+    console.debug(
+      "[WB] Marked pending save:",
+      Array.from(pendingSaveRef.current)
+    );
   }, [
     selectedAnswers,
     currentIndex,
     isCurrentAnswered,
     correctAnswer,
-    answeredQuestions,
-    correctAnswers,
-    showResult,
-    currentQuestion,
-    setItemCompleted,
-    packId,
-    dayNumber,
-    settings.autoProgressEnabled,
-    goToNext,
-    workbook.length,
+    // remove setItemCompleted dependency
   ]);
 
-  // 다시 풀기 핸들러
+  // 🔥 완전한 다시 풀기 핸들러
   const handleRetry = useCallback(() => {
-    const newAnswered = new Set(answeredQuestions);
-    newAnswered.delete(currentIndex);
-    setAnsweredQuestions(newAnswered);
+    console.log("🔄 다시 풀기:", currentIndex);
 
-    const newCorrect = new Set(correctAnswers);
-    newCorrect.delete(currentIndex);
-    setCorrectAnswers(newCorrect);
+    // 모든 관련 상태 완전 제거
+    setAnsweredQuestions((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(currentIndex);
+      return newSet;
+    });
 
-    const newShowResult = { ...showResult };
-    delete newShowResult[currentIndex];
-    setShowResult(newShowResult);
+    setCorrectAnswers((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(currentIndex);
+      return newSet;
+    });
 
-    const newShowExplanation = { ...showExplanation };
-    delete newShowExplanation[currentIndex];
-    setShowExplanation(newShowExplanation);
+    setShowResult((prev) => {
+      const newObj = { ...prev };
+      delete newObj[currentIndex];
+      return newObj;
+    });
 
-    const newSelectedAnswers = { ...selectedAnswers };
-    delete newSelectedAnswers[currentIndex];
-    setSelectedAnswers(newSelectedAnswers);
+    setShowExplanation((prev) => {
+      const newObj = { ...prev };
+      delete newObj[currentIndex];
+      return newObj;
+    });
+
+    setSelectedAnswers((prev) => {
+      const newObj = { ...prev };
+      delete newObj[currentIndex];
+      return newObj;
+    });
 
     // Zustand 스토어에서도 제거
     if (currentQuestion) {
       setItemCompleted(packId, dayNumber, currentQuestion.id, false);
     }
-  }, [
-    answeredQuestions,
-    correctAnswers,
-    showResult,
-    showExplanation,
-    selectedAnswers,
-    currentIndex,
-    currentQuestion,
-    setItemCompleted,
-    packId,
-    dayNumber,
-  ]);
+  }, [currentIndex, currentQuestion, setItemCompleted, packId, dayNumber]);
 
   // 설명 토글
   const handleToggleExplanation = useCallback(() => {
-    const newShowExplanation = { ...showExplanation };
-    newShowExplanation[currentIndex] = !newShowExplanation[currentIndex];
-    setShowExplanation(newShowExplanation);
-  }, [showExplanation, currentIndex]);
+    setShowExplanation((prev) => ({
+      ...prev,
+      [currentIndex]: !prev[currentIndex],
+    }));
+  }, [currentIndex]);
 
   // 전체 완료 핸들러
   const handleComplete = useCallback(() => {
+    // pending 전부 저장
+    pendingSaveRef.current.forEach((idx) => {
+      const item = workbook[idx];
+      if (item) {
+        const wasCorrect = correctAnswers.has(idx);
+        try {
+          setItemCompleted(packId, dayNumber, item.id, wasCorrect);
+        } catch (e) {
+          console.warn("[WB] failed to save pending on complete", e);
+        }
+      }
+    });
+    pendingSaveRef.current.clear();
+
     markModeCompleted(dayNumber, "workbook");
     onComplete?.();
-  }, [markModeCompleted, dayNumber, onComplete]);
+  }, [
+    markModeCompleted,
+    dayNumber,
+    onComplete,
+    workbook,
+    correctAnswers,
+    packId,
+    setItemCompleted,
+  ]);
 
   // 키보드 이벤트
   useEffect(() => {
@@ -309,7 +376,7 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
     handleCheckAnswer,
   ]);
 
-  // 로컬스토리지에서 진행상태 복원
+  // 🔥 진행상태 복원 (수정됨)
   useEffect(() => {
     const answered = new Set<number>();
     const correct = new Set<number>();
@@ -317,10 +384,15 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
 
     workbook.forEach((item, index) => {
       const progress = getItemProgress(packId, dayNumber, item.id);
-      if (progress) {
+
+      // 🔥 실제 완료된 것만 복원 (더 엄격한 조건)
+      if (progress && progress.isCompleted === true) {
         answered.add(index);
         results[index] = true;
-        if (progress.completed) {
+
+        // 정답 여부 확인 (추가 검증)
+        const itemCorrectAnswer = getCorrectAnswer(item);
+        if (progress.lastStudied && itemCorrectAnswer) {
           correct.add(index);
         }
       }
@@ -336,7 +408,7 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
       answeredCount: answered.size,
       correctCount: correct.size,
     });
-  }, [workbook, getItemProgress, packId, dayNumber]);
+  }, [workbook, getItemProgress, packId, dayNumber, getCorrectAnswer]);
 
   if (!workbook.length) {
     return (
@@ -364,7 +436,11 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
   }
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-129px)] bg-gray-50 font-sans">
+    <div
+      key={componentKey}
+      className="flex h-full min-h-[calc(100vh-129px)] bg-gray-50 font-sans"
+    >
+      {/* 기존 UI는 완전히 동일하게 유지 */}
       {/* 모바일 헤더 */}
       <div className="lg:hidden bg-white border-b px-4 py-3">
         <div className="flex items-center justify-between">
