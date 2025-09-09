@@ -158,32 +158,67 @@ export const StudyInterface: React.FC = () => {
 
       const contentIds = modeData.map((item) => item.id);
 
+      // 🔥 각 아이템의 완료 상태 확인
+      const completionStates = contentIds.map((itemId, index) => {
+        const progress = getItemProgress(itemId);
+        return {
+          index,
+          itemId,
+          isCompleted: progress.isCompleted,
+        };
+      });
+
+      // 미완료된 첫 번째 아이템 찾기
+      const firstUncompletedItem = completionStates.find(
+        (item) => !item.isCompleted
+      );
+
       // 저장된 위치 확인
       const savedIndex = getCurrentItemIndex(packData.id, currentDay, mode);
 
-      // 다음 미완료 아이템 인덱스 계산
-      const nextUncompletedIndex = getNextUncompletedIndex(
-        packData.id,
-        currentDay,
-        mode,
-        contentIds
-      );
+      let optimalIndex;
 
-      // 더 앞선 위치 사용 (학습 진행 상황에 맞게)
-      const optimalIndex = Math.max(savedIndex, nextUncompletedIndex);
+      if (firstUncompletedItem) {
+        // 🔥 미완료 아이템이 있는 경우
+        // 저장된 위치와 첫 번째 미완료 위치 중 더 앞선 것 선택
+        optimalIndex = Math.min(savedIndex, firstUncompletedItem.index);
+      } else {
+        // 🔥 모든 아이템이 완료된 경우
+        // 처음부터 다시 시작하거나 저장된 위치 중 선택
+        const completedCount = completionStates.length;
 
-      // console.log(
-      //   `🔍 Mode ${mode} - Saved: ${savedIndex}, Uncompleted: ${nextUncompletedIndex}, Using: ${optimalIndex}`
-      // );
+        // "다시풀기"로 모든 것이 초기화된 경우를 감지
+        const recentlyResetItems = completionStates.filter((item) => {
+          const progress = getItemProgress(item.itemId);
+          // 최근 1분 내에 초기화된 아이템들 확인
+          return (
+            !progress.isCompleted &&
+            progress.lastStudied &&
+            Date.now() - new Date(progress.lastStudied).getTime() < 60000
+          );
+        });
+
+        if (recentlyResetItems.length > 0) {
+          // 최근에 초기화된 아이템들이 있으면 처음부터 시작
+          optimalIndex = 0;
+        } else {
+          // 자연스럽게 모든 것이 완료된 경우 저장된 위치 유지
+          optimalIndex = Math.min(savedIndex, contentIds.length - 1);
+        }
+      }
+
+      console.log(`🔍 Mode ${mode} 위치 계산 (개선됨):`, {
+        totalItems: contentIds.length,
+        completedCount: completionStates.filter((s) => s.isCompleted).length,
+        firstUncompletedIndex: firstUncompletedItem?.index ?? "none",
+        savedIndex,
+        optimalIndex,
+        logic: firstUncompletedItem ? "has uncompleted" : "all completed",
+      });
+
       return optimalIndex;
     },
-    [
-      packData,
-      currentDay,
-      getModeData,
-      getCurrentItemIndex,
-      getNextUncompletedIndex,
-    ]
+    [packData, currentDay, getModeData, getItemProgress, getCurrentItemIndex]
   );
 
   const handleItemCompleted = useCallback(
