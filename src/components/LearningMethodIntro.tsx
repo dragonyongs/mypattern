@@ -19,6 +19,34 @@ export const LearningMethodIntro: React.FC<LearningMethodIntroProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [completedCards, setCompletedCards] = useState<Set<number>>(new Set());
 
+  // 스토어에서 상태와 액션 가져오기
+  const getDayProgress = useStudyProgressStore((state) => state.getDayProgress);
+  const completeDay1Introduction = useStudyProgressStore(
+    (state) => state.completeDay1Introduction
+  );
+
+  // Day1 완료 상태 확인
+  const day1Progress = getDayProgress(packId, 1);
+  const isIntroductionCompleted =
+    day1Progress?.completedModes["introduction"] ?? false;
+
+  // console.log("🔍 LearningMethodIntro - day1Progress:", day1Progress);
+  // console.log(
+  //   "🔍 LearningMethodIntro - isIntroductionCompleted:",
+  //   isIntroductionCompleted
+  // );
+
+  useEffect(() => {
+    if (isIntroductionCompleted && methods.length > 0) {
+      setCurrentIndex(methods.length - 1);
+      const allCards = new Set(
+        Array.from({ length: methods.length }, (_, i) => i)
+      );
+      setCompletedCards(allCards);
+      console.log("🔥 Day 1 already completed, showing final page");
+    }
+  }, [isIntroductionCompleted, methods.length]);
+
   // [중요] packId 검증 및 로깅
   console.log("🔍 LearningMethodIntro - Received packId:", packId);
 
@@ -42,34 +70,6 @@ export const LearningMethodIntro: React.FC<LearningMethodIntroProps> = ({
       </div>
     );
   }
-
-  // 스토어에서 상태와 액션 가져오기
-  const getDayProgress = useStudyProgressStore((state) => state.getDayProgress);
-  const completeDay1Introduction = useStudyProgressStore(
-    (state) => state.completeDay1Introduction
-  );
-
-  // Day1 완료 상태 확인
-  const day1Progress = getDayProgress(packId, 1);
-  const isIntroductionCompleted =
-    day1Progress?.completedModes["introduction"] ?? false;
-
-  console.log("🔍 LearningMethodIntro - day1Progress:", day1Progress);
-  console.log(
-    "🔍 LearningMethodIntro - isIntroductionCompleted:",
-    isIntroductionCompleted
-  );
-
-  useEffect(() => {
-    if (isIntroductionCompleted && methods.length > 0) {
-      setCurrentIndex(methods.length - 1);
-      const allCards = new Set(
-        Array.from({ length: methods.length }, (_, i) => i)
-      );
-      setCompletedCards(allCards);
-      console.log("🔥 Day 1 already completed, showing final page");
-    }
-  }, [isIntroductionCompleted, methods.length]);
 
   if (!methods || methods.length === 0) {
     return (

@@ -1,175 +1,141 @@
-// src/components/study-modes/VocabularyMode.tsx
+// src/components/study-modes/VocabularyMode.tsx (최종 정리 버전)
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   ArrowLeft,
-  ArrowRight,
   Volume2,
   CheckCircle,
   RotateCcw,
   Brain,
   Lightbulb,
-  Eye,
-  EyeOff,
-  Zap,
-  Target,
-  X,
-  Play,
-  Pause,
   ChevronLeft,
   ChevronRight,
   Check,
+  Target,
 } from "lucide-react";
+
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
-import { useDayProgress, useStudySettings } from "@/shared/hooks/useAppHooks";
+import { useDayProgress } from "@/shared/hooks/useAppHooks";
 import { StudySettingsPanel } from "@/shared/components/StudySettingsPanel";
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
 
+interface VocabularyItem {
+  id: string;
+  word: string;
+  pronunciation?: string;
+  meaning: string;
+  usage?: string;
+  emoji?: string;
+}
+
 interface VocabularyModeProps {
-  items: any[];
+  items: VocabularyItem[];
   initialItemIndex?: number;
   dayNumber: number;
-  category: string;
+  category?: string;
   packId: string;
-  settings?: any;
+  settings?: {
+    studyMode?: "immersive" | "assisted";
+    showMeaningEnabled?: boolean;
+    autoProgressEnabled?: boolean;
+    autoPlayOnSelect?: boolean;
+  };
   getItemProgress?: (itemId: string) => {
     isCompleted: boolean;
     lastStudied?: string | null;
   };
+  onItemCompleted?: (itemId: string, completed: boolean) => void;
   onComplete: () => void;
 }
 
 export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   items,
   dayNumber,
-  category,
+  category = "단어 학습",
   packId,
-  settings: propsSettings = {}, // [수정] props settings를 propsSettings로 변경
-  onItemCompleted,
+  settings = {},
   getItemProgress,
+  onItemCompleted,
   onComplete,
   initialItemIndex = 0,
 }) => {
+  // 🔥 상태 관리
   const [currentIndex, setCurrentIndex] = useState(initialItemIndex);
   const [showMeaning, setShowMeaning] = useState(false);
   const [studiedCards, setStudiedCards] = useState<Set<number>>(new Set());
   const [masteredCards, setMasteredCards] = useState<Set<number>>(new Set());
 
-  // [수정] 훅에서 받는 settings는 그대로 사용
-  const { settings, updateSetting } = useStudySettings(packId);
+  // 🔥 훅들
   const { speak, isSpeaking } = useTTS();
   const { markModeCompleted } = useDayProgress(packId, dayNumber);
   const { setItemCompleted, getItemProgress: storeGetItemProgress } =
     useStudyProgressStore();
 
+  // 🔥 초기 인덱스 설정
   useEffect(() => {
-    // console.log(
-    //   `🎯 VocabularyMode: Setting initial index to ${initialItemIndex}`
-    // );
     setCurrentIndex(initialItemIndex);
   }, [initialItemIndex]);
 
-  // useEffect(() => {
-  //   // 🔥 컴포넌트 초기화 시 기존 완료 상태 복원
-  //   if (items && items.length > 0 && getItemProgress) {
-  //     console.log("🔄 Restoring completed items state...");
-
-  //     items.forEach((item) => {
-  //       const progress = getItemProgress(item.id);
-  //       // console.log(`📊 Item ${item.id} progress:`, progress);
-
-  //       if (progress.isCompleted) {
-  //         // 완료된 아이템을 UI 상태에 반영
-  //         // (실제 state 변수명은 컴포넌트 구조에 따라 수정 필요)
-  //         console.log(`✅ Restoring completed item: ${item.id}`);
-  //         // setCompletedItems나 해당하는 상태 업데이트 함수 호출
-  //       }
-  //     });
-  //   }
-  // }, [items, getItemProgress]);
+  // 🔥 설정 기본값 처리
   const finalSettings = useMemo(
     () => ({
-      ...propsSettings,
+      studyMode: "immersive" as const,
+      showMeaningEnabled: false,
+      autoProgressEnabled: true,
+      autoPlayOnSelect: false,
       ...settings,
     }),
-    [propsSettings, settings]
+    [settings]
   );
 
+  // 🔥 현재 아이템
   const currentItem = useMemo(() => items[currentIndex], [items, currentIndex]);
+
+  // 🔥 진행률 계산
   const progress = useMemo(
     () => (items.length ? (masteredCards.size / items.length) * 100 : 0),
     [masteredCards.size, items.length]
   );
+
   const isAllMastered = useMemo(
     () => items.length > 0 && masteredCards.size === items.length,
     [masteredCards.size, items.length]
   );
 
-  // [수정] 안전한 getItemProgress 사용
+  // 🔥 안전한 진행 상태 확인
   const safeGetItemProgress = useCallback(
     (itemId: string) => {
-      if (typeof getItemProgress === "function") {
+      if (getItemProgress) {
         return getItemProgress(itemId);
       }
-      if (typeof storeGetItemProgress === "function") {
+      if (storeGetItemProgress) {
         return storeGetItemProgress(packId, dayNumber, itemId);
       }
-      console.warn("getItemProgress is not available, using default");
       return { isCompleted: false };
     },
     [getItemProgress, storeGetItemProgress, packId, dayNumber]
   );
 
+  // 🔥 완료 상태 복원
   useEffect(() => {
     const masteredSet = new Set<number>();
     const studiedSet = new Set<number>();
+
     items.forEach((vocab, index) => {
       if (vocab.id) {
         const progress = safeGetItemProgress(vocab.id);
-        if (progress?.completed || progress?.isCompleted) {
+        if (progress?.isCompleted) {
           masteredSet.add(index);
           studiedSet.add(index);
         }
       }
     });
+
     setMasteredCards(masteredSet);
     setStudiedCards(studiedSet);
-    // console.debug("[VocabularyMode] 완료 상태 복원:", {
-    //   packId,
-    //   dayNumber,
-    //   masteredCount: masteredSet.size,
-    //   studiedCount: studiedSet.size,
-    // });
-  }, [items, safeGetItemProgress, packId, dayNumber]);
+  }, [items, safeGetItemProgress]);
 
-  const handleCardCompleted = useCallback(
-    (itemId: string) => {
-      // ✅ 개별 카드 완료 시 즉시 저장
-      onItemCompleted?.(itemId, true);
-    },
-    [onItemCompleted]
-  );
-
-  // 완료된 카드 수 계산
-  const completedCount = useMemo(() => {
-    return items.filter((item) => getItemProgress(item.id).isCompleted).length;
-  }, [items, getItemProgress]);
-
-  const handleModeChange = useCallback(
-    (mode: "immersive" | "assisted") => {
-      updateSetting("studyMode", mode);
-      updateSetting("showMeaningEnabled", mode === "assisted");
-    },
-    [updateSetting]
-  );
-
-  const handleAutoProgressChange = useCallback(
-    (enabled: boolean) => {
-      updateSetting("autoProgressEnabled", enabled);
-    },
-    [updateSetting]
-  );
-
+  // 🔥 이벤트 핸들러들
   const handleSpeak = useCallback(
     (text: string) => {
       if (text) speak(text, { lang: "en-US", rate: 0.8 });
@@ -179,94 +145,109 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
 
   const handleToggleMeaning = useCallback(() => {
     if (!finalSettings.showMeaningEnabled) return;
+
     setShowMeaning((prev) => !prev);
+
     if (!showMeaning) {
-      const s = new Set(studiedCards);
-      s.add(currentIndex);
-      setStudiedCards(s);
+      setStudiedCards((prev) => {
+        const newSet = new Set(prev);
+        newSet.add(currentIndex);
+        return newSet;
+      });
     }
-  }, [
-    finalSettings.showMeaningEnabled,
-    showMeaning,
-    studiedCards,
-    currentIndex,
-  ]);
+  }, [finalSettings.showMeaningEnabled, showMeaning, currentIndex]);
 
   const handleMarkAsMastered = useCallback(() => {
     const currentVocab = items[currentIndex];
-    if (!currentVocab?.id) {
-      console.warn("[VocabularyMode] 단어 ID가 없습니다:", currentVocab);
-      return;
-    }
-    const m = new Set(masteredCards);
-    m.add(currentIndex);
-    setMasteredCards(m);
-    const s = new Set(studiedCards);
-    s.add(currentIndex);
-    setStudiedCards(s);
+    if (!currentVocab?.id) return;
 
-    // [수정] setItemCompleted 안전하게 호출
-    if (typeof setItemCompleted === "function") {
-      setItemCompleted(packId, dayNumber, currentVocab.id, true);
-    }
+    // 상태 업데이트
+    setMasteredCards((prev) => {
+      const newSet = new Set(prev);
+      newSet.add(currentIndex);
+      return newSet;
+    });
 
-    // console.debug("[VocabularyMode] 단어 완료 처리:", {
-    //   packId,
-    //   dayNumber,
-    //   vocabId: currentVocab.id,
-    //   word: currentVocab.word,
-    // });
+    setStudiedCards((prev) => {
+      const newSet = new Set(prev);
+      newSet.add(currentIndex);
+      return newSet;
+    });
 
+    // 진행 상태 저장
+    setItemCompleted(packId, dayNumber, currentVocab.id, true);
+    onItemCompleted?.(currentVocab.id, true);
+
+    // 🔥 자동 진행 (함수형 업데이트)
     if (finalSettings.autoProgressEnabled && currentIndex < items.length - 1) {
       setTimeout(() => {
-        setCurrentIndex((prev) => prev + 1);
+        setCurrentIndex((prevIndex) => {
+          const nextIndex = Math.min(prevIndex + 1, items.length - 1);
+          console.log(`🔄 Auto progress: ${prevIndex} → ${nextIndex}`);
+          return nextIndex;
+        });
         setShowMeaning(false);
       }, 300);
     }
   }, [
     items,
     currentIndex,
-    masteredCards,
-    studiedCards,
     setItemCompleted,
     packId,
     dayNumber,
+    onItemCompleted,
     finalSettings.autoProgressEnabled,
   ]);
 
   const handleMarkAsNotMastered = useCallback(() => {
     const currentVocab = items[currentIndex];
     if (!currentVocab?.id) return;
-    const m = new Set(masteredCards);
-    m.delete(currentIndex);
-    setMasteredCards(m);
 
-    // [수정] setItemCompleted 안전하게 호출
-    if (typeof setItemCompleted === "function") {
-      setItemCompleted(packId, dayNumber, currentVocab.id, false);
-    }
-
-    console.debug("[VocabularyMode] 단어 완료 취소:", {
-      packId,
-      dayNumber,
-      vocabId: currentVocab.id,
-      word: currentVocab.word,
+    setMasteredCards((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(currentIndex);
+      return newSet;
     });
-  }, [items, currentIndex, masteredCards, setItemCompleted, packId, dayNumber]);
 
+    setItemCompleted(packId, dayNumber, currentVocab.id, false);
+    onItemCompleted?.(currentVocab.id, false);
+  }, [
+    items,
+    currentIndex,
+    setItemCompleted,
+    packId,
+    dayNumber,
+    onItemCompleted,
+  ]);
+
+  // 🔥 네비게이션 (함수형 업데이트 적용)
   const goToNext = useCallback(() => {
-    if (currentIndex < items.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-      setShowMeaning(false);
-    }
-  }, [currentIndex, items.length]);
+    setCurrentIndex((prevIndex) => {
+      const nextIndex = Math.min(prevIndex + 1, items.length - 1);
+      console.log(`👉 Manual next: ${prevIndex} → ${nextIndex}`);
+      return nextIndex;
+    });
+    setShowMeaning(false);
+  }, [items.length]);
 
   const goToPrev = useCallback(() => {
-    if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
+    setCurrentIndex((prevIndex) => {
+      const nextIndex = Math.max(prevIndex - 1, 0);
+      console.log(`👈 Manual prev: ${prevIndex} → ${nextIndex}`);
+      return nextIndex;
+    });
+    setShowMeaning(false);
+  }, []);
+
+  const goToIndex = useCallback(
+    (index: number) => {
+      const safeIndex = Math.max(0, Math.min(index, items.length - 1));
+      console.log(`👆 Manual select: ${currentIndex} → ${safeIndex}`);
+      setCurrentIndex(safeIndex);
       setShowMeaning(false);
-    }
-  }, [currentIndex]);
+    },
+    [items.length, currentIndex]
+  );
 
   const swipeHandlers = useSwipeGesture({
     onSwipeLeft: goToNext,
@@ -274,12 +255,11 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   });
 
   const handleComplete = useCallback(() => {
-    if (typeof markModeCompleted === "function") {
-      markModeCompleted(packId, "vocab");
-    }
+    markModeCompleted(packId, "vocab");
     onComplete?.();
   }, [markModeCompleted, packId, onComplete]);
 
+  // 🔥 로딩 처리
   if (!items.length) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
@@ -306,10 +286,8 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
             <h1 className="font-bold text-gray-800">{category}</h1>
             <p className="text-xs text-gray-500">Day {dayNumber}</p>
           </div>
-          <div className="w-8"></div>
-          {/* ✅ 실제 진행도 표시 */}
-          <div className="progress-indicator">
-            완료: {completedCount} / {items.length}
+          <div className="text-xs text-gray-500">
+            {masteredCards.size}/{items.length}
           </div>
         </header>
 
@@ -335,14 +313,12 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
           {...swipeHandlers}
         >
           <div className="w-full max-w-xl">
+            {/* Progress Dots */}
             <div className="flex items-center justify-center gap-1.5 mb-4">
               {items.map((_, idx) => (
                 <button
                   key={idx}
-                  onClick={() => {
-                    setCurrentIndex(idx);
-                    setShowMeaning(false);
-                  }}
+                  onClick={() => goToIndex(idx)}
                   className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
                     idx === currentIndex
                       ? "w-8 bg-indigo-600"
@@ -354,6 +330,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               ))}
             </div>
 
+            {/* Word Card */}
             <div
               className="relative bg-white rounded-2xl shadow-lg p-8 text-center cursor-pointer transition-transform active:scale-95"
               onClick={handleToggleMeaning}
@@ -363,28 +340,34 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
                   학습 완료
                 </div>
               )}
-              <div className="text-6xl mb-4">{currentItem.emoji}</div>
-              <h2 className="text-3xl font-bold text-gray-800">
+
+              {currentItem.emoji && (
+                <div className="text-6xl mb-4">{currentItem.emoji}</div>
+              )}
+
+              <h2 className="text-3xl font-bold text-gray-800 mb-2">
                 {currentItem.word}
               </h2>
+
               {currentItem.pronunciation && (
-                <p className="text-gray-500 mt-1">
+                <p className="text-gray-500 mb-4">
                   [{currentItem.pronunciation}]
                 </p>
               )}
+
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handleSpeak(currentItem.word);
                 }}
                 disabled={isSpeaking}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700 rounded-full text-sm font-medium transition-all disabled:opacity-50 mt-4"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700 rounded-full text-sm font-medium transition-all disabled:opacity-50 mb-6"
               >
                 <Volume2 className="w-4 h-4" />
                 {isSpeaking ? "재생중..." : "발음 듣기"}
               </button>
 
-              <div className="h-20 mt-6 pt-6 border-t border-gray-200 flex flex-col justify-center">
+              <div className="h-20 pt-6 border-t border-gray-200 flex flex-col justify-center">
                 {finalSettings.showMeaningEnabled && showMeaning ? (
                   <div className="animate-in fade-in">
                     <p className="text-xl font-semibold text-gray-800">
@@ -406,6 +389,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               </div>
             </div>
 
+            {/* Navigation */}
             <div className="flex items-center gap-3 mt-6">
               <button
                 onClick={goToPrev}
@@ -426,6 +410,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               </button>
             </div>
 
+            {/* Action Buttons */}
             <div className="mt-4">
               {masteredCards.has(currentIndex) ? (
                 <button
@@ -444,6 +429,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               )}
             </div>
 
+            {/* Complete Button */}
             {isAllMastered && (
               <button
                 onClick={handleComplete}
@@ -488,10 +474,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               {items.map((_, idx) => (
                 <button
                   key={idx}
-                  onClick={() => {
-                    setCurrentIndex(idx);
-                    setShowMeaning(false);
-                  }}
+                  onClick={() => goToIndex(idx)}
                   className={`aspect-square rounded-lg text-xs font-semibold transition-all ${
                     idx === currentIndex
                       ? "bg-indigo-600 text-white shadow-md scale-110"
@@ -511,8 +494,8 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
           <div className="pt-6 border-t border-gray-200">
             <StudySettingsPanel
               settings={finalSettings}
-              handleModeChange={handleModeChange}
-              handleAutoProgressChange={handleAutoProgressChange}
+              handleModeChange={() => {}} // 상위에서 처리
+              handleAutoProgressChange={() => {}} // 상위에서 처리
             />
           </div>
         </div>
@@ -521,4 +504,5 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   );
 };
 
+VocabularyMode.displayName = "VocabularyMode";
 export default VocabularyMode;

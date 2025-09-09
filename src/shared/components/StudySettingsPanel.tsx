@@ -1,19 +1,21 @@
 // src/shared/components/StudySettingsPanel.tsx
 
 import React from "react";
-import { Brain, Lightbulb, Zap } from "lucide-react";
+import { Brain, Lightbulb, Zap, Volume2 } from "lucide-react";
 import type { StudySettings } from "@/types"; // settings 타입 임포트
 
 interface StudySettingsPanelProps {
   settings: StudySettings;
   handleModeChange: (mode: "assisted" | "immersive") => void;
   handleAutoProgressChange: (enabled: boolean) => void;
+  handleAutoPlayChange?: (enabled: boolean) => void; // 🔥 새로 추가
 }
 
 export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
   settings,
   handleModeChange,
   handleAutoProgressChange,
+  handleAutoPlayChange, // 🔥 새로 추가
 }) => {
   return (
     <div className="space-y-4">
@@ -73,6 +75,25 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
             }`}
           />
         </button>
+      </div>
+
+      {/* 🔥 답 선택시 자동 재생 설정 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Volume2 className="w-4 h-4 text-gray-500" />
+          <span className="text-sm font-medium text-gray-700">
+            답 선택시 자동 재생
+          </span>
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={settings.autoPlayOnSelect || false}
+            onChange={(e) => handleAutoPlayChange?.(e.target.checked)}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
       </div>
     </div>
   );

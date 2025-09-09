@@ -1,11 +1,10 @@
-// src/components/study-modes/WorkbookMode.tsx (수정된 핵심 부분)
+// src/components/study-modes/WorkbookMode.tsx (최종 완성 버전)
 import React, { useEffect, useMemo, useCallback } from "react";
 import { PenTool } from "lucide-react";
 
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
-import { useStudySettings } from "@/shared/hooks/useAppHooks";
 
 import { useWorkbookState } from "@/hooks/useWorkbookState";
 import { useWorkbookLogic } from "@/hooks/useWorkbookLogic";
@@ -30,33 +29,24 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     packId,
     onComplete,
     initialItemIndex = 0,
+    settings,
   }) => {
+    // 🔥 워크북 데이터 처리
     const workbook = useMemo(() => {
       if (!Array.isArray(rawWorkbook) || rawWorkbook.length === 0) {
         return [];
       }
-
-      // 🔥 한 번만 섞이도록 안정적인 키 기반 메모이제이션
-      const dataHash = rawWorkbook
-        .map((item) => `${item.id}-${item.options?.length || 0}`)
-        .join("|");
-      console.log("🔀 워크북 데이터 처리:", {
-        length: rawWorkbook.length,
-        hash: dataHash.substring(0, 50) + "...",
-      });
-
       return shuffleWorkbookData(rawWorkbook);
     }, [rawWorkbook]);
 
-    // 🔥 컴포넌트 키 생성 방식 개선
+    // 🔥 컴포넌트 키 생성
     const componentKey = useMemo(() => {
       const baseKey = `${packId}-${dayNumber}-${workbook.length}`;
-      // 워크북 내용이 바뀐 경우에만 키 변경
       const contentHash = workbook.map((item) => item.id).join("-");
       return `${baseKey}-${contentHash}`;
     }, [packId, dayNumber, workbook]);
 
-    // 🔥 기존 방식 그대로 사용 (개별 변수들)
+    // 🔥 상태 관리
     const {
       currentIndex,
       selectedAnswers,
@@ -79,22 +69,25 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       pendingSaveRef,
     } = useWorkbookState(workbook, initialItemIndex, componentKey);
 
+    // 🔥 로직 및 훅
     const { getCorrectAnswer, saveProgress, restoreProgress } =
       useWorkbookLogic(packId, dayNumber, workbook);
-
-    const { settings, updateSetting } = useStudySettings(packId);
     const { markModeCompleted } = useDayProgress(packId, dayNumber);
     const { speak, isSpeaking } = useTTS();
 
-    // 🔥 기존 핸들러들 그대로 유지
-    const handleModeChange = useCallback(
-      (mode: "immersive" | "assisted") => {
-        updateSetting("studyMode", mode);
-        updateSetting("showMeaningEnabled", mode === "assisted");
-      },
-      [updateSetting]
+    // 🔥 설정 기본값 처리
+    const studySettings = useMemo(
+      () => ({
+        studyMode: "immersive" as const,
+        showMeaningEnabled: false,
+        autoProgressEnabled: true,
+        autoPlayOnSelect: false,
+        ...settings,
+      }),
+      [settings]
     );
 
+    // 🔥 이벤트 핸들러들
     const handleSpeak = useCallback(
       (text: string) => {
         if (text) speak(text, WORKBOOK_CONSTANTS.TTS_CONFIG);
@@ -106,15 +99,17 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       (answer: string) => {
         if (isCurrentAnswered) return;
 
-        setSelectedAnswers((prev) => ({ ...prev, [currentIndex]: answer }));
+        setSelectedAnswers((prev: Record<number, string>) => ({
+          ...prev,
+          [currentIndex]: answer,
+        }));
 
-        // 🔥 답 선택시 자동으로 TTS 재생 (선택사항)
-        if (settings.autoPlayOnSelect && currentQuestion) {
+        // 🔥 답 선택시 자동 TTS 재생
+        if (studySettings.autoPlayOnSelect && currentQuestion) {
           const questionText =
             currentQuestion.question || currentQuestion.sentence || "";
           const completeText = questionText.replace(/_{2,}/g, answer);
 
-          // 잠깐 지연 후 재생 (자연스러운 UX)
           setTimeout(() => {
             handleSpeak(completeText);
           }, 300);
@@ -123,9 +118,10 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       [
         currentIndex,
         isCurrentAnswered,
-        settings.autoPlayOnSelect,
+        studySettings.autoPlayOnSelect,
         currentQuestion,
         handleSpeak,
+        setSelectedAnswers,
       ]
     );
 
@@ -136,7 +132,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       const correctAnswer = getCorrectAnswer(currentQuestion!);
       const isCorrect = selectedAnswer === correctAnswer;
 
-      // 기존 방식 그대로
+      // 상태 업데이트
       setAnsweredQuestions((prev) => {
         const newSet = new Set(prev);
         newSet.add(currentIndex);
@@ -164,6 +160,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       setShowResult,
     ]);
 
+    // 🔥 함수형 업데이트로 안전한 다음 이동
     const goToNext = useCallback(() => {
       // 저장 로직
       if (pendingSaveRef.current.has(currentIndex)) {
@@ -172,27 +169,22 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
         pendingSaveRef.current.delete(currentIndex);
       }
 
-      if (currentIndex < workbook.length - 1) {
-        setCurrentIndex((prev) => prev + 1);
-      }
-    }, [
-      currentIndex,
-      correctAnswers,
-      workbook.length,
-      saveProgress,
-      setCurrentIndex,
-    ]);
+      // 🔥 함수형 업데이트로 안전하게 증가
+      setCurrentIndex((prevIndex) => {
+        const nextIndex = Math.min(prevIndex + 1, workbook.length - 1);
+        console.log(`🔄 Moving: ${prevIndex} → ${nextIndex}`);
+        return nextIndex;
+      });
+    }, [correctAnswers, workbook.length, saveProgress, setCurrentIndex]);
 
     const goToPrev = useCallback(() => {
-      if (currentIndex > 0) {
-        setCurrentIndex((prev) => prev - 1);
-      }
-    }, [currentIndex, setCurrentIndex]);
+      setCurrentIndex((prev) => Math.max(prev - 1, 0));
+    }, [setCurrentIndex]);
 
     const handleRetry = useCallback(() => {
       console.log("🔄 다시 풀기:", currentIndex);
 
-      // 기존 로직 그대로
+      // 상태 초기화
       setAnsweredQuestions((prev) => {
         const newSet = new Set(prev);
         newSet.delete(currentIndex);
@@ -244,6 +236,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       }));
     }, [currentIndex, setShowExplanation]);
 
+    // 🔥 워크북 완료 처리
     const handleComplete = useCallback(() => {
       pendingSaveRef.current.forEach((idx) => {
         const isCorrect = correctAnswers.has(idx);
@@ -261,7 +254,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       onComplete,
     ]);
 
-    // 진행상태 복원
+    // 🔥 Effects
     useEffect(() => {
       const { answered, correct, results } = restoreProgress();
       setAnsweredQuestions(answered);
@@ -279,7 +272,6 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       onSwipeRight: goToPrev,
     });
 
-    // 키보드 이벤트 (기존 그대로)
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === "ArrowRight") goToNext();
@@ -304,7 +296,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       handleCheckAnswer,
     ]);
 
-    // 로딩 상태 처리 (기존 그대로)
+    // 🔥 로딩 상태 처리
     if (!workbook.length) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
@@ -387,8 +379,8 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                     correctAnswer={getCorrectAnswer(currentQuestion)}
                     onCheck={handleCheckAnswer}
                     onRetry={handleRetry}
-                    studyMode={settings.studyMode}
-                    showMeaningEnabled={settings.showMeaningEnabled}
+                    studyMode={studySettings.studyMode}
+                    showMeaningEnabled={studySettings.showMeaningEnabled}
                     explanation={currentQuestion.explanation}
                     showExplanation={showExplanation[currentIndex]}
                     onToggleExplanation={handleToggleExplanation}
@@ -426,12 +418,10 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
           currentIndex={currentIndex}
           answeredQuestions={answeredQuestions}
           correctAnswers={correctAnswers}
-          settings={settings}
+          settings={studySettings}
           onIndexChange={setCurrentIndex}
-          onModeChange={handleModeChange}
-          onAutoProgressChange={(enabled) =>
-            updateSetting("autoProgressEnabled", enabled)
-          }
+          onModeChange={() => {}} // 빈 함수 (상위에서 처리)
+          onAutoProgressChange={() => {}} // 빈 함수 (상위에서 처리)
         />
       </div>
     );

@@ -16,6 +16,7 @@ export interface StudySettings {
   showMeaningEnabled: boolean;
   autoProgressEnabled: boolean;
   studyMode: "immersive" | "assisted";
+  autoPlayOnSelect?: boolean; // 🔥 새로 추가
 }
 
 // =================================================================

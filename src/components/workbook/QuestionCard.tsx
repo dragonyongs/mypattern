@@ -18,7 +18,7 @@ export const QuestionCard = memo<QuestionCardProps>(
     question,
     isAnswered,
     isCorrect,
-    selectedAnswer, // 🔥 새로 추가
+    selectedAnswer,
     onSpeak,
     isSpeaking,
     children,

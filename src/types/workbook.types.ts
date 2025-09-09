@@ -1,22 +1,23 @@
 // src/types/workbook.types.ts
+import { StudySettings } from "@/types";
 export interface WorkbookItem {
   id: string;
-  type?: "fill-blank" | "multiple-choice";
-  sentence?: string;
-  question?: string;
+  sentence: string;
+  blank: string;
   options: string[];
-  answer?: string;
-  correctAnswer?: string;
+  answer: string;
   explanation?: string;
+  question?: string;
 }
 
 export interface WorkbookModeProps {
   items: WorkbookItem[];
-  initialItemIndex?: number;
   dayNumber: number;
-  category: string;
+  category?: string;
   packId: string;
   onComplete?: () => void;
+  initialItemIndex?: number;
+  settings?: StudySettings; // 🔥 새로 추가
 }
 
 export interface WorkbookState {
