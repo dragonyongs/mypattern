@@ -26,38 +26,13 @@ export const useAvailablePacks = () => {
       setLoading(true);
       setError(null);
 
-      // 중요: 이제 loadPackList 대신, 우리가 알고 있는 팩 ID 목록을 직접 사용합니다.
-      // 향후 이 부분은 API 호출로 대체될 수 있습니다.
-      const availablePackIds = ["real-voca-basic", "everyday-convo-3days"]; // 예: "real-voca-advanced" 등 추가
+      console.log("🔍 Fetching available packs...");
+      const availablePacks = await packDataService.getAvailablePacks();
 
-      if (availablePackIds.length === 0) {
-        setPacks([]);
-        return;
-      }
-
-      // 각 팩의 전체 데이터를 병렬로 로드합니다.
-      const packPromises = availablePackIds.map((packId) =>
-        packDataService.loadPackData(packId)
-      );
-
-      const loadedPacks = await Promise.all(packPromises);
-
-      // 전체 데이터에서 목록 표시에 필요한 메타데이터만 추출합니다.
-      const metadataList = loadedPacks.map(
-        (pack): PackMetadata => ({
-          id: pack.id,
-          title: pack.title,
-          subtitle: pack.subtitle,
-          description: pack.description,
-          level: pack.level,
-          tags: pack.tags,
-          totalDays: pack.learningPlan.totalDays,
-        })
-      );
-
-      setPacks(metadataList);
+      setPacks(availablePacks);
+      console.log(`✅ Loaded ${availablePacks.length} available packs`);
     } catch (err) {
-      console.error("Pack data fetch error:", err);
+      console.error("❌ Pack data fetch error:", err);
       setError("학습팩 목록을 불러오는 데 실패했습니다.");
     } finally {
       setLoading(false);
@@ -69,4 +44,41 @@ export const useAvailablePacks = () => {
   }, [fetchPacks]);
 
   return { packs, loading, error, refetch: fetchPacks };
+};
+
+// 🔥 특정 팩 데이터를 로드하는 훅
+export const usePackData = (packId: string | null) => {
+  const [packData, setPackData] = useState<PackData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadPack = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log(`🔍 Loading pack data: ${id}`);
+      const data = await packDataService.loadPackData(id);
+
+      setPackData(data);
+      console.log(`✅ Pack data loaded: ${data.title}`);
+    } catch (err) {
+      console.error(`❌ Failed to load pack ${id}:`, err);
+      setError(`학습팩 "${id}"을 불러오는 데 실패했습니다.`);
+      setPackData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (packId) {
+      loadPack(packId);
+    } else {
+      setPackData(null);
+      setError(null);
+    }
+  }, [packId, loadPack]);
+
+  return { packData, loading, error, reload: () => packId && loadPack(packId) };
 };

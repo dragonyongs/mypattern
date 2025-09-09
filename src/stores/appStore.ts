@@ -1,10 +1,8 @@
 // src/stores/appStore.ts
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { packDataService } from "@/shared/services/packDataService";
 import type { PackData } from "@/types";
-
-// 🔥 콘텐츠 데이터는 항상 최신 JSON에서 로드
-import realVocaBasicData from "../data/packs/real-voca-basic.json";
 
 interface AppState {
   isAuthenticated: boolean;
@@ -13,9 +11,8 @@ interface AppState {
   selectedPackData: PackData | null;
   currentDay: number;
   _hasHydrated: boolean;
-
-  // 🔥 콘텐츠 버전 관리 (단순화)
   contentVersion: string;
+  selectedPackId: string | null; // 🔥 선택된 팩 ID
 }
 
 interface AppActions {
@@ -26,8 +23,10 @@ interface AppActions {
   initialize: () => void;
   setHasHydrated: (state: boolean) => void;
 
-  // 🔥 콘텐츠 데이터 관리
-  refreshContentData: () => void;
+  // 🔥 새로운 팩 관리 메서드들
+  loadPackById: (packId: string) => Promise<PackData | null>;
+  refreshContentData: () => Promise<void>;
+  autoRestoreRecentPack: () => Promise<void>;
   validateContentCompatibility: () => boolean;
 }
 
@@ -41,41 +40,85 @@ export const useAppStore = create<AppState & AppActions>()(
       selectedPackData: null,
       currentDay: 1,
       _hasHydrated: false,
-      contentVersion: "1.0.0", // 🔥 단순한 버전 관리
+      contentVersion: "1.0.0",
+      selectedPackId: null,
 
       // --- 액션 ---
       setHasHydrated: (state) => set({ _hasHydrated: state }),
 
-      // 🔥 콘텐츠 데이터 새로 고침 (JSON에서 다시 로드)
-      refreshContentData: () => {
-        console.log("🔄 Refreshing content data from JSON...");
+      // 🔥 팩 ID로 데이터 로드
+      loadPackById: async (packId: string) => {
         try {
-          const latestData = realVocaBasicData as PackData;
+          console.log(`🔍 Loading pack by ID: ${packId}`);
+
+          // 사용 가능한 팩인지 확인
+          const isAvailable = await packDataService.isPackAvailable(packId);
+          if (!isAvailable) {
+            console.warn(`⚠️ Pack not available: ${packId}`);
+            return null;
+          }
+
+          const packData = await packDataService.loadPackData(packId);
+
           set({
-            selectedPackData: latestData,
-            contentVersion: latestData.version || "1.0.0",
+            selectedPackData: packData,
+            selectedPackId: packId,
+            contentVersion: packData.version || "1.0.0",
           });
-          console.log("✅ Content data refreshed");
+
+          console.log(`✅ Pack loaded successfully: ${packData.title}`);
+          return packData;
         } catch (error) {
-          console.error("❌ Failed to refresh content data:", error);
+          console.error(`❌ Failed to load pack ${packId}:`, error);
+          return null;
         }
       },
 
-      // 🔥 콘텐츠 호환성 검증 (ID 구조 변경 감지)
-      validateContentCompatibility: () => {
-        const state = get();
-        const currentData = realVocaBasicData as PackData;
+      // 🔥 콘텐츠 데이터 새로 고침 (동적)
+      refreshContentData: async () => {
+        console.log("🔄 Refreshing content data...");
 
-        // 간단한 호환성 체크 (콘텐츠 ID 패턴 확인)
-        if (!currentData.contents || currentData.contents.length === 0) {
-          return false;
+        const state = get();
+        const savedPackId = state.selectedPackId;
+
+        if (savedPackId) {
+          // 저장된 팩 ID로 데이터 로드
+          const packData = await get().loadPackById(savedPackId);
+          if (packData) {
+            console.log(`✅ Restored pack data: ${packData.title}`);
+            return;
+          }
         }
 
-        // 새로운 카테고리 기반 ID 구조인지 확인
-        const hasNewIdStructure = currentData.contents.some(
+        // 저장된 팩이 없으면 최근 팩 추론
+        await get().autoRestoreRecentPack();
+      },
+
+      // 🔥 최근 팩 자동 복원
+      autoRestoreRecentPack: async () => {
+        try {
+          console.log("🔍 Auto-restoring recent pack...");
+
+          const recentPackId = await packDataService.inferRecentPackId();
+          if (recentPackId) {
+            await get().loadPackById(recentPackId);
+            console.log(`✅ Auto-restored recent pack: ${recentPackId}`);
+          } else {
+            console.log("ℹ️ No recent pack found");
+          }
+        } catch (error) {
+          console.error("❌ Failed to auto-restore recent pack:", error);
+        }
+      },
+
+      validateContentCompatibility: () => {
+        const state = get();
+        if (!state.selectedPackData) return false;
+
+        const currentData = state.selectedPackData;
+        const hasNewIdStructure = currentData.contents?.some(
           (item) => item.id && item.id.includes("-") && item.category
         );
-
         return hasNewIdStructure;
       },
 
@@ -85,7 +128,6 @@ export const useAppStore = create<AppState & AppActions>()(
 
         try {
           await new Promise((resolve) => setTimeout(resolve, 1000));
-
           const demoUser = {
             id: "demo-user",
             name: "Demo User",
@@ -98,9 +140,8 @@ export const useAppStore = create<AppState & AppActions>()(
             loading: false,
           });
 
-          // 🔥 로그인 후 최신 콘텐츠 데이터 로드
-          get().refreshContentData();
-
+          // 🔥 로그인 후 콘텐츠 데이터 복원
+          await get().refreshContentData();
           console.log("✅ Login successful");
         } catch (error) {
           console.error("❌ Login failed:", error);
@@ -114,40 +155,48 @@ export const useAppStore = create<AppState & AppActions>()(
           isAuthenticated: false,
           user: null,
           selectedPackData: null,
+          selectedPackId: null,
           currentDay: 1,
         });
+
+        // 캐시도 정리
+        packDataService.clearCache();
       },
 
       setSelectedPackData: (packData) => {
         if (!packData) return;
-        set({ selectedPackData: packData });
+
+        set({
+          selectedPackData: packData,
+          selectedPackId: packData.id,
+        });
+        console.log(`📦 Selected pack: ${packData.id} (${packData.title})`);
       },
 
       setCurrentDay: (day) => set({ currentDay: day }),
 
-      initialize: () => {
+      initialize: async () => {
         console.log("🔥 App initialization started");
-        const state = get();
 
-        // 🔥 항상 최신 콘텐츠 데이터 로드
+        const state = get();
         if (state.isAuthenticated) {
-          get().refreshContentData();
+          await get().refreshContentData();
         }
 
         console.log("✅ App initialization completed");
+        console.log("📊 Cache stats:", packDataService.getCacheStats());
       },
     }),
     {
-      name: "app-store-v3",
+      name: "app-store-v4",
       storage: createJSONStorage(() => localStorage),
 
-      // 🔥 콘텐츠 데이터는 제외하고 앱 상태만 저장
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         user: state.user,
         currentDay: state.currentDay,
-        contentVersion: state.contentVersion, // 버전 정보만 저장
-        // selectedPackData는 제외 - 항상 JSON에서 로드
+        contentVersion: state.contentVersion,
+        selectedPackId: state.selectedPackId, // 🔥 중요: 팩 ID 저장
       }),
 
       onRehydrateStorage: () => (state, error) => {
@@ -157,7 +206,7 @@ export const useAppStore = create<AppState & AppActions>()(
           console.log("✅ App store hydration completed");
           if (state) {
             state.setHasHydrated(true);
-            state.initialize(); // 최신 콘텐츠 데이터 로드
+            state.initialize();
           }
         }
       },

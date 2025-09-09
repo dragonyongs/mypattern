@@ -105,9 +105,28 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     const handleAnswerSelect = useCallback(
       (answer: string) => {
         if (isCurrentAnswered) return;
+
         setSelectedAnswers((prev) => ({ ...prev, [currentIndex]: answer }));
+
+        // 🔥 답 선택시 자동으로 TTS 재생 (선택사항)
+        if (settings.autoPlayOnSelect && currentQuestion) {
+          const questionText =
+            currentQuestion.question || currentQuestion.sentence || "";
+          const completeText = questionText.replace(/_{2,}/g, answer);
+
+          // 잠깐 지연 후 재생 (자연스러운 UX)
+          setTimeout(() => {
+            handleSpeak(completeText);
+          }, 300);
+        }
       },
-      [currentIndex, isCurrentAnswered]
+      [
+        currentIndex,
+        isCurrentAnswered,
+        settings.autoPlayOnSelect,
+        currentQuestion,
+        handleSpeak,
+      ]
     );
 
     const handleCheckAnswer = useCallback(() => {
@@ -348,6 +367,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                   question={currentQuestion}
                   isAnswered={isCurrentAnswered}
                   isCorrect={isCurrentCorrect}
+                  selectedAnswer={selectedAnswers[currentIndex]}
                   onSpeak={handleSpeak}
                   isSpeaking={isSpeaking}
                 >
