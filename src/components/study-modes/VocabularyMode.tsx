@@ -27,6 +27,7 @@ import { useStudyProgressStore } from "@/stores/studyProgressStore";
 
 interface VocabularyModeProps {
   items: any[];
+  initialItemIndex?: number;
   dayNumber: number;
   category: string;
   packId: string;
@@ -47,8 +48,9 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   onItemCompleted,
   getItemProgress,
   onComplete,
+  initialItemIndex = 0,
 }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(initialItemIndex);
   const [showMeaning, setShowMeaning] = useState(false);
   const [studiedCards, setStudiedCards] = useState<Set<number>>(new Set());
   const [masteredCards, setMasteredCards] = useState<Set<number>>(new Set());
@@ -61,24 +63,30 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
     useStudyProgressStore();
 
   useEffect(() => {
-    // 🔥 컴포넌트 초기화 시 기존 완료 상태 복원
-    if (items && items.length > 0 && getItemProgress) {
-      console.log("🔄 Restoring completed items state...");
+    // console.log(
+    //   `🎯 VocabularyMode: Setting initial index to ${initialItemIndex}`
+    // );
+    setCurrentIndex(initialItemIndex);
+  }, [initialItemIndex]);
 
-      items.forEach((item) => {
-        const progress = getItemProgress(item.id);
-        // console.log(`📊 Item ${item.id} progress:`, progress);
+  // useEffect(() => {
+  //   // 🔥 컴포넌트 초기화 시 기존 완료 상태 복원
+  //   if (items && items.length > 0 && getItemProgress) {
+  //     console.log("🔄 Restoring completed items state...");
 
-        if (progress.isCompleted) {
-          // 완료된 아이템을 UI 상태에 반영
-          // (실제 state 변수명은 컴포넌트 구조에 따라 수정 필요)
-          console.log(`✅ Restoring completed item: ${item.id}`);
-          // setCompletedItems나 해당하는 상태 업데이트 함수 호출
-        }
-      });
-    }
-  }, [items, getItemProgress]);
-  // [수정] 최종 settings는 hook settings와 props settings를 합성
+  //     items.forEach((item) => {
+  //       const progress = getItemProgress(item.id);
+  //       // console.log(`📊 Item ${item.id} progress:`, progress);
+
+  //       if (progress.isCompleted) {
+  //         // 완료된 아이템을 UI 상태에 반영
+  //         // (실제 state 변수명은 컴포넌트 구조에 따라 수정 필요)
+  //         console.log(`✅ Restoring completed item: ${item.id}`);
+  //         // setCompletedItems나 해당하는 상태 업데이트 함수 호출
+  //       }
+  //     });
+  //   }
+  // }, [items, getItemProgress]);
   const finalSettings = useMemo(
     () => ({
       ...propsSettings,
@@ -126,12 +134,12 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
     });
     setMasteredCards(masteredSet);
     setStudiedCards(studiedSet);
-    console.debug("[VocabularyMode] 완료 상태 복원:", {
-      packId,
-      dayNumber,
-      masteredCount: masteredSet.size,
-      studiedCount: studiedSet.size,
-    });
+    // console.debug("[VocabularyMode] 완료 상태 복원:", {
+    //   packId,
+    //   dayNumber,
+    //   masteredCount: masteredSet.size,
+    //   studiedCount: studiedSet.size,
+    // });
   }, [items, safeGetItemProgress, packId, dayNumber]);
 
   const handleCardCompleted = useCallback(
@@ -202,12 +210,12 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
       setItemCompleted(packId, dayNumber, currentVocab.id, true);
     }
 
-    console.debug("[VocabularyMode] 단어 완료 처리:", {
-      packId,
-      dayNumber,
-      vocabId: currentVocab.id,
-      word: currentVocab.word,
-    });
+    // console.debug("[VocabularyMode] 단어 완료 처리:", {
+    //   packId,
+    //   dayNumber,
+    //   vocabId: currentVocab.id,
+    //   word: currentVocab.word,
+    // });
 
     if (finalSettings.autoProgressEnabled && currentIndex < items.length - 1) {
       setTimeout(() => {

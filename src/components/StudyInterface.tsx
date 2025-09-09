@@ -20,7 +20,6 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { useAppStore } from "@/stores/appStore";
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
 import { packDataService } from "@/shared/services/packDataService";
-import type { PackData } from "@/types";
 import { CompletionModal } from "@/shared/components/CompletionModal";
 
 type StudyMode =
@@ -40,10 +39,17 @@ export const StudyInterface: React.FC = () => {
 
   const packData = useAppStore((state) => state.selectedPackData);
   const setCurrentDay = useAppStore((state) => state.setCurrentDay);
-  const setModeCompleted = useStudyProgressStore(
-    (state) => state.setModeCompleted
-  );
-  const getSettings = useStudyProgressStore((state) => state.getSettings);
+
+  const {
+    setModeCompleted,
+    getSettings,
+    // 🔥 학습 위치 관리 hooks 추가
+    getCurrentItemIndex,
+    setCurrentItemIndex,
+    getNextUncompletedIndex,
+    autoMoveToNextMode,
+  } = useStudyProgressStore();
+
   const dayProgress = useStudyProgressStore((state) =>
     packData ? state.progress[packData.id]?.progressByDay[currentDay] : null
   );
@@ -142,21 +148,66 @@ export const StudyInterface: React.FC = () => {
     [packData, currentDay]
   );
 
-  const handleItemCompleted = useCallback(
-    (itemId: string, completed: boolean = true) => {
-      if (!packData) return;
-      console.log(`🎯 Item completed: ${itemId} = ${completed}`);
-      console.log(
-        "ㅇㅇㅇㅇㅇㅇㅇㅇㅇ",
+  // 🔥 학습 위치 계산 함수 추가
+  const getInitialItemIndex = useCallback(
+    (mode: StudyMode) => {
+      if (!packData) return 0;
+
+      const modeData = getModeData(mode);
+      if (!modeData.length) return 0;
+
+      const contentIds = modeData.map((item) => item.id);
+
+      // 저장된 위치 확인
+      const savedIndex = getCurrentItemIndex(packData.id, currentDay, mode);
+
+      // 다음 미완료 아이템 인덱스 계산
+      const nextUncompletedIndex = getNextUncompletedIndex(
         packData.id,
         currentDay,
-        itemId,
-        completed
+        mode,
+        contentIds
       );
+
+      // 더 앞선 위치 사용 (학습 진행 상황에 맞게)
+      const optimalIndex = Math.max(savedIndex, nextUncompletedIndex);
+
+      // console.log(
+      //   `🔍 Mode ${mode} - Saved: ${savedIndex}, Uncompleted: ${nextUncompletedIndex}, Using: ${optimalIndex}`
+      // );
+      return optimalIndex;
+    },
+    [
+      packData,
+      currentDay,
+      getModeData,
+      getCurrentItemIndex,
+      getNextUncompletedIndex,
+    ]
+  );
+
+  const handleItemCompleted = useCallback(
+    (itemId: string, completed: boolean = true) => {
+      if (!packData || !currentMode) return;
+
+      console.log(`🎯 Item completed: ${itemId} = ${completed}`);
+
       // 🔥 즉시 스토어에 저장
       useStudyProgressStore
         .getState()
         .setItemCompleted(packData.id, currentDay, itemId, completed);
+
+      // 🔥 현재 아이템의 인덱스 계산
+      const modeData = getModeData(currentMode);
+      const currentItemIndex = modeData.findIndex((item) => item.id === itemId);
+
+      if (currentItemIndex >= 0) {
+        // 다음 아이템 인덱스로 위치 업데이트
+        const nextIndex = Math.min(currentItemIndex + 1, modeData.length - 1);
+        setCurrentItemIndex(packData.id, currentDay, currentMode, nextIndex);
+
+        console.log(`📍 Updated current position to index: ${nextIndex}`);
+      }
 
       // 🔥 상태 업데이트 후 로그
       setTimeout(() => {
@@ -166,7 +217,7 @@ export const StudyInterface: React.FC = () => {
         console.log(`📊 Updated item progress for ${itemId}:`, updatedProgress);
       }, 100);
     },
-    [packData, currentDay]
+    [packData, currentDay, currentMode, getModeData, setCurrentItemIndex]
   );
 
   const handleBack = useCallback(() => {
@@ -176,6 +227,7 @@ export const StudyInterface: React.FC = () => {
   const handleModeComplete = useCallback(
     (completedMode: StudyMode) => {
       if (completion.open || !packData || !dayPlan) return;
+
       setModeCompleted(packData.id, currentDay, completedMode, packData);
 
       const seq = availableModeKeys;
@@ -183,9 +235,20 @@ export const StudyInterface: React.FC = () => {
       const next = idx >= 0 && idx < seq.length - 1 ? seq[idx + 1] : null;
 
       if (settings?.autoProgressEnabled && next) {
-        setCurrentMode(next);
+        // 🔥 autoMoveToNextMode 사용으로 자동 이동
+        const nextMode = autoMoveToNextMode(
+          packData.id,
+          currentDay,
+          completedMode,
+          packData
+        );
+        if (nextMode) {
+          setCurrentMode(nextMode);
+          console.log(`🔄 Auto moved to ${nextMode}`);
+        }
         return;
       }
+
       setCompletion({ open: true, completed: completedMode });
     },
     [
@@ -196,6 +259,7 @@ export const StudyInterface: React.FC = () => {
       setModeCompleted,
       settings,
       availableModeKeys,
+      autoMoveToNextMode, // 🔥 추가
     ]
   );
 
@@ -210,7 +274,16 @@ export const StudyInterface: React.FC = () => {
     const next = idx >= 0 && idx < seq.length - 1 ? seq[idx + 1] : null;
 
     if (next) {
-      setCurrentMode(next);
+      // 🔥 다음 모드로 이동 시 위치 초기화
+      const nextMode = autoMoveToNextMode(
+        packData!.id,
+        currentDay,
+        completion.completed,
+        packData!
+      );
+      if (nextMode) {
+        setCurrentMode(nextMode);
+      }
     } else {
       const nextDay = currentDay + 1;
       if (nextDay <= (packData?.learningPlan.totalDays ?? 14)) {
@@ -228,6 +301,7 @@ export const StudyInterface: React.FC = () => {
     navigate,
     setCurrentDay,
     packData,
+    autoMoveToNextMode,
   ]);
 
   const handleCloseModal = useCallback(() => {
@@ -241,7 +315,6 @@ export const StudyInterface: React.FC = () => {
       if (items.length === 0) return { completed: 0, total: 0, percentage: 0 };
 
       const completedCount = items.filter((item) => {
-        // ✅ currentDay와 packData.id를 함께 전달
         const progress = getItemProgress(item.id);
         return progress.isCompleted;
       }).length;
@@ -252,21 +325,11 @@ export const StudyInterface: React.FC = () => {
         percentage: Math.round((completedCount / items.length) * 100),
       };
     },
-    [getModeData, getItemProgress, currentDay, packData] // ✅ 의존성 추가
+    [getModeData, getItemProgress, currentDay, packData]
   );
 
   // ✅ 수정된 studyModes - progress 정보 포함
   const studyModes = useMemo(() => {
-    const labelMap: Record<StudyMode, string> = {
-      introduction: "소개",
-      "imagination-vocab": "단어",
-      "skimming-vocab": "단어",
-      "skimming-sentence": "문장",
-      "speaking-vocab": "단어",
-      "speaking-sentence": "문장",
-      workbook: "워크북",
-    };
-
     const iconMap: Record<StudyMode, React.ComponentType<any>> = {
       introduction: Book,
       "imagination-vocab": Image,
@@ -296,23 +359,64 @@ export const StudyInterface: React.FC = () => {
         icon: iconMap[key] || Book,
         completed,
         available,
-        progress, // 🔥 progress 정보 추가
+        progress,
       };
     });
-  }, [availableModeKeys, dayProgress, getModeProgress]);
+  }, [availableModeKeys, dayProgress, getModeProgress, labelMap]);
+
+  // 🔥 모드 변경 시 최적의 시작 위치로 이동
+  const handleModeChange = useCallback(
+    (mode: StudyMode) => {
+      if (!packData) return;
+
+      setCurrentMode(mode);
+
+      // 🔥 해당 모드의 최적 시작 인덱스 계산
+      const modeData = getModeData(mode);
+      const contentIds = modeData.map((item) => item.id);
+
+      // 기존에 저장된 위치가 있으면 그것을 사용, 없으면 다음 미완료 아이템
+      const savedIndex = getCurrentItemIndex(packData.id, currentDay, mode);
+      const nextUncompletedIndex = getNextUncompletedIndex(
+        packData.id,
+        currentDay,
+        mode,
+        contentIds
+      );
+
+      // 저장된 위치와 다음 미완료 위치 중 더 앞선 것 사용
+      const optimalIndex = Math.max(savedIndex, nextUncompletedIndex);
+
+      setCurrentItemIndex(packData.id, currentDay, mode, optimalIndex);
+
+      console.log(`🔄 Mode changed to ${mode}:`);
+      console.log(`  - Saved index: ${savedIndex}`);
+      console.log(`  - Next uncompleted: ${nextUncompletedIndex}`);
+      console.log(`  - Using optimal: ${optimalIndex}`);
+    },
+    [
+      packData,
+      currentDay,
+      getModeData,
+      getCurrentItemIndex,
+      getNextUncompletedIndex,
+      setCurrentItemIndex,
+    ]
+  );
 
   // ✅ useEffect를 마지막에 호출
   useEffect(() => {
     if (availableModeKeys.length && !currentMode) {
-      setCurrentMode(availableModeKeys[0]);
+      const firstMode = availableModeKeys[0];
+      handleModeChange(firstMode);
     } else if (
       availableModeKeys.length &&
       currentMode &&
       !availableModeKeys.includes(currentMode)
     ) {
-      setCurrentMode(availableModeKeys[0]);
+      handleModeChange(availableModeKeys[0]);
     }
-  }, [availableModeKeys, currentMode]);
+  }, [availableModeKeys, currentMode, handleModeChange]);
 
   // ✅ Day 접근 권한 검증
   const isDayAccessible = useMemo(() => {
@@ -449,18 +553,23 @@ export const StudyInterface: React.FC = () => {
     const learningMethod = getLearningMethod(currentMode);
     const contentType = getContentType(currentMode);
 
+    // 🔥 초기 아이템 인덱스 계산
+    const initialItemIndex = getInitialItemIndex(currentMode);
+
     // ✅ 공통 props 정의
     const commonProps = {
       packId: packData.id,
-      currentDay, // ✅ 이미 있음
-      dayNumber: currentDay, // ✅ 추가 - VocabularyMode용
+      currentDay,
+      dayNumber: currentDay,
       getItemProgress,
       onItemCompleted: handleItemCompleted,
       onComplete: () => handleModeComplete(currentMode),
+      // 🔥 초기 인덱스 추가
+      initialItemIndex,
     };
 
     // ✅ studyMode를 key로 추가하여 모드 변경 시 컴포넌트 강제 재생성
-    const componentKey = `${currentMode}-${settings.studyMode}`;
+    const componentKey = `${currentMode}-${settings.studyMode}-${initialItemIndex}`;
 
     switch (contentType) {
       case "vocab":
@@ -516,7 +625,7 @@ export const StudyInterface: React.FC = () => {
               ({ key, label, icon: Icon, completed, available, progress }) => (
                 <button
                   key={key}
-                  onClick={() => available && setCurrentMode(key)}
+                  onClick={() => available && handleModeChange(key)} // 🔥 handleModeChange 사용
                   disabled={!available}
                   className={`
                   flex items-center gap-2.5 px-4 py-2.5 rounded-lg font-medium text-sm whitespace-nowrap
@@ -552,7 +661,7 @@ export const StudyInterface: React.FC = () => {
 
         {/* 완료 모달 */}
         <CompletionModal
-          key={`${completion.completed}-${currentDay}`} // ✅ 핵심 수정: 완료된 모드별로 새 모달 생성
+          key={`${completion.completed}-${currentDay}`}
           open={completion.open}
           title={
             completion.completed

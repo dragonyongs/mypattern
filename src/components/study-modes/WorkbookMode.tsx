@@ -49,6 +49,7 @@ interface WorkbookItem {
 
 interface WorkbookModeProps {
   items: WorkbookItem[];
+  initialItemIndex?: number;
   dayNumber: number;
   category: string;
   packId: string;
@@ -65,12 +66,13 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
   category,
   packId,
   onComplete,
+  initialItemIndex = 0,
 }) => {
   const workbook = Array.isArray(rawWorkbook) ? rawWorkbook : [];
   const workbookIds = useMemo(() => workbook.map((w) => w.id), [workbook]);
 
   // 상태 관리
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(initialItemIndex);
   const [selectedAnswers, setSelectedAnswers] = useState<
     Record<number, string>
   >({});
@@ -89,6 +91,10 @@ export const WorkbookMode: React.FC<WorkbookModeProps> = ({
   const { markModeCompleted } = useDayProgress(packId, dayNumber);
   const { setItemCompleted, getItemProgress } = useStudyProgressStore();
   const { speak, isSpeaking } = useTTS();
+
+  useEffect(() => {
+    setCurrentIndex(initialItemIndex);
+  }, [initialItemIndex]);
 
   // 현재 문제 정보
   const currentQuestion = useMemo(

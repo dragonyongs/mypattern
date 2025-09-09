@@ -28,6 +28,7 @@ import { useStudyProgressStore } from "@/stores/studyProgressStore";
 
 interface SentenceModeProps {
   items: any[];
+  initialItemIndex?: number;
   dayNumber: number;
   category: string;
   packId: string;
@@ -47,8 +48,9 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   settings: propsSettings = {}, // [수정] props settings를 propsSettings로 변경
   getItemProgress = () => ({ isCompleted: false }),
   onComplete,
+  initialItemIndex = 0,
 }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(initialItemIndex);
   const [showTranslation, setShowTranslation] = useState(false);
   const [studiedCards, setStudiedCards] = useState<Set<number>>(new Set());
   const [masteredCards, setMasteredCards] = useState<Set<number>>(new Set());
@@ -59,6 +61,10 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   const { markModeCompleted } = useDayProgress(packId, dayNumber);
   const { setItemCompleted, getItemProgress: storeGetItemProgress } =
     useStudyProgressStore();
+
+  useEffect(() => {
+    setCurrentIndex(initialItemIndex);
+  }, [initialItemIndex]);
 
   // [수정] 최종 settings는 hook settings와 props settings를 합성
   const finalSettings = useMemo(
@@ -108,12 +114,12 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
     });
     setMasteredCards(masteredSet);
     setStudiedCards(studiedSet);
-    console.debug("[SentenceMode] 완료 상태 복원:", {
-      packId,
-      dayNumber,
-      masteredCount: masteredSet.size,
-      studiedCount: studiedSet.size,
-    });
+    // console.debug("[SentenceMode] 완료 상태 복원:", {
+    //   packId,
+    //   dayNumber,
+    //   masteredCount: masteredSet.size,
+    //   studiedCount: studiedSet.size,
+    // });
   }, [items, safeGetItemProgress, packId, dayNumber]);
 
   const handleModeChange = useCallback(

@@ -8,7 +8,7 @@ import type {
   StudySettings,
 } from "@/types";
 
-const STORAGE_KEY = "study-progress-v5";
+const STORAGE_KEY = "study-progress-v6";
 
 interface StudyProgressState {
   progress: Record<string, PackProgress>;
@@ -46,13 +46,34 @@ interface StudyProgressActions {
   // 간단한 유틸리티 메서드
   clearPackProgress: (packId: string) => void;
   validateProgressForContent: (packId: string, contentIds: string[]) => void;
+
+  // 학습 위치 메서드
+  getCurrentItemIndex: (packId: string, day: number, mode: string) => number;
+  setCurrentItemIndex: (
+    packId: string,
+    day: number,
+    mode: string,
+    index: number
+  ) => void;
+  getNextUncompletedIndex: (
+    packId: string,
+    day: number,
+    mode: string,
+    contentIds: string[]
+  ) => number;
+  autoMoveToNextMode: (
+    packId: string,
+    day: number,
+    currentMode: string,
+    packData: PackData
+  ) => string | null;
 }
 
 // 기본값 생성 함수들
 const createDefaultStudySettings = (): StudySettings => ({
   showMeaningEnabled: true,
   autoProgressEnabled: true,
-  studyMode: "assisted",
+  studyMode: "immersive",
 });
 
 const createEmptyDayProgress = (day: number): DayProgress => ({
@@ -61,6 +82,7 @@ const createEmptyDayProgress = (day: number): DayProgress => ({
   completedItems: {},
   isCompleted: false,
   lastStudiedAt: null,
+  currentItemIndexByMode: {},
 });
 
 const createEmptyPackProgress = (packId: string): PackProgress => ({
@@ -361,6 +383,114 @@ export const useStudyProgressStore = create<
 
           return { progress: newProgress };
         });
+      },
+
+      // 🔥 현재 학습 위치 저장
+      setCurrentItemIndex: (packId, day, mode, index) => {
+        if (!packId || packId === "undefined") return;
+
+        set((state) => {
+          const newProgress = { ...state.progress };
+          if (!newProgress[packId])
+            newProgress[packId] = createEmptyPackProgress(packId);
+
+          const packProgress = newProgress[packId];
+          if (!packProgress.progressByDay[day])
+            packProgress.progressByDay[day] = createEmptyDayProgress(day);
+
+          const dayProgress = { ...packProgress.progressByDay[day] };
+
+          // currentItemIndexByMode가 없으면 초기화
+          if (!dayProgress.currentItemIndexByMode) {
+            dayProgress.currentItemIndexByMode = {};
+          }
+
+          dayProgress.currentItemIndexByMode[mode] = index;
+          packProgress.progressByDay[day] = dayProgress;
+          newProgress[packId] = packProgress;
+
+          // console.log(`📍 Set current index for ${mode}: ${index}`);
+          return { progress: newProgress };
+        });
+      },
+
+      // 🔥 현재 학습 위치 조회
+      getCurrentItemIndex: (packId, day, mode) => {
+        if (!packId || packId === "undefined") return 0;
+
+        const dayProgress = get().progress[packId]?.progressByDay?.[day];
+        const index = dayProgress?.currentItemIndexByMode?.[mode] || 0;
+        // console.log(`📍 Get current index for ${mode}: ${index}`);
+        return index;
+      },
+
+      // 🔥 다음 미완료 아이템 인덱스 계산
+      getNextUncompletedIndex: (packId, day, mode, contentIds) => {
+        if (!packId || packId === "undefined" || !contentIds.length) return 0;
+
+        const dayProgress = get().progress[packId]?.progressByDay?.[day];
+        if (!dayProgress) return 0;
+
+        // 완료된 아이템들 확인
+        for (let i = 0; i < contentIds.length; i++) {
+          const itemProgress = dayProgress.completedItems?.[contentIds[i]];
+          const isCompleted =
+            typeof itemProgress === "boolean"
+              ? itemProgress
+              : itemProgress?.isCompleted || false;
+
+          if (!isCompleted) {
+            // console.log(`🔍 Next uncompleted index for ${mode}: ${i}`);
+            return i;
+          }
+        }
+
+        // 모든 아이템이 완료된 경우 마지막 인덱스
+        const lastIndex = contentIds.length - 1;
+        // console.log(
+        //   `🔍 All completed, returning last index for ${mode}: ${lastIndex}`
+        // );
+        return lastIndex;
+      },
+
+      // 🔥 자동 다음 모드 이동
+      autoMoveToNextMode: (packId, day, currentMode, packData) => {
+        const dayPlan = packData.learningPlan?.days?.find((d) => d.day === day);
+        if (!dayPlan) return null;
+
+        const currentModeIndex = dayPlan.modes.findIndex(
+          (m) => m.type === currentMode
+        );
+        if (
+          currentModeIndex === -1 ||
+          currentModeIndex >= dayPlan.modes.length - 1
+        ) {
+          return null;
+        }
+
+        const nextMode = dayPlan.modes[currentModeIndex + 1];
+
+        // 🔥 다음 모드의 콘텐츠 ID 가져오기
+        const nextModeContentIds = nextMode.contentIds || [];
+
+        if (nextModeContentIds.length > 0) {
+          // 🔥 다음 모드의 최적 시작 위치 계산 (0이 아님)
+          const optimalIndex = get().getNextUncompletedIndex(
+            packId,
+            day,
+            nextMode.type,
+            nextModeContentIds
+          );
+          get().setCurrentItemIndex(packId, day, nextMode.type, optimalIndex);
+          console.log(
+            `🔄 Auto moved to ${nextMode.type} at index ${optimalIndex}`
+          );
+        } else {
+          // 콘텐츠가 없으면 0부터 시작
+          get().setCurrentItemIndex(packId, day, nextMode.type, 0);
+        }
+
+        return nextMode.type;
       },
     }),
     {
