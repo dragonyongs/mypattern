@@ -25,6 +25,7 @@ import { StudySidebar } from "@/shared/components/StudySidebar";
 
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
 import ActionButtons from "@/shared/components/ActionButtons";
+import ProgressDots from "@/shared/components/ProgressDots";
 
 import { shuffleWorkbookData } from "@/utils/workbook.utils";
 import type { WorkbookModeProps } from "@/types/workbook.types";
@@ -395,14 +396,6 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
             {/* 왼쪽 본문: 중앙 카드 */}
             <div className="flex-1 flex items-center justify-center p-4">
               <div className="w-full max-w-2xl">
-                <ProgressIndicator
-                  workbook={workbook}
-                  currentIndex={currentIndex}
-                  correctAnswers={correctAnswers}
-                  answeredQuestions={answeredQuestions}
-                  onIndexChange={goToIndex}
-                />
-
                 <div {...swipeHandlers}>
                   <QuestionCard
                     question={currentQuestion}
@@ -444,6 +437,13 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                     )}
                   </QuestionCard>
                 </div>
+                <ProgressDots
+                  total={workbook.length} // useMemo로 만든 workbook 배열 사용
+                  currentIndex={currentIndex}
+                  correct={correctAnswers} // 정답(초록)
+                  answered={answeredQuestions} // 답변됨(오답 포함, 빨강)
+                  onIndexChange={goToIndex}
+                />
 
                 <div className="mt-6">
                   <ActionButtons

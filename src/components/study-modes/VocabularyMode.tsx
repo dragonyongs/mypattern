@@ -26,6 +26,7 @@ import StudyCard from "@/shared/components/StudyCard";
 import StudyNavigation from "@/shared/components/StudyNavigation";
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
 import ActionButtons from "@/shared/components/ActionButtons";
+import ProgressDots from "@/shared/components/ProgressDots";
 
 interface VocabularyItem {
   id: string;
@@ -465,23 +466,6 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
           {...swipeHandlers}
         >
           <div className="w-full max-w-xl">
-            {/* Progress Dots */}
-            <div className="flex items-center justify-center gap-1.5 mb-4">
-              {items.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => goToIndex(idx)}
-                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                    idx === currentIndex
-                      ? "w-8 bg-indigo-600"
-                      : masteredCards.has(idx)
-                      ? "w-1.5 bg-indigo-600"
-                      : "w-1.5 bg-gray-300 hover:bg-gray-400"
-                  }`}
-                />
-              ))}
-            </div>
-
             {/* Word Card (분리된 컴포넌트 사용) */}
             <StudyCard
               word={currentItem.word}
@@ -500,6 +484,29 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               // onMarkAsNotMastered={handleMarkAsNotMastered}
               isAllMastered={isAllMastered}
               handleComplete={handleComplete}
+            />
+            {/* Progress Dots */}
+            {/* <div className="flex items-center justify-center gap-1.5 mt-6 mb-4">
+              {items.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => goToIndex(idx)}
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                    idx === currentIndex
+                      ? "w-8 bg-indigo-600"
+                      : masteredCards.has(idx)
+                      ? "w-1.5 bg-indigo-600"
+                      : "w-1.5 bg-gray-300 hover:bg-gray-400"
+                  }`}
+                />
+              ))}
+            </div> */}
+            <ProgressDots
+              total={items.length}
+              currentIndex={currentIndex}
+              completed={masteredCards} // 완료(숙달)된 카드
+              // 필요시 studied 등 보조 상태가 있으면 secondary로 전달
+              onIndexChange={goToIndex}
             />
 
             {/* Action */}

@@ -6,24 +6,17 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import {
-  ArrowLeft,
-  Volume2,
-  RotateCcw,
-  Check,
-  MessageSquare,
-} from "lucide-react";
+import { Volume2, MessageSquare } from "lucide-react";
 
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
 import { StudySidebar } from "@/shared/components/StudySidebar";
-
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
-
 import StudyNavigation from "@/shared/components/StudyNavigation";
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
 import ActionButtons from "@/shared/components/ActionButtons";
+import ProgressDots from "@/shared/components/ProgressDots";
 
 interface SentenceItem {
   id: string;
@@ -98,9 +91,15 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   const { setItemCompleted, getItemProgress: storeGetItemProgress } =
     useStudyProgressStore();
 
-  // sync settings prop -> localSettings
+  // settings → localSettings 동기화 (+ 정합 보장)
   useEffect(() => {
-    setLocalSettings((prev) => ({ ...prev, ...settings }));
+    setLocalSettings((prev) => {
+      const next = { ...prev, ...settings };
+      if (typeof next.studyMode !== "undefined") {
+        next.showMeaningEnabled = next.studyMode === "assisted";
+      }
+      return next;
+    });
   }, [settings]);
 
   // sync refs when state changes
@@ -196,7 +195,11 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   const handleModeChange = useCallback(
     (mode: StudyModeType) => {
       setLocalSettings((prev) => {
-        const next = { ...prev, studyMode: mode };
+        const next = {
+          ...prev,
+          studyMode: mode,
+          showMeaningEnabled: mode === "assisted",
+        };
         onSettingsChange?.(next);
         return next;
       });
@@ -285,7 +288,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
     [items, localSettings.autoPlayOnSelect, navigateTo, handleSpeak]
   );
 
-  // 완료/미완료 핸들러 (deterministic next index 계산)
+  // 완료/미완료 핸들러
   const handleMarkAsMastered = useCallback(() => {
     const idx = currentIndexRef.current;
     const currentSentence = items[idx];
@@ -413,23 +416,6 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
           {...swipeHandlers}
         >
           <div className="w-full max-w-2xl">
-            {/* Progress Dots */}
-            <div className="flex items-center justify-center gap-1.5 mb-4">
-              {items.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => goToIndex(idx)}
-                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                    idx === currentIndex
-                      ? "w-8 bg-indigo-600"
-                      : masteredCards.has(idx)
-                      ? "w-1.5 bg-indigo-600"
-                      : "w-1.5 bg-gray-300 hover:bg-gray-400"
-                  }`}
-                />
-              ))}
-            </div>
-
             {/* Sentence Card */}
             <div
               className="relative bg-white rounded-2xl shadow-lg p-8 text-center cursor-pointer transition-transform active:scale-95"
@@ -488,6 +474,15 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
               </div>
             </div>
 
+            {/* Progress Dots */}
+            <ProgressDots
+              total={items.length}
+              currentIndex={currentIndex}
+              completed={masteredCards}
+              secondary={studiedCards}
+              onIndexChange={goToIndex}
+            />
+
             {/* Action */}
             <div className="mt-6">
               <ActionButtons
@@ -523,10 +518,9 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
       <StudySidebar
         category={category}
         dayNumber={dayNumber}
-        progress={progress} // 기존 계산 값
+        progress={progress}
         items={items}
         currentIndex={currentIndex}
-        // ⬇️ 문장 모드는 이 두 세트를 넘겨줍니다
         studiedCards={studiedCards}
         masteredCards={masteredCards}
         onSelectIndex={goToIndex}

@@ -1,5 +1,6 @@
 // src/components/StudyInterface.tsx
 import React, { useState, useCallback, useMemo, useEffect } from "react";
+import { shallow } from "zustand/shallow"; // 선택
 import {
   ArrowLeft,
   CheckCircle2,
@@ -10,7 +11,7 @@ import {
   Mic,
   // Settings,
 } from "lucide-react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { VocabularyMode } from "./study-modes/VocabularyMode";
 import { SentenceMode } from "./study-modes/SentenceMode";
 import { WorkbookMode } from "./study-modes/WorkbookMode";
@@ -20,7 +21,6 @@ import { useAppStore } from "@/stores/appStore";
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
 import { packDataService } from "@/shared/services/packDataService";
 import { CompletionModal } from "@/shared/components/CompletionModal";
-// import BottomAppBar from "@/shared/components/BottomAppBar";
 import StudySettingsSheet from "@/shared/components/StudySettingsSheet";
 import type { StudySettings } from "@/types";
 
@@ -85,30 +85,31 @@ export const StudyInterface: React.FC = () => {
     workbook: "워크북",
   };
 
+  // 1) 현재 packId 도출
   const packId = packData?.id;
 
-  // 🔥 설정 기본값 보장
-  const settings = useMemo(() => {
-    const baseSettings = packData ? getSettings(packData.id) : {};
+  // 2) 스토어 설정 slice 구독
+  const storeSettings = useStudyProgressStore(
+    (state) => (packId ? state.progress[packId]?.settings : undefined),
+    shallow
+  );
 
-    // 🔥 기본값과 병합하되, 명시적으로 설정
-    const mergedSettings = {
-      showMeaningEnabled: baseSettings.studyMode === "assisted" ? true : false,
+  // 3) settings 계산을 storeSettings에 반응하도록 변경
+  const settings = useMemo(() => {
+    // 기본값
+    const base = {
+      showMeaningEnabled: false,
       autoProgressEnabled: true,
       studyMode: "immersive" as const,
       autoPlayOnSelect: false,
-      ...baseSettings,
     };
+    const merged = { ...base, ...(storeSettings || {}) };
 
-    // 🔥 studyMode에 따른 showMeaningEnabled 자동 조정
-    if (mergedSettings.studyMode === "immersive") {
-      mergedSettings.showMeaningEnabled = false;
-    } else if (mergedSettings.studyMode === "assisted") {
-      mergedSettings.showMeaningEnabled = true;
-    }
+    // studyMode에 따른 표시 정책 일원화
+    merged.showMeaningEnabled = merged.studyMode === "assisted";
 
-    return mergedSettings;
-  }, [packData, getSettings]);
+    return merged;
+  }, [storeSettings]); // 🔥 storeSettings 변화에 반응
 
   const dayPlan = useMemo(() => {
     if (!packData) return null;
@@ -824,13 +825,7 @@ export const StudyInterface: React.FC = () => {
           onConfirm={handleConfirmNext}
           onClose={handleCloseModal}
         />
-        {/* <BottomAppBar
-          onGoPacks={() => navigate("/packs")}
-          onGoCalendar={() => navigate("/calendar")}
-          onOpenSettings={() => setIsSettingOpen(true)}
-          current={currentTab}
-        />
-        ; */}
+
         <StudySettingsSheet
           open={isSettingOpen}
           onClose={() => setIsSettingOpen(false)}

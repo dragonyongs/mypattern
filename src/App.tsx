@@ -82,17 +82,19 @@ function MobileNavController() {
 
   const goPacks = () =>
     navigate("/pack-select", { replace: current === "packs" });
+
   const goCalendar = () => {
     if (selectedPackData)
       navigate("/calendar", { replace: current === "calendar" });
     else navigate("/pack-select");
   };
+
   const openSettings = () => {
     if (!isStudy) return;
+    console.log("🔥 Dispatching open-study-settings event");
     window.dispatchEvent(new CustomEvent("open-study-settings"));
   };
 
-  // BottomAppBar는 내부에서 lg:hidden이므로 모바일 전용으로 보임
   return (
     <BottomAppBar
       onGoPacks={goPacks}
