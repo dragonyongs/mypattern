@@ -119,12 +119,12 @@ const PackSelectPage: React.FC = () => {
       <div className="container mx-auto px-4 py-6 max-w-4xl">
         {/* 헤더 */}
         <div className="flex items-center gap-4 mb-8">
-          <button
+          {/* <button
             onClick={() => navigate("/")}
             className="p-2 hover:bg-white/50 rounded-full transition-colors"
           >
             <ArrowLeft className="w-6 h-6 text-gray-700" />
-          </button>
+          </button> */}
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               학습할 팩을 선택하세요

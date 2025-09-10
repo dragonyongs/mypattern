@@ -13,6 +13,7 @@ interface StudySettingsPanelProps {
 
 export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
   settings,
+  isSettingOpen,
   handleModeChange,
   handleAutoProgressChange,
   handleAutoPlayChange, // 🔥 새로 추가
@@ -78,7 +79,7 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
       </div>
 
       {/* 🔥 답 선택시 자동 재생 설정 */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
         <div className="flex items-center gap-2">
           <Volume2 className="w-4 h-4 text-gray-500" />
           <span className="text-sm font-medium text-gray-700">

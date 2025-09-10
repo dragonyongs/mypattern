@@ -46,6 +46,7 @@ export const StudySidebar: React.FC<StudySidebarProps> = ({
   handleModeChange,
   handleAutoProgressChange,
   handleAutoPlayChange,
+  isSettingOpen,
 }) => {
   // 공통 집계
   const totals = useMemo(() => {
@@ -147,8 +148,8 @@ export const StudySidebar: React.FC<StudySidebarProps> = ({
         <div className="p-4">
           <StudySettingsPanel
             settings={settings}
-            handleModeChange={handleModeChange}
-            handleAutoProgressChange={handleAutoProgressChange}
+            handleModeChange={handleModeChange!}
+            handleAutoProgressChange={handleAutoProgressChange!}
             handleAutoPlayChange={handleAutoPlayChange}
           />
         </div>

@@ -8,8 +8,9 @@ import {
   Image,
   Search,
   Mic,
+  // Settings,
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { VocabularyMode } from "./study-modes/VocabularyMode";
 import { SentenceMode } from "./study-modes/SentenceMode";
 import { WorkbookMode } from "./study-modes/WorkbookMode";
@@ -19,6 +20,9 @@ import { useAppStore } from "@/stores/appStore";
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
 import { packDataService } from "@/shared/services/packDataService";
 import { CompletionModal } from "@/shared/components/CompletionModal";
+// import BottomAppBar from "@/shared/components/BottomAppBar";
+import StudySettingsSheet from "@/shared/components/StudySettingsSheet";
+import type { StudySettings } from "@/types";
 
 type StudyMode =
   | "introduction"
@@ -32,13 +36,29 @@ type StudyMode =
 export const StudyInterface: React.FC = () => {
   // ✅ 모든 hooks를 최상단에 호출
   const navigate = useNavigate();
+  // const { pathname } = useLocation();
   const { day: dayParam } = useParams<{ day: string }>();
   const [lastCompletedItem, setLastCompletedItem] = useState<string | null>(
     null
   );
+  const [isSettingOpen, setIsSettingOpen] = useState(false);
+
   const currentDay = parseInt(dayParam || "1", 10);
   const packData = useAppStore((state) => state.selectedPackData);
   const setCurrentDay = useAppStore((state) => state.setCurrentDay);
+
+  useEffect(() => {
+    const open = () => setIsSettingOpen(true);
+    window.addEventListener("open-study-settings", open as EventListener);
+    return () =>
+      window.removeEventListener("open-study-settings", open as EventListener);
+  }, []);
+
+  // const currentTab = pathname.startsWith("/packs")
+  //   ? "packs"
+  //   : pathname.startsWith("/calendar")
+  //   ? "calendar"
+  //   : undefined; // 설정은 모달이므로 undefined
 
   const {
     setModeCompleted,
@@ -47,6 +67,7 @@ export const StudyInterface: React.FC = () => {
     setCurrentItemIndex,
     getNextUncompletedIndex,
     autoMoveToNextMode,
+    updateSettings,
   } = useStudyProgressStore();
 
   const dayProgress = useStudyProgressStore((state) =>
@@ -69,13 +90,24 @@ export const StudyInterface: React.FC = () => {
   // 🔥 설정 기본값 보장
   const settings = useMemo(() => {
     const baseSettings = packData ? getSettings(packData.id) : {};
-    return {
-      showMeaningEnabled: true,
+
+    // 🔥 기본값과 병합하되, 명시적으로 설정
+    const mergedSettings = {
+      showMeaningEnabled: baseSettings.studyMode === "assisted" ? true : false,
       autoProgressEnabled: true,
       studyMode: "immersive" as const,
       autoPlayOnSelect: false,
-      ...baseSettings, // 기존 설정 덮어쓰기
+      ...baseSettings,
     };
+
+    // 🔥 studyMode에 따른 showMeaningEnabled 자동 조정
+    if (mergedSettings.studyMode === "immersive") {
+      mergedSettings.showMeaningEnabled = false;
+    } else if (mergedSettings.studyMode === "assisted") {
+      mergedSettings.showMeaningEnabled = true;
+    }
+
+    return mergedSettings;
   }, [packData, getSettings]);
 
   const dayPlan = useMemo(() => {
@@ -497,6 +529,7 @@ export const StudyInterface: React.FC = () => {
       onComplete: () => handleModeComplete(currentMode),
       initialItemIndex,
       settings,
+      onSettingsChange: (s: StudySettings) => setSettingsForPack(s),
     };
 
     const componentKey = `${currentMode}-${packData.id}-${currentDay}`;
@@ -508,6 +541,7 @@ export const StudyInterface: React.FC = () => {
             key={componentKey}
             items={items}
             learningMethod={learningMethod}
+            isSettingOpen={isSettingOpen}
             {...commonProps}
           />
         );
@@ -517,6 +551,7 @@ export const StudyInterface: React.FC = () => {
             key={componentKey}
             items={items}
             learningMethod={learningMethod}
+            isSettingOpen={isSettingOpen}
             {...commonProps}
           />
         );
@@ -530,6 +565,7 @@ export const StudyInterface: React.FC = () => {
             onComplete={() => handleModeComplete(currentMode)}
             onItemCompleted={handleItemCompleted}
             initialItemIndex={initialItemIndex}
+            isSettingOpen={isSettingOpen}
             settings={settings}
           />
         );
@@ -550,6 +586,45 @@ export const StudyInterface: React.FC = () => {
     handleModeComplete,
     settings,
   ]);
+
+  const setSettingsForPack = React.useCallback(
+    (next: Partial<StudySettings>) => {
+      if (!packData) return;
+      updateSettings(packData.id, next); // ← setSettings 대신 updateSettings 사용
+    },
+    [packData, updateSettings]
+  );
+
+  const handleModeSetting = React.useCallback(
+    (mode: "assisted" | "immersive") => {
+      const newSettings: Partial<StudySettings> = {
+        studyMode: mode,
+        showMeaningEnabled: mode === "assisted",
+      };
+
+      console.log("🎯 Updating settings:", newSettings);
+      setSettingsForPack(newSettings);
+
+      // 🔥 강제 리렌더링을 위한 이벤트 디스패치
+      setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent("settings-updated", {
+            detail: newSettings,
+          })
+        );
+      }, 100);
+    },
+    [setSettingsForPack]
+  );
+
+  const handleAutoProgressSetting = React.useCallback(
+    (v: boolean) => setSettingsForPack({ autoProgressEnabled: v }),
+    [setSettingsForPack]
+  );
+  const handleAutoPlaySetting = React.useCallback(
+    (v: boolean) => setSettingsForPack({ autoPlayOnSelect: v }),
+    [setSettingsForPack]
+  );
 
   // ✅ 조건부 렌더링
   if (!isDayAccessible) {
@@ -677,13 +752,18 @@ export const StudyInterface: React.FC = () => {
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
-            <div>
+            <div className="flex-1">
               <h1 className="font-semibold text-gray-900">Day {currentDay}</h1>
               <p className="text-sm text-gray-600">{dayPlan.title}</p>
             </div>
+            {/* <button
+              onClick={() => setIsSettingOpen((p) => !p)}
+              className="lg:hidden w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-all"
+            >
+              <Settings className="w-5 h-5 text-gray-600" />
+            </button> */}
           </div>
         </div>
-
         {/* 모드 탭 */}
         <div className="bg-white border-b border-gray-200 px-4 py-3">
           <div className="flex gap-2 overflow-x-auto p-2">
@@ -709,21 +789,19 @@ export const StudyInterface: React.FC = () => {
                 >
                   <Icon className="w-4 h-4" />
                   <span>{label}</span>
-                  {progress && progress.total > 0 && (
+                  {/* {progress && progress.total > 0 && (
                     <span className="text-xs opacity-75">
                       ({progress.completed}/{progress.total})
                     </span>
-                  )}
+                  )} */}
                   {completed && <CheckCircle2 className="w-4 h-4" />}
                 </button>
               )
             )}
           </div>
         </div>
-
         {/* 컨텐츠 영역 */}
         <div className="flex-1">{renderContent()}</div>
-
         {/* 완료 모달 */}
         <CompletionModal
           key={`${completion.completed}-${currentDay}`}
@@ -745,6 +823,21 @@ export const StudyInterface: React.FC = () => {
           confirmText={settings.autoProgressEnabled ? "다음으로" : "확인"}
           onConfirm={handleConfirmNext}
           onClose={handleCloseModal}
+        />
+        {/* <BottomAppBar
+          onGoPacks={() => navigate("/packs")}
+          onGoCalendar={() => navigate("/calendar")}
+          onOpenSettings={() => setIsSettingOpen(true)}
+          current={currentTab}
+        />
+        ; */}
+        <StudySettingsSheet
+          open={isSettingOpen}
+          onClose={() => setIsSettingOpen(false)}
+          settings={settings}
+          onModeChange={handleModeSetting}
+          onAutoChange={handleAutoProgressSetting}
+          onAutoPlayChange={handleAutoPlaySetting}
         />
       </div>
     </ErrorBoundary>

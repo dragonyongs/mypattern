@@ -404,38 +404,8 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   }
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-154px)] bg-gray-50 font-sans">
+    <div className="flex h-full min-h-[calc(100vh-217px)] lg:min-h-[calc(100vh-154px)] bg-gray-50 font-sans pb-20 lg:pb-0">
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between p-4 border-b border-gray-200 bg-white">
-          <button className="p-2 -ml-2">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="text-center">
-            <h1 className="font-bold text-gray-800">{category}</h1>
-            <p className="text-xs text-gray-500">Day {dayNumber}</p>
-          </div>
-          <div className="text-xs text-gray-500">
-            {masteredCards.size}/{items.length}
-          </div>
-        </header>
-
-        {/* Mobile Progress Bar */}
-        <div className="lg:hidden p-4 bg-white">
-          <div className="flex justify-between items-center text-xs text-gray-500 mb-1.5">
-            <span className="font-medium">진행률</span>
-            <span className="font-semibold">
-              {masteredCards.size}/{items.length}
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-indigo-600 h-2 rounded-full transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-
         {/* Main */}
         <main
           className="flex-1 flex flex-col justify-center items-center p-4 overflow-y-auto"
@@ -517,18 +487,8 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
               </div>
             </div>
 
-            {/* Navigation */}
-            <div className="mt-6">
-              <StudyNavigation
-                currentIndex={currentIndex}
-                total={items.length}
-                onPrev={goToPrev}
-                onNext={goToNext}
-              />
-            </div>
-
             {/* Action */}
-            <div className="mt-4">
+            <div className="mt-6">
               {masteredCards.has(currentIndex) ? (
                 <button
                   onClick={handleMarkAsNotMastered}
@@ -547,10 +507,18 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
             </div>
 
             {/* Complete */}
-            <div className="mt-4">
-              <StudyCompleteButton
-                isAllMastered={isAllMastered}
-                onComplete={handleComplete}
+            <StudyCompleteButton
+              isAllMastered={isAllMastered}
+              onComplete={handleComplete}
+            />
+
+            {/* Navigation */}
+            <div className="mt-6">
+              <StudyNavigation
+                currentIndex={currentIndex}
+                total={items.length}
+                onPrev={goToPrev}
+                onNext={goToNext}
               />
             </div>
           </div>

@@ -71,9 +71,10 @@ interface StudyProgressActions {
 
 // 기본값 생성 함수들
 const createDefaultStudySettings = (): StudySettings => ({
-  showMeaningEnabled: true,
+  showMeaningEnabled: false, // 🔥 immersive 모드 기본값
   autoProgressEnabled: true,
-  studyMode: "immersive",
+  studyMode: "immersive", // 🔥 기본값 확실히 설정
+  autoPlayOnSelect: false,
 });
 
 const createEmptyDayProgress = (day: number): DayProgress => ({

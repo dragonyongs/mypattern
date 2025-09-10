@@ -1,6 +1,5 @@
-import React from "react";
+import React, { useEffect, useCallback } from "react";
 import { Volume2, RotateCcw, Check } from "lucide-react";
-
 export interface StudyCardProps {
   // 현재 카드 데이터
   word: string;
@@ -38,9 +37,18 @@ export const StudyCard: React.FC<StudyCardProps> = ({
   showMeaningEnabled,
   onToggleMeaning,
   onSpeak,
-  onMarkAsMastered,
-  onMarkAsNotMastered,
+  // onMarkAsMastered,
+  // onMarkAsNotMastered,
 }) => {
+  // 🔥 디버깅용 로그 추가
+  useEffect(() => {
+    console.log("StudyCard settings:", {
+      studyMode,
+      showMeaningEnabled,
+      showMeaning,
+    });
+  }, [studyMode, showMeaningEnabled, showMeaning]);
+
   return (
     <div
       className="relative bg-white rounded-2xl shadow-lg p-8 text-center cursor-pointer transition-transform active:scale-95"
@@ -84,30 +92,6 @@ export const StudyCard: React.FC<StudyCardProps> = ({
               ? "영어로 의미를 생각해보세요"
               : "탭하여 의미 확인"}
           </p>
-        )}
-      </div>
-
-      <div className="mt-4">
-        {isMastered ? (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onMarkAsNotMastered();
-            }}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-200 text-gray-700 rounded-xl font-medium transition-all hover:bg-gray-300"
-          >
-            <RotateCcw className="w-4 h-4" /> 다시 학습
-          </button>
-        ) : (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onMarkAsMastered();
-            }}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 text-white rounded-xl font-medium transition-all hover:bg-indigo-700"
-          >
-            <Check className="w-4 h-4" /> 학습 완료
-          </button>
         )}
       </div>
     </div>

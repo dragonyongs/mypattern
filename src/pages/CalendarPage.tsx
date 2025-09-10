@@ -483,18 +483,11 @@ export default function CalendarPage(): JSX.Element {
     totalDays > 0 ? (completedDays / totalDays) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div className="min-h-screen bg-slate-50 font-sans pb-20 lg:pb-0">
       <header className="sticky top-0 bg-slate-50/80 backdrop-blur-lg z-10 border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <button
-              onClick={handleBack}
-              className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-lg p-2 -ml-2"
-            >
-              <ArrowLeft size={18} />
-              뒤로가기
-            </button>
-            <div className="text-center">
+            <div className="flex-1">
               <h1 className="text-lg font-bold text-slate-800">
                 {selectedPackData.title}
               </h1>
@@ -504,7 +497,7 @@ export default function CalendarPage(): JSX.Element {
                 </p>
               )}
             </div>
-            <div className="w-24 text-right">
+            <div className="text-right">
               <Calendar className="h-6 w-6 text-slate-400 inline-block" />
             </div>
           </div>

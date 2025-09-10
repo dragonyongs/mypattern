@@ -1,6 +1,13 @@
 // src/App.tsx
 import React, { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { useParams } from "react-router-dom";
 import { useAppStore } from "@/stores/appStore";
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
@@ -10,7 +17,9 @@ import PackSelectPage from "@/pages/PackSelectPage";
 import CalendarPage from "@/pages/CalendarPage";
 import { StudyInterface } from "@/components/StudyInterface";
 import { useHydration } from "@/hooks/useHydration";
+import BottomAppBar from "@/shared/components/BottomAppBar";
 
+// 학습 상세 라우트 가드 (기존 유지)
 function StudyPage() {
   const selectedPackData = useAppStore((state) => state.selectedPackData);
   const { day } = useParams<{ day: string }>();
@@ -58,13 +67,50 @@ function StudyPage() {
   return <StudyInterface />;
 }
 
+// 전역 모바일 하단 내비 컨트롤러
+function MobileNavController() {
+  const selectedPackData = useAppStore((s) => s.selectedPackData);
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  const isStudy = pathname.startsWith("/study");
+  const current = pathname.startsWith("/pack-select")
+    ? "packs"
+    : pathname.startsWith("/calendar")
+    ? "calendar"
+    : undefined;
+
+  const goPacks = () =>
+    navigate("/pack-select", { replace: current === "packs" });
+  const goCalendar = () => {
+    if (selectedPackData)
+      navigate("/calendar", { replace: current === "calendar" });
+    else navigate("/pack-select");
+  };
+  const openSettings = () => {
+    if (!isStudy) return;
+    window.dispatchEvent(new CustomEvent("open-study-settings"));
+  };
+
+  // BottomAppBar는 내부에서 lg:hidden이므로 모바일 전용으로 보임
+  return (
+    <BottomAppBar
+      onGoPacks={goPacks}
+      onGoCalendar={goCalendar}
+      onOpenSettings={openSettings}
+      current={current}
+      showSettings={isStudy}
+    />
+  );
+}
+
 function App() {
   const hydrated = useHydration();
   const { selectedPackData, _hasHydrated: appHydrated } = useAppStore();
   const { validateProgressForContent, _hasHydrated: progressHydrated } =
     useStudyProgressStore();
 
-  // 두 store 모두 hydration 완료 후 진행 상황 검증
+  // 두 store 모두 hydration 후 진행 상황 검증
   useEffect(() => {
     if (appHydrated && progressHydrated && selectedPackData?.contents) {
       const contentIds = selectedPackData.contents.map((item) => item.id);
@@ -102,6 +148,9 @@ function App() {
           <Route path="/study/:day" element={<StudyPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+
+        {/* 전역 모바일 하단 앱바 */}
+        <MobileNavController />
       </BrowserRouter>
     </ErrorBoundary>
   );

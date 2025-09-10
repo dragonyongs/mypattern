@@ -20,7 +20,6 @@ import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
-import { StudySettingsPanel } from "@/shared/components/StudySettingsPanel";
 import { StudySidebar } from "@/shared/components/StudySidebar";
 
 import StudyCard from "@/shared/components/StudyCard";
@@ -76,6 +75,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   onComplete,
   initialItemIndex = 0,
   onSettingsChange,
+  isSettingOpen,
 }) => {
   // 상태
   const [currentIndex, setCurrentIndex] = useState<number>(initialItemIndex);
@@ -89,6 +89,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
     showMeaningEnabled: false,
     autoProgressEnabled: true,
     autoPlayOnSelect: false,
+    isSettingOpen: false,
     ...settings,
   }));
 
@@ -209,44 +210,80 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   // 설정 변경 핸들러들 (로컬 상태 업데이트 + 상위 콜백)
   const handleModeChange = useCallback(
     (mode: StudyModeType) => {
-      setLocalSettings((prev) => {
-        const next = { ...prev, studyMode: mode };
-        onSettingsChange?.(next);
-        return next;
-      });
+      // 🔥 즉시 로컬 상태 업데이트
+      setLocalSettings((prev) => ({
+        ...prev,
+        studyMode: mode,
+        showMeaningEnabled: mode === "assisted", // 🔥 자동 연동
+      }));
+
+      // 🔥 상위 컴포넌트 업데이트는 다음 틱에서 실행
+      setTimeout(() => {
+        onSettingsChange?.({
+          studyMode: mode,
+          showMeaningEnabled: mode === "assisted",
+        });
+      }, 0);
     },
     [onSettingsChange]
   );
 
   const handleAutoProgressChange = useCallback(
     (enabled: boolean) => {
-      setLocalSettings((prev) => {
-        const next = { ...prev, autoProgressEnabled: enabled };
-        onSettingsChange?.(next);
-        return next;
-      });
+      setLocalSettings((prev) => ({
+        ...prev,
+        autoProgressEnabled: enabled,
+      }));
+
+      setTimeout(() => {
+        onSettingsChange?.({ autoProgressEnabled: enabled });
+      }, 0);
     },
     [onSettingsChange]
   );
 
   const handleAutoPlayChange = useCallback(
     (enabled: boolean) => {
-      setLocalSettings((prev) => {
-        const next = { ...prev, autoPlayOnSelect: enabled };
-        onSettingsChange?.(next);
-        return next;
-      });
+      setLocalSettings((prev) => ({
+        ...prev,
+        autoPlayOnSelect: enabled,
+      }));
+
+      setTimeout(() => {
+        onSettingsChange?.({ autoPlayOnSelect: enabled });
+      }, 0);
     },
     [onSettingsChange]
   );
 
+  // 🔥 설정 동기화 useEffect 수정
+  useEffect(() => {
+    setLocalSettings((prev) => {
+      const newSettings = {
+        ...prev,
+        ...settings,
+        // studyMode에 따른 showMeaningEnabled 강제 동기화
+        showMeaningEnabled: settings.studyMode === "assisted",
+      };
+      return newSettings;
+    });
+  }, [settings]);
+
   // 의미 토글 (showMeaningEnabled에 따라 동작)
   const handleToggleMeaning = useCallback(() => {
-    if (!localSettings.showMeaningEnabled) return;
+    // 몰입 모드이거나 showMeaningEnabled가 false면 아무것도 하지 않음
+    if (
+      localSettings.studyMode === "immersive" ||
+      !localSettings.showMeaningEnabled
+    ) {
+      console.log(
+        "🚫 Toggle blocked - immersive mode or showMeaningEnabled=false"
+      );
+      return;
+    }
 
     setShowMeaning((prev) => {
       const next = !prev;
-      // 처음으로 의미를 본 경우 studied로 처리
       if (!prev) {
         setStudiedCards((s) => {
           const newSet = new Set(s);
@@ -256,7 +293,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
       }
       return next;
     });
-  }, [localSettings.showMeaningEnabled, currentIndex]);
+  }, [localSettings.studyMode, localSettings.showMeaningEnabled, currentIndex]);
 
   // 완료/미완료 핸들러
   const handleMarkAsMastered = useCallback(() => {
@@ -419,38 +456,8 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   }
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-152px)] bg-gray-50 font-sans">
+    <div className="flex h-full min-h-[calc(100vh-217px)] lg:min-h-[calc(100vh-152px)] bg-gray-50 font-sans pb-20 lg:pb-0">
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between p-4 border-b border-gray-200 bg-white">
-          <button className="p-2 -ml-2">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="text-center">
-            <h1 className="font-bold text-gray-800">{category}</h1>
-            <p className="text-xs text-gray-500">Day {dayNumber}</p>
-          </div>
-          <div className="text-xs text-gray-500">
-            {masteredCards.size}/{items.length}
-          </div>
-        </header>
-
-        {/* Mobile Progress Bar */}
-        <div className="lg:hidden p-4 bg-white">
-          <div className="flex justify-between items-center text-xs text-gray-500 mb-1.5">
-            <span className="font-medium">진행률</span>
-            <span className="font-semibold">
-              {masteredCards.size}/{items.length}
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-indigo-600 h-2 rounded-full transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-
         {/* Main Content Area */}
         <main
           className="flex-1 flex flex-col justify-center items-center p-4 overflow-y-auto"
@@ -484,12 +491,39 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               isMastered={masteredCards.has(currentIndex)}
               isSpeaking={isSpeaking}
               showMeaning={showMeaning}
-              studyMode={localSettings.studyMode || "immersive"}
-              showMeaningEnabled={!!localSettings.showMeaningEnabled}
+              studyMode={localSettings.studyMode} // 🔥 로컬 설정 사용
+              showMeaningEnabled={localSettings.showMeaningEnabled} // 🔥 로컬 설정 사용
               onToggleMeaning={handleToggleMeaning}
               onSpeak={handleSpeak}
-              onMarkAsMastered={handleMarkAsMastered}
-              onMarkAsNotMastered={handleMarkAsNotMastered}
+              // onMarkAsMastered={handleMarkAsMastered}
+              // onMarkAsNotMastered={handleMarkAsNotMastered}
+              isAllMastered={isAllMastered}
+              handleComplete={handleComplete}
+            />
+
+            {/* Action */}
+            <div className="mt-6">
+              {masteredCards.has(currentIndex) ? (
+                <button
+                  onClick={handleMarkAsNotMastered}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-200 text-gray-700 rounded-xl font-medium transition-all hover:bg-gray-300"
+                >
+                  <RotateCcw className="w-4 h-4" /> 다시 학습
+                </button>
+              ) : (
+                <button
+                  onClick={handleMarkAsMastered}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 text-white rounded-xl font-medium transition-all hover:bg-indigo-700"
+                >
+                  <Check className="w-4 h-4" /> 학습 완료
+                </button>
+              )}
+            </div>
+
+            {/* Complete Button */}
+            <StudyCompleteButton
+              isAllMastered={isAllMastered}
+              onComplete={handleComplete}
             />
 
             {/* Navigation */}
@@ -501,92 +535,24 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
                 onNext={goToNext}
               />
             </div>
-
-            {/* Complete Button */}
-            <div className="mt-4">
-              <StudyCompleteButton
-                isAllMastered={isAllMastered}
-                onComplete={handleComplete}
-              />
-            </div>
           </div>
         </main>
       </div>
 
-      {/* Desktop Sidebar (직접 렌더링하여 설정 핸들러 전달) */}
-      {/* <aside className="hidden lg:block w-80 bg-white shadow-md">
-        <div className="p-6 h-full flex flex-col space-y-6">
-          <div>
-            <h3 className="text-lg font-bold text-gray-800">{category}</h3>
-            <p className="text-sm text-gray-500">Day {dayNumber}</p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <h4 className="text-sm font-medium text-gray-700">학습 진행률</h4>
-              <span className="text-sm font-bold text-indigo-600">
-                {Math.round(progress)}%
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-indigo-600 h-2 rounded-full"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <p className="text-xs text-right text-gray-500">
-              {masteredCards.size}/{items.length} 완료
-            </p>
-          </div>
-
-          <div className="space-y-3 flex-1">
-            <h4 className="text-sm font-medium text-gray-700">학습 카드</h4>
-            <div className="grid grid-cols-7 gap-2">
-              {items.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => goToIndex(idx)}
-                  className={`aspect-square rounded-lg text-xs font-semibold transition-all ${
-                    idx === currentIndex
-                      ? "bg-indigo-600 text-white shadow-md scale-110"
-                      : masteredCards.has(idx)
-                      ? "bg-indigo-100 text-indigo-600 hover:bg-indigo-200"
-                      : studiedCards.has(idx)
-                      ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      : "bg-gray-50 text-gray-400 hover:bg-gray-100"
-                  }`}
-                >
-                  {idx + 1}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="pt-6 border-t border-gray-200">
-            <StudySettingsPanel
-              settings={localSettings}
-              handleModeChange={handleModeChange}
-              handleAutoProgressChange={handleAutoProgressChange}
-              handleAutoPlayChange={handleAutoPlayChange}
-            />
-          </div>
-        </div>
-      </aside> */}
-
       <StudySidebar
         category={category}
         dayNumber={dayNumber}
-        progress={progress} // 기존 계산 값
+        progress={progress}
         items={items}
         currentIndex={currentIndex}
-        // ⬇️ 문장 모드는 이 두 세트를 넘겨줍니다
-        studiedCards={studiedCards}
         masteredCards={masteredCards}
+        studiedCards={studiedCards}
         onSelectIndex={goToIndex}
-        settings={localSettings}
+        settings={localSettings} // 🔥 로컬 설정 전달
         handleModeChange={handleModeChange}
         handleAutoProgressChange={handleAutoProgressChange}
         handleAutoPlayChange={handleAutoPlayChange}
+        isSettingOpen={isSettingOpen}
       />
     </div>
   );

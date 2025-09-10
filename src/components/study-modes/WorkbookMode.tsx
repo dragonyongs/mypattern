@@ -6,7 +6,7 @@ import React, {
   useState,
   useRef,
 } from "react";
-import { PenTool } from "lucide-react";
+import { PenTool, Check, RotateCcw } from "lucide-react";
 
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
@@ -17,7 +17,6 @@ import { useWorkbookLogic } from "@/hooks/useWorkbookLogic";
 
 import { QuestionCard } from "@/components/workbook/QuestionCard";
 import { AnswerOptions } from "@/components/workbook/AnswerOptions";
-import { MobileHeader } from "@/components/workbook/MobileHeader";
 import { ProgressIndicator } from "@/components/workbook/ProgressIndicator";
 import { ActionSection } from "@/components/workbook/ActionSection";
 import StudyNavigation from "@/shared/components/StudyNavigation";
@@ -386,18 +385,9 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     return (
       <div
         key={componentKey}
-        className="flex h-full min-h-[calc(100vh-154px)] bg-gray-50 font-sans"
+        className="flex h-full min-h-[calc(100vh-154px)] bg-gray-50 font-sans pb-20 lg:pb-0"
       >
         <div className="flex-1 flex flex-col overflow-hidden">
-          <MobileHeader
-            category={category}
-            dayNumber={dayNumber}
-            progress={progress}
-            answeredCount={answeredQuestions.size}
-            totalCount={workbook.length}
-            score={score}
-          />
-
           {/* 본문+사이드바 2열 */}
           <div className="flex-1 flex">
             {/* 왼쪽 본문: 중앙 카드 */}
@@ -432,24 +422,43 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                     <ActionSection
                       isAnswered={isCurrentAnswered}
                       isCorrect={isCurrentCorrect}
-                      hasSelectedAnswer={!!selectedAnswers[currentIndex]}
                       correctAnswer={getCorrectAnswer(currentQuestion)}
-                      onCheck={handleCheckAnswer}
-                      onRetry={handleRetry}
                       studyMode={localSettings.studyMode}
                       showMeaningEnabled={localSettings.showMeaningEnabled}
                       explanation={currentQuestion.explanation}
                       showExplanation={showExplanation[currentIndex]}
                       onToggleExplanation={handleToggleExplanation}
                     />
-                    {isAllAnswered && (
-                      <StudyCompleteButton
-                        isAllMastered={isAllAnswered}
-                        onComplete={handleComplete}
-                      />
-                    )}
                   </QuestionCard>
                 </div>
+
+                <div className="mt-4">
+                  {!isCurrentAnswered ? (
+                    <button
+                      onClick={handleCheckAnswer}
+                      disabled={!selectedAnswers[currentIndex]}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all"
+                    >
+                      <Check className="w-4 h-4" />
+                      정답 확인
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleRetry}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-all"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      다시 풀기
+                    </button>
+                  )}
+                </div>
+
+                {isAllAnswered && (
+                  <StudyCompleteButton
+                    isAllMastered={isAllAnswered}
+                    onComplete={handleComplete}
+                  />
+                )}
 
                 <StudyNavigation
                   currentIndex={currentIndex}
