@@ -1,124 +1,193 @@
 // src/shared/hooks/useStudyNavigation.ts
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 
-export interface UseStudyNavigationProps<T> {
+export interface StudyNavigationConfig<T> {
   items: T[];
   initialIndex?: number;
-  onItemCompleted?: (itemId: string, completed: boolean) => void;
-  packId: string;
-  currentDay: number;
-  mode: string;
+  onItemCompleted?: (item: T, index: number) => void;
+  onComplete?: () => void;
+  getItemProgress?: (item: T) => {
+    isCompleted: boolean;
+    lastStudied: Date | null;
+  };
+  settings?: {
+    autoProgressEnabled?: boolean;
+    skipCompletedItems?: boolean; // 🔥 완료된 아이템 건너뛸지 여부 제어
+  };
 }
 
 export function useStudyNavigation<T extends { id: string }>({
   items,
   initialIndex = 0,
   onItemCompleted,
-  packId,
-  currentDay,
-  mode,
-}: UseStudyNavigationProps<T>) {
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [completedItems, setCompletedItems] = useState<Set<number>>(new Set());
+  onComplete,
+  getItemProgress,
+  settings = {},
+}: StudyNavigationConfig<T>) {
+  const {
+    autoProgressEnabled = true,
+    skipCompletedItems = false, // 🔥 기본값을 false로 설정하여 순차 진행 보장
+  } = settings;
 
-  // 🔥 안전한 상태 업데이트를 위한 ref
-  const itemsRef = useRef(items);
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
+  // 🔥 상태 관리
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    return Math.max(0, Math.min(initialIndex, items.length - 1));
+  });
 
-  // 🔥 현재 아이템
-  const currentItem = items[currentIndex];
+  const currentItem = useMemo(() => {
+    return items[currentIndex] || null;
+  }, [items, currentIndex]);
 
-  // 🔥 다음으로 이동 (함수형 업데이트)
-  const goToNext = useCallback(() => {
-    setCurrentIndex((prev) => {
-      const nextIndex = Math.min(prev + 1, itemsRef.current.length - 1);
-      console.log(`🔄 ${mode} Moving: ${prev} → ${nextIndex}`);
-      return nextIndex;
-    });
-  }, [mode]);
+  // 🔥 진행률 계산
+  const progress = useMemo(() => {
+    if (!items.length) return { completed: 0, total: 0, percentage: 0 };
 
-  // 🔥 이전으로 이동
-  const goToPrev = useCallback(() => {
-    setCurrentIndex((prev) => Math.max(prev - 1, 0));
+    const completedCount = items.filter((item) => {
+      const progress = getItemProgress?.(item);
+      return progress?.isCompleted ?? false;
+    }).length;
+
+    return {
+      completed: completedCount,
+      total: items.length,
+      percentage: Math.round((completedCount / items.length) * 100),
+    };
+  }, [items, getItemProgress]);
+
+  // 🔥 다음 아이템 찾기 (순차 진행 보장)
+  const findNextIndex = useCallback(
+    (fromIndex: number): number => {
+      if (!skipCompletedItems) {
+        // 🔥 순차 진행 모드: 단순히 다음 인덱스
+        return Math.min(fromIndex + 1, items.length - 1);
+      }
+
+      // 🔥 완료된 아이템 건너뛰기 모드 (기존 로직)
+      for (let i = fromIndex + 1; i < items.length; i++) {
+        const item = items[i];
+        const itemProgress = getItemProgress?.(item);
+        if (!itemProgress?.isCompleted) {
+          return i;
+        }
+      }
+      return Math.min(fromIndex + 1, items.length - 1);
+    },
+    [items, getItemProgress, skipCompletedItems]
+  );
+
+  // 🔥 이전 아이템 찾기
+  const findPrevIndex = useCallback((fromIndex: number): number => {
+    return Math.max(fromIndex - 1, 0);
   }, []);
 
-  // 🔥 특정 인덱스로 이동
+  // 🔥 네비게이션 함수들
+  const goToNext = useCallback(() => {
+    setCurrentIndex((prevIndex) => {
+      const nextIndex = findNextIndex(prevIndex);
+      console.log(`🔄 Navigation: ${prevIndex} → ${nextIndex}`);
+      return nextIndex;
+    });
+  }, [findNextIndex]);
+
+  const goToPrev = useCallback(() => {
+    setCurrentIndex((prevIndex) => {
+      const prevIdx = findPrevIndex(prevIndex);
+      console.log(`🔄 Navigation: ${prevIndex} → ${prevIdx}`);
+      return prevIdx;
+    });
+  }, [findPrevIndex]);
+
   const goToIndex = useCallback(
     (index: number) => {
-      const safeIndex = Math.max(
-        0,
-        Math.min(index, itemsRef.current.length - 1)
-      );
-      console.log(`👆 ${mode} User selected index: ${safeIndex}`);
-      setCurrentIndex(safeIndex);
+      const targetIndex = Math.max(0, Math.min(index, items.length - 1));
+      setCurrentIndex(targetIndex);
     },
-    [mode]
+    [items.length]
   );
 
   // 🔥 아이템 완료 처리
-  const markItemCompleted = useCallback(
-    (itemId?: string, completed: boolean = true) => {
-      const targetId = itemId || currentItem?.id;
-      if (!targetId) return;
+  const handleItemComplete = useCallback(
+    (completed: boolean = true) => {
+      if (!currentItem) return;
 
-      // 완료된 아이템 추가
-      setCompletedItems((prev) => {
-        const newSet = new Set(prev);
-        if (completed) {
-          newSet.add(currentIndex);
-        } else {
-          newSet.delete(currentIndex);
-        }
-        return newSet;
-      });
+      console.log(`🎯 Item completed: ${currentItem.id} = ${completed}`);
 
-      // 외부 콜백 호출
-      onItemCompleted?.(targetId, completed);
+      // 상위 컴포넌트에 완료 알림
+      onItemCompleted?.(currentItem, currentIndex);
 
-      console.log(`🎯 ${mode} Item ${targetId} completed: ${completed}`);
+      // 🔥 자동 진행이 활성화되고, 완료된 경우에만 다음으로 이동
+      if (autoProgressEnabled && completed && currentIndex < items.length - 1) {
+        setTimeout(() => {
+          goToNext();
+        }, 300); // 약간의 딜레이로 UX 개선
+      }
     },
-    [currentIndex, currentItem?.id, onItemCompleted, mode]
+    [
+      currentItem,
+      currentIndex,
+      onItemCompleted,
+      autoProgressEnabled,
+      items.length,
+      goToNext,
+    ]
   );
 
-  // 🔥 학습 완료 후 자동 다음 이동
-  const completeAndNext = useCallback(() => {
-    markItemCompleted(currentItem?.id, true);
+  // 🔥 모든 아이템 완료 확인
+  const isAllCompleted = useMemo(() => {
+    return progress.completed === progress.total && progress.total > 0;
+  }, [progress]);
 
-    // 다음 아이템으로 자동 이동
-    setTimeout(() => {
-      goToNext();
-    }, 100); // 상태 업데이트 후 이동
-  }, [markItemCompleted, currentItem?.id, goToNext]);
+  // 🔥 현재 아이템 완료 상태
+  const isCurrentCompleted = useMemo(() => {
+    if (!currentItem) return false;
+    const itemProgress = getItemProgress?.(currentItem);
+    return itemProgress?.isCompleted ?? false;
+  }, [currentItem, getItemProgress]);
 
-  // 🔥 유틸리티 함수들
-  const isCurrentCompleted = completedItems.has(currentIndex);
-  const isLastItem = currentIndex >= items.length - 1;
-  const isFirstItem = currentIndex === 0;
+  // 🔥 스와이프 제스처
+  const swipeHandlers = useSwipeGesture({
+    onSwipeLeft: goToNext,
+    onSwipeRight: goToPrev,
+  });
+
+  // 🔥 키보드 이벤트
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") goToNext();
+      else if (e.key === "ArrowLeft") goToPrev();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [goToNext, goToPrev]);
+
+  // 🔥 완료 체크
+  useEffect(() => {
+    if (isAllCompleted) {
+      onComplete?.();
+    }
+  }, [isAllCompleted, onComplete]);
 
   return {
     // 상태
     currentIndex,
     currentItem,
-    completedItems,
-
-    // 상태 확인
+    progress,
+    isAllCompleted,
     isCurrentCompleted,
-    isLastItem,
-    isFirstItem,
 
     // 네비게이션
     goToNext,
     goToPrev,
     goToIndex,
+    canGoNext: currentIndex < items.length - 1,
+    canGoPrev: currentIndex > 0,
 
-    // 아이템 완료
-    markItemCompleted,
-    completeAndNext,
+    // 완료 처리
+    handleItemComplete,
 
-    // 직접 상태 변경 (필요시)
-    setCurrentIndex,
-    setCompletedItems,
+    // 이벤트 핸들러
+    swipeHandlers,
   };
 }

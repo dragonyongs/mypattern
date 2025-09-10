@@ -1,5 +1,11 @@
-// src/components/study-modes/WorkbookMode.tsx (최종 완성 버전)
-import React, { useEffect, useMemo, useCallback } from "react";
+// src/components/study-modes/WorkbookMode.tsx
+import React, {
+  useEffect,
+  useMemo,
+  useCallback,
+  useState,
+  useRef,
+} from "react";
 import { PenTool } from "lucide-react";
 
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
@@ -8,45 +14,87 @@ import { useDayProgress } from "@/shared/hooks/useAppHooks";
 
 import { useWorkbookState } from "@/hooks/useWorkbookState";
 import { useWorkbookLogic } from "@/hooks/useWorkbookLogic";
+
 import { QuestionCard } from "@/components/workbook/QuestionCard";
 import { AnswerOptions } from "@/components/workbook/AnswerOptions";
-import { WorkbookNavigation } from "@/components/workbook/WorkbookNavigation";
-import { CompletionCard } from "@/components/workbook/CompletionCard";
 import { MobileHeader } from "@/components/workbook/MobileHeader";
 import { ProgressIndicator } from "@/components/workbook/ProgressIndicator";
 import { ActionSection } from "@/components/workbook/ActionSection";
-import { DesktopSidebar } from "@/components/workbook/DesktopSidebar";
+import StudyNavigation from "@/shared/components/StudyNavigation";
+import { StudySidebar } from "@/shared/components/StudySidebar";
+
+import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
 
 import { shuffleWorkbookData } from "@/utils/workbook.utils";
 import type { WorkbookModeProps } from "@/types/workbook.types";
-import { WORKBOOK_CONSTANTS } from "@/constants/workbook.constants";
 
 export const WorkbookMode = React.memo<WorkbookModeProps>(
   ({
     items: rawWorkbook,
     dayNumber,
-    category,
+    category = "워크북",
     packId,
     onComplete,
     initialItemIndex = 0,
-    settings,
+    settings = {},
+    onSettingsChange,
   }) => {
-    // 🔥 워크북 데이터 처리
+    // 데이터
     const workbook = useMemo(() => {
-      if (!Array.isArray(rawWorkbook) || rawWorkbook.length === 0) {
-        return [];
-      }
+      if (!Array.isArray(rawWorkbook) || rawWorkbook.length === 0) return [];
       return shuffleWorkbookData(rawWorkbook);
     }, [rawWorkbook]);
 
-    // 🔥 컴포넌트 키 생성
     const componentKey = useMemo(() => {
       const baseKey = `${packId}-${dayNumber}-${workbook.length}`;
-      const contentHash = workbook.map((item) => item.id).join("-");
+      const contentHash = workbook.map((it) => it.id).join("-");
       return `${baseKey}-${contentHash}`;
     }, [packId, dayNumber, workbook]);
 
-    // 🔥 상태 관리
+    // 로컬 설정
+    const [localSettings, setLocalSettings] = useState(() => ({
+      studyMode: "immersive" as const,
+      showMeaningEnabled: false,
+      autoProgressEnabled: true,
+      autoPlayOnSelect: false,
+      ...settings,
+    }));
+    useEffect(() => {
+      setLocalSettings((prev) => ({ ...prev, ...settings }));
+    }, [settings]);
+
+    const handleModeChange = useCallback(
+      (mode: "immersive" | "assisted") => {
+        setLocalSettings((prev) => {
+          const next = { ...prev, studyMode: mode };
+          onSettingsChange?.(next);
+          return next;
+        });
+      },
+      [onSettingsChange]
+    );
+    const handleAutoProgressChange = useCallback(
+      (enabled: boolean) => {
+        setLocalSettings((prev) => {
+          const next = { ...prev, autoProgressEnabled: enabled };
+          onSettingsChange?.(next);
+          return next;
+        });
+      },
+      [onSettingsChange]
+    );
+    const handleAutoPlayChange = useCallback(
+      (enabled: boolean) => {
+        setLocalSettings((prev) => {
+          const next = { ...prev, autoPlayOnSelect: enabled };
+          onSettingsChange?.(next);
+          return next;
+        });
+      },
+      [onSettingsChange]
+    );
+
+    // 상태 훅
     const {
       currentIndex,
       selectedAnswers,
@@ -69,159 +117,181 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       pendingSaveRef,
     } = useWorkbookState(workbook, initialItemIndex, componentKey);
 
-    // 🔥 로직 및 훅
+    // 로직
     const { getCorrectAnswer, saveProgress, restoreProgress } =
       useWorkbookLogic(packId, dayNumber, workbook);
-    const { markModeCompleted } = useDayProgress(packId, dayNumber);
     const { speak, isSpeaking } = useTTS();
+    const { markModeCompleted } = useDayProgress(packId, dayNumber);
 
-    // 🔥 설정 기본값 처리
-    const studySettings = useMemo(
-      () => ({
-        studyMode: "immersive" as const,
-        showMeaningEnabled: false,
-        autoProgressEnabled: true,
-        autoPlayOnSelect: false,
-        ...settings,
-      }),
-      [settings]
+    // 내비/타이머/refs
+    const autoProgressTimeoutRef = useRef<number | null>(null);
+    const currentIndexRef = useRef<number>(initialItemIndex);
+    const answeredRef = useRef<Set<number>>(answeredQuestions);
+    const correctRef = useRef<Set<number>>(correctAnswers);
+
+    useEffect(() => {
+      currentIndexRef.current = currentIndex;
+    }, [currentIndex]);
+    useEffect(() => {
+      answeredRef.current = answeredQuestions;
+    }, [answeredQuestions]);
+    useEffect(() => {
+      correctRef.current = correctAnswers;
+    }, [correctAnswers]);
+    useEffect(() => {
+      return () => {
+        if (autoProgressTimeoutRef.current) {
+          window.clearTimeout(autoProgressTimeoutRef.current);
+          autoProgressTimeoutRef.current = null;
+        }
+      };
+    }, []);
+
+    // 이동은 항상 navigateTo
+    const navigateTo = useCallback(
+      (index: number) => {
+        if (autoProgressTimeoutRef.current) {
+          window.clearTimeout(autoProgressTimeoutRef.current);
+          autoProgressTimeoutRef.current = null;
+        }
+        const safeIndex = Math.max(0, Math.min(index, workbook.length - 1));
+        currentIndexRef.current = safeIndex;
+        setCurrentIndex(safeIndex);
+      },
+      [workbook.length, setCurrentIndex]
     );
 
-    // 🔥 이벤트 핸들러들
+    // TTS: 단어/문장 모드와 동일 인자
     const handleSpeak = useCallback(
       (text: string) => {
-        if (text) speak(text, WORKBOOK_CONSTANTS.TTS_CONFIG);
+        const toSay = (text || "").trim();
+        if (!toSay) return;
+        speak(toSay, { lang: "en-US", rate: 0.8 });
       },
       [speak]
     );
 
+    // 복원(마운트 1회)
+    useEffect(() => {
+      const { answered, correct, results } = restoreProgress();
+      setAnsweredQuestions(answered);
+      setCorrectAnswers(correct);
+      setShowResult(results);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // 선택
     const handleAnswerSelect = useCallback(
       (answer: string) => {
         if (isCurrentAnswered) return;
-
-        setSelectedAnswers((prev: Record<number, string>) => ({
-          ...prev,
-          [currentIndex]: answer,
-        }));
-
-        // 🔥 답 선택시 자동 TTS 재생
-        if (studySettings.autoPlayOnSelect && currentQuestion) {
-          const questionText =
+        const idx = currentIndexRef.current;
+        setSelectedAnswers((prev) => ({ ...prev, [idx]: answer }));
+        if (localSettings.autoPlayOnSelect && currentQuestion) {
+          const qText =
             currentQuestion.question || currentQuestion.sentence || "";
-          const completeText = questionText.replace(/_{2,}/g, answer);
-
-          setTimeout(() => {
-            handleSpeak(completeText);
-          }, 300);
+          const filled = qText.replace(/_{2,}/g, answer);
+          setTimeout(() => handleSpeak(filled), 240);
         }
       },
       [
-        currentIndex,
         isCurrentAnswered,
-        studySettings.autoPlayOnSelect,
         currentQuestion,
         handleSpeak,
+        localSettings.autoPlayOnSelect,
         setSelectedAnswers,
       ]
     );
 
+    // 정답 확인
     const handleCheckAnswer = useCallback(() => {
-      const selectedAnswer = selectedAnswers[currentIndex];
-      if (!selectedAnswer || isCurrentAnswered) return;
+      const idx = currentIndexRef.current;
+      if (answeredRef.current.has(idx)) return;
 
-      const correctAnswer = getCorrectAnswer(currentQuestion!);
-      const isCorrect = selectedAnswer === correctAnswer;
+      const selected = selectedAnswers[idx];
+      if (!selected) return;
 
-      // 상태 업데이트
+      const correct = getCorrectAnswer(currentQuestion!);
+      const isCorrect = selected === correct;
+
+      // 상태 반영
       setAnsweredQuestions((prev) => {
-        const newSet = new Set(prev);
-        newSet.add(currentIndex);
-        return newSet;
+        const n = new Set(prev);
+        n.add(idx);
+        return n;
       });
-
       if (isCorrect) {
         setCorrectAnswers((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(currentIndex);
-          return newSet;
+          const n = new Set(prev);
+          n.add(idx);
+          return n;
         });
       }
+      setShowResult((prev) => ({ ...prev, [idx]: true }));
 
-      setShowResult((prev) => ({ ...prev, [currentIndex]: true }));
-      pendingSaveRef.current.add(currentIndex);
+      // ✅ 즉시 저장하여 이탈해도 복원 가능
+      saveProgress(idx, isCorrect);
+      // pendingSaveRef.current.add(idx);
+
+      if (localSettings.autoProgressEnabled) {
+        if (autoProgressTimeoutRef.current) {
+          window.clearTimeout(autoProgressTimeoutRef.current);
+          autoProgressTimeoutRef.current = null;
+        }
+        let nextIdx = -1;
+        for (let i = idx + 1; i < workbook.length; i++) {
+          if (!answeredRef.current.has(i)) {
+            nextIdx = i;
+            break;
+          }
+        }
+        if (nextIdx === -1) nextIdx = Math.min(idx + 1, workbook.length - 1);
+
+        autoProgressTimeoutRef.current = window.setTimeout(() => {
+          navigateTo(nextIdx);
+          autoProgressTimeoutRef.current = null;
+        }, 380) as unknown as number;
+      }
     }, [
       selectedAnswers,
-      currentIndex,
-      isCurrentAnswered,
       getCorrectAnswer,
       currentQuestion,
       setAnsweredQuestions,
       setCorrectAnswers,
       setShowResult,
+      saveProgress,
     ]);
 
-    // 🔥 함수형 업데이트로 안전한 다음 이동
-    const goToNext = useCallback(() => {
-      // 저장 로직
-      if (pendingSaveRef.current.has(currentIndex)) {
-        const isCorrect = correctAnswers.has(currentIndex);
-        saveProgress(currentIndex, isCorrect);
-        pendingSaveRef.current.delete(currentIndex);
-      }
-
-      // 🔥 함수형 업데이트로 안전하게 증가
-      setCurrentIndex((prevIndex) => {
-        const nextIndex = Math.min(prevIndex + 1, workbook.length - 1);
-        console.log(`🔄 Moving: ${prevIndex} → ${nextIndex}`);
-        return nextIndex;
-      });
-    }, [correctAnswers, workbook.length, saveProgress, setCurrentIndex]);
-
-    const goToPrev = useCallback(() => {
-      setCurrentIndex((prev) => Math.max(prev - 1, 0));
-    }, [setCurrentIndex]);
-
+    // 다시 풀기(현재 카드만 리셋)
     const handleRetry = useCallback(() => {
-      console.log("🔄 다시 풀기:", currentIndex);
+      const idx = currentIndexRef.current;
+      pendingSaveRef.current.delete(idx);
 
-      // 상태 초기화
       setAnsweredQuestions((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(currentIndex);
-        return newSet;
+        const n = new Set(prev);
+        n.delete(idx);
+        return n;
       });
-
       setCorrectAnswers((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(currentIndex);
-        return newSet;
+        const n = new Set(prev);
+        n.delete(idx);
+        return n;
       });
-
       setShowResult((prev) => {
-        const newObj = { ...prev };
-        delete newObj[currentIndex];
-        return newObj;
+        const copy = { ...prev };
+        delete copy[idx];
+        return copy;
       });
-
       setShowExplanation((prev) => {
-        const newObj = { ...prev };
-        delete newObj[currentIndex];
-        return newObj;
+        const copy = { ...prev };
+        delete copy[idx];
+        return copy;
       });
-
       setSelectedAnswers((prev) => {
-        const newObj = { ...prev };
-        delete newObj[currentIndex];
-        return newObj;
+        const copy = { ...prev };
+        delete copy[idx];
+        return copy;
       });
-
-      if (currentQuestion) {
-        saveProgress(currentIndex, false);
-      }
     }, [
-      currentIndex,
-      currentQuestion,
-      saveProgress,
       setAnsweredQuestions,
       setCorrectAnswers,
       setShowResult,
@@ -230,73 +300,62 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     ]);
 
     const handleToggleExplanation = useCallback(() => {
-      setShowExplanation((prev) => ({
-        ...prev,
-        [currentIndex]: !prev[currentIndex],
-      }));
-    }, [currentIndex, setShowExplanation]);
+      const idx = currentIndexRef.current;
+      setShowExplanation((prev) => ({ ...prev, [idx]: !prev[idx] }));
+    }, [setShowExplanation]);
 
-    // 🔥 워크북 완료 처리
-    const handleComplete = useCallback(() => {
-      pendingSaveRef.current.forEach((idx) => {
-        const isCorrect = correctAnswers.has(idx);
+    // 다음/이전
+    const goToNext = useCallback(() => {
+      const idx = currentIndexRef.current;
+      if (pendingSaveRef.current.has(idx)) {
+        const isCorrect = correctRef.current.has(idx);
         saveProgress(idx, isCorrect);
-      });
-      pendingSaveRef.current.clear();
+        pendingSaveRef.current.delete(idx);
+      }
+      const nextIndex = Math.min(
+        currentIndexRef.current + 1,
+        workbook.length - 1
+      );
+      navigateTo(nextIndex);
+    }, [navigateTo, saveProgress, workbook.length]);
 
-      markModeCompleted(dayNumber, "workbook");
-      onComplete?.();
-    }, [
-      correctAnswers,
-      saveProgress,
-      markModeCompleted,
-      dayNumber,
-      onComplete,
-    ]);
+    const goToPrev = useCallback(() => {
+      const prevIndex = Math.max(currentIndexRef.current - 1, 0);
+      navigateTo(prevIndex);
+    }, [navigateTo]);
 
-    // 🔥 Effects
-    useEffect(() => {
-      const { answered, correct, results } = restoreProgress();
-      setAnsweredQuestions(answered);
-      setCorrectAnswers(correct);
-      setShowResult(results);
-    }, [
-      restoreProgress,
-      setAnsweredQuestions,
-      setCorrectAnswers,
-      setShowResult,
-    ]);
+    const goToIndex = useCallback(
+      (i: number) => navigateTo(Math.max(0, Math.min(i, workbook.length - 1))),
+      [navigateTo]
+    );
 
+    // 제스처/키
     const swipeHandlers = useSwipeGesture({
       onSwipeLeft: goToNext,
       onSwipeRight: goToPrev,
     });
-
     useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
+      const onKey = (e: KeyboardEvent) => {
         if (e.key === "ArrowRight") goToNext();
-        else if (e.key === "ArrowLeft") goToPrev();
-        else if (
-          e.key === "Enter" &&
-          selectedAnswers[currentIndex] &&
-          !isCurrentAnswered
-        ) {
-          handleCheckAnswer();
-        }
+        if (e.key === "ArrowLeft") goToPrev();
+        if (e.key === "Enter") handleCheckAnswer();
       };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [goToNext, goToPrev, handleCheckAnswer]);
 
-      window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [
-      goToNext,
-      goToPrev,
-      selectedAnswers,
-      currentIndex,
-      isCurrentAnswered,
-      handleCheckAnswer,
-    ]);
+    // 완료
+    const handleComplete = useCallback(() => {
+      pendingSaveRef.current.forEach((idx) => {
+        const isCorrect = correctRef.current.has(idx);
+        saveProgress(idx, isCorrect);
+      });
+      pendingSaveRef.current.clear();
+      markModeCompleted(packId, "workbook");
+      onComplete?.();
+    }, [saveProgress, markModeCompleted, packId, onComplete]);
 
-    // 🔥 로딩 상태 처리
+    // 경계
     if (!workbook.length) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
@@ -310,12 +369,11 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
         </div>
       );
     }
-
     if (!currentQuestion) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            문제를 로드할 수 없습니다
+            문제를 불러올 수 없습니다
           </h3>
           <p className="text-gray-600">
             현재 인덱스: {currentIndex}, 전체: {workbook.length}
@@ -324,14 +382,13 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       );
     }
 
+    // 레이아웃: SentenceMode와 동일 2열 구조
     return (
       <div
         key={componentKey}
-        className="flex h-full min-h-[calc(100vh-129px)] bg-gray-50 font-sans"
+        className="flex h-full min-h-[calc(100vh-154px)] bg-gray-50 font-sans"
       >
-        {/* 메인 컨텐츠 */}
-        <div className="flex-1 flex flex-col">
-          {/* 모바일 헤더 */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           <MobileHeader
             category={category}
             dayNumber={dayNumber}
@@ -341,88 +398,86 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
             score={score}
           />
 
-          {/* 메인 카드 영역 */}
-          <div className="flex-1 flex items-center justify-center p-4">
-            <div className="w-full max-w-2xl">
-              {/* 진행 인디케이터 */}
-              <ProgressIndicator
-                workbook={workbook}
-                currentIndex={currentIndex}
-                correctAnswers={correctAnswers}
-                answeredQuestions={answeredQuestions}
-                onIndexChange={setCurrentIndex}
-              />
+          {/* 본문+사이드바 2열 */}
+          <div className="flex-1 flex">
+            {/* 왼쪽 본문: 중앙 카드 */}
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="w-full max-w-2xl">
+                <ProgressIndicator
+                  workbook={workbook}
+                  currentIndex={currentIndex}
+                  correctAnswers={correctAnswers}
+                  answeredQuestions={answeredQuestions}
+                  onIndexChange={goToIndex}
+                />
 
-              {/* 메인 카드 */}
-              <div {...swipeHandlers}>
-                <QuestionCard
-                  question={currentQuestion}
-                  isAnswered={isCurrentAnswered}
-                  isCorrect={isCurrentCorrect}
-                  selectedAnswer={selectedAnswers[currentIndex]}
-                  onSpeak={handleSpeak}
-                  isSpeaking={isSpeaking}
-                >
-                  <AnswerOptions
-                    options={currentQuestion.options}
-                    selectedAnswer={selectedAnswers[currentIndex]}
-                    correctAnswer={getCorrectAnswer(currentQuestion)}
-                    showResult={showResult[currentIndex] || false}
-                    isAnswered={isCurrentAnswered}
-                    onSelect={handleAnswerSelect}
-                  />
-
-                  <ActionSection
+                <div {...swipeHandlers}>
+                  <QuestionCard
+                    question={currentQuestion}
                     isAnswered={isCurrentAnswered}
                     isCorrect={isCurrentCorrect}
-                    hasSelectedAnswer={!!selectedAnswers[currentIndex]}
-                    correctAnswer={getCorrectAnswer(currentQuestion)}
-                    onCheck={handleCheckAnswer}
-                    onRetry={handleRetry}
-                    studyMode={studySettings.studyMode}
-                    showMeaningEnabled={studySettings.showMeaningEnabled}
-                    explanation={currentQuestion.explanation}
-                    showExplanation={showExplanation[currentIndex]}
-                    onToggleExplanation={handleToggleExplanation}
-                  />
-                </QuestionCard>
-              </div>
+                    selectedAnswer={selectedAnswers[currentIndex]}
+                    onSpeak={handleSpeak}
+                    isSpeaking={isSpeaking}
+                  >
+                    <AnswerOptions
+                      options={currentQuestion.options}
+                      selectedAnswer={selectedAnswers[currentIndex]}
+                      correctAnswer={getCorrectAnswer(currentQuestion)}
+                      showResult={showResult[currentIndex] || false}
+                      isAnswered={isCurrentAnswered}
+                      onSelect={handleAnswerSelect}
+                    />
 
-              {/* 네비게이션 */}
-              <WorkbookNavigation
-                currentIndex={currentIndex}
-                totalCount={workbook.length}
-                onPrev={goToPrev}
-                onNext={goToNext}
-              />
+                    <ActionSection
+                      isAnswered={isCurrentAnswered}
+                      isCorrect={isCurrentCorrect}
+                      hasSelectedAnswer={!!selectedAnswers[currentIndex]}
+                      correctAnswer={getCorrectAnswer(currentQuestion)}
+                      onCheck={handleCheckAnswer}
+                      onRetry={handleRetry}
+                      studyMode={localSettings.studyMode}
+                      showMeaningEnabled={localSettings.showMeaningEnabled}
+                      explanation={currentQuestion.explanation}
+                      showExplanation={showExplanation[currentIndex]}
+                      onToggleExplanation={handleToggleExplanation}
+                    />
+                    {isAllAnswered && (
+                      <StudyCompleteButton
+                        isAllMastered={isAllAnswered}
+                        onComplete={handleComplete}
+                      />
+                    )}
+                  </QuestionCard>
+                </div>
 
-              {/* 완료 카드 */}
-              {isAllAnswered && (
-                <CompletionCard
-                  score={score}
-                  totalQuestions={workbook.length}
-                  onComplete={handleComplete}
+                <StudyNavigation
+                  currentIndex={currentIndex}
+                  totalCount={workbook.length}
+                  onPrev={goToPrev}
+                  onNext={goToNext}
                 />
-              )}
+              </div>
             </div>
+
+            {/* 오른쪽 사이드바: 독립 컬럼 */}
+            <StudySidebar
+              category={category}
+              dayNumber={dayNumber}
+              progress={progress}
+              items={workbook}
+              currentIndex={currentIndex}
+              studiedCards={answeredQuestions} // 학습됨 = 답안 확인 완료
+              masteredCards={correctAnswers} // 완료 = 정답 처리
+              score={score}
+              onSelectIndex={goToIndex}
+              settings={localSettings}
+              handleModeChange={handleModeChange}
+              handleAutoProgressChange={handleAutoProgressChange}
+              handleAutoPlayChange={handleAutoPlayChange}
+            />
           </div>
         </div>
-
-        {/* 데스크톱 사이드바 */}
-        <DesktopSidebar
-          category={category}
-          dayNumber={dayNumber}
-          progress={progress}
-          score={score}
-          workbook={workbook}
-          currentIndex={currentIndex}
-          answeredQuestions={answeredQuestions}
-          correctAnswers={correctAnswers}
-          settings={studySettings}
-          onIndexChange={setCurrentIndex}
-          onModeChange={() => {}} // 빈 함수 (상위에서 처리)
-          onAutoProgressChange={() => {}} // 빈 함수 (상위에서 처리)
-        />
       </div>
     );
   }

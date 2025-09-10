@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   Book,
-  MessageSquare,
   PenTool,
   Image,
   Search,

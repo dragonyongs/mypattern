@@ -1,0 +1,113 @@
+{
+    "id": "unique-pack-id",
+    "title": "여기에 팩 제목을 입력하세요",
+    "subtitle": "팩에 대한 간단한 부제를 입력하세요",
+    "description": "이 학습 팩이 무엇에 관한 것인지 상세한 설명을 작성합니다.",
+    "totalDays": 30,
+    "author": "제작자 이름",
+    "level": "beginner",
+    "tags": [
+        "일상회화",
+        "비즈니스",
+        "여행"
+    ],
+    "contents": [
+        {
+            "id": "vocab-001",
+            "type": "vocabulary",
+            "word": "Apple",
+            "meaning": "사과",
+            "pronunciation": "/ˈæp.əl/",
+            "emoji": "🍎",
+            "relatedIllustrationId": "illust-001"
+        },
+        {
+            "id": "sentence-001",
+            "type": "sentence",
+            "sentence": "I eat an apple every day.",
+            "translation": "나는 매일 사과를 먹는다.",
+            "targetWords": [
+                "apple"
+            ],
+            "relatedVocabIds": [
+                "vocab-001"
+            ]
+        },
+        {
+            "id": "workbook-001",
+            "type": "workbook",
+            "question": "I eat an _____ every day.",
+            "options": [
+                "apple",
+                "orange",
+                "banana"
+            ],
+            "correctAnswer": "apple",
+            "explanation": "'사과'는 영어로 'apple'입니다.",
+            "relatedSentenceId": "sentence-001"
+        },
+        {
+            "id": "illust-001",
+            "type": "illustration",
+            "src": "/images/packs/unique-pack-id/apple.png",
+            "description": "사과 그림"
+        },
+        {
+            "id": "audio-001",
+            "type": "audio",
+            "src": "/audio/packs/unique-pack-id/apple-pronunciation.mp3",
+            "description": "Apple 원어민 발음"
+        }
+    ],
+    "learningPlan": {
+        "totalDays": 30,
+        "days": [
+            {
+                "day": 1,
+                "title": "기초 다지기",
+                "modes": [
+                    {
+                        "type": "skimming-vocab",
+                        "displayName": "핵심 단어",
+                        "contentIds": [
+                            "vocab-001"
+                        ]
+                    },
+                    {
+                        "type": "skimming-illust",
+                        "displayName": "그림으로 연상",
+                        "contentIds": [
+                            "illust-001"
+                        ]
+                    }
+                ]
+            },
+            {
+                "day": 2,
+                "title": "문장으로 연습",
+                "modes": [
+                    {
+                        "type": "speaking-sentence",
+                        "displayName": "문장 말하기",
+                        "contentIds": [
+                            "sentence-001"
+                        ]
+                    }
+                ]
+            },
+            {
+                "day": 3,
+                "title": "복습 퀴즈",
+                "modes": [
+                    {
+                        "type": "workbook",
+                        "displayName": "퀴즈",
+                        "contentIds": [
+                            "workbook-001"
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}
