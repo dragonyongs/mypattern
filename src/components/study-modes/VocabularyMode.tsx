@@ -485,22 +485,8 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               isAllMastered={isAllMastered}
               handleComplete={handleComplete}
             />
+
             {/* Progress Dots */}
-            {/* <div className="flex items-center justify-center gap-1.5 mt-6 mb-4">
-              {items.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => goToIndex(idx)}
-                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                    idx === currentIndex
-                      ? "w-8 bg-indigo-600"
-                      : masteredCards.has(idx)
-                      ? "w-1.5 bg-indigo-600"
-                      : "w-1.5 bg-gray-300 hover:bg-gray-400"
-                  }`}
-                />
-              ))}
-            </div> */}
             <ProgressDots
               total={items.length}
               currentIndex={currentIndex}

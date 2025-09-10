@@ -953,12 +953,44 @@
                 ]
             },
             {
-                "day": 6,
-                "title": "Wake up (말해보기)",
+                "day": 4,
+                "title": "훑어보기 (76-105p)",
                 "modes": [
                     {
                         "type": "speaking-vocab",
-                        "displayName": "단어 말하기",
+                        "displayName": "단어",
+                        "contentIds": []
+                    },
+                    {
+                        "type": "speaking-sentence",
+                        "displayName": "문장",
+                        "contentIds": []
+                    }
+                ]
+            },
+            {
+                "day": 5,
+                "title": "훑어보기 (106-141p)",
+                "modes": [
+                    {
+                        "type": "speaking-vocab",
+                        "displayName": "단어",
+                        "contentIds": []
+                    },
+                    {
+                        "type": "speaking-sentence",
+                        "displayName": "문장",
+                        "contentIds": []
+                    }
+                ]
+            },
+            {
+                "day": 6,
+                "title": "말해보기 (142-191p)",
+                "modes": [
+                    {
+                        "type": "speaking-vocab",
+                        "displayName": "단어",
                         "contentIds": [
                             "v-wakeup-01",
                             "v-wakeup-02",
@@ -968,7 +1000,7 @@
                     },
                     {
                         "type": "speaking-sentence",
-                        "displayName": "문장 말하기",
+                        "displayName": "문장",
                         "contentIds": [
                             "s-wakeup-01",
                             "s-wakeup-02"
