@@ -1,0 +1,1027 @@
+{
+  "id": "real-voca-basic",
+  "title": "Real VOCA Basic",
+  "subtitle": "14일이면 한 권을 충분히 볼 수 있습니다.",
+  "totalDays": 14,
+  "learningMethods": [
+    {
+      "phase": 1,
+      "name": "상상하고",
+      "icon": "Image",
+      "description": "단어 리스트를 보면서 의미를 생각해봅니다. Target Words를 중심으로 그림을 통해 상황을 연상하면서 단어의 의미를 이미지로 기억합니다."
+    },
+    {
+      "phase": 2,
+      "name": "훑어보고",
+      "icon": "Search",
+      "description": "내가 원래 알고 있었던 단어, 뜻은 아는데 정작 사용할 줄 몰랐던 단어, 알듯 말듯한 표현 등을 점검하면서 전체 내용을 훑어봅니다."
+    },
+    {
+      "phase": 3,
+      "name": "말해보고",
+      "icon": "Mic",
+      "description": "문장 속에 있는 단어를 유심히 살피면서 소리 내어 읽어봅니다. MP3를 들으면서 따라해 보는 것도 적극 추천합니다."
+    },
+    {
+      "phase": 4,
+      "name": "확인하고",
+      "icon": "CheckSquare",
+      "description": "워크북의 빈칸을 채워보세요. 손으로 써 봐도 좋고, 소리 내어 말해보는 것도 괜찮아요."
+    }
+  ],
+  "categories": [
+    {
+      "id": "wakeup",
+      "name": "Wake up",
+      "page": 28
+    },
+    {
+      "id": "breakfast",
+      "name": "Breakfast",
+      "page": 34
+    },
+    {
+      "id": "washing-up",
+      "name": "Washing up",
+      "page": 40
+    },
+    {
+      "id": "skin-care",
+      "name": "Skin Care",
+      "page": 46
+    },
+    {
+      "id": "what-to-wear",
+      "name": "What to wear",
+      "page": 52
+    },
+    {
+      "id": "going-to-work",
+      "name": "Going to work",
+      "page": 58
+    },
+    {
+      "id": "at-work",
+      "name": "At work",
+      "page": 64
+    },
+    {
+      "id": "at-a-bar",
+      "name": "At a bar",
+      "page": 70
+    },
+    {
+      "id": "shopping-for-jeans",
+      "name": "Shopping for jeans",
+      "page": 76
+    },
+    {
+      "id": "shopping-for-shoes",
+      "name": "Shopping for shoes",
+      "page": 82
+    },
+    {
+      "id": "having-a-meal",
+      "name": "Having a meal",
+      "page": 88
+    },
+    {
+      "id": "coffee-time",
+      "name": "Coffee time",
+      "page": 94
+    },
+    {
+      "id": "shopping-at-costco",
+      "name": "Shopping at Costco",
+      "page": 100
+    },
+    {
+      "id": "watching-tv",
+      "name": "Watching TV",
+      "page": 106
+    },
+    {
+      "id": "cleaning-a-room",
+      "name": "Cleaning a room",
+      "page": 112
+    },
+    {
+      "id": "doing-the-laundry",
+      "name": "Doing the laundry",
+      "page": 118
+    },
+    {
+      "id": "cooking",
+      "name": "Cooking",
+      "page": 124
+    },
+    {
+      "id": "a-fall",
+      "name": "A fall",
+      "page": 130
+    },
+    {
+      "id": "getting-ready-for-bed",
+      "name": "Getting ready for bed",
+      "page": 136
+    }
+  ],
+  "contents": [
+    {
+      "id": "v-wakeup-01",
+      "type": "vocabulary",
+      "category": "wakeup",
+      "word": "hear",
+      "meaning": "듣다",
+      "emoji": "👂",
+      "pronunciation": "/hɪər/"
+    },
+    {
+      "id": "v-wakeup-02",
+      "type": "vocabulary",
+      "category": "wakeup",
+      "word": "going off",
+      "meaning": "(알람이) 울리다",
+      "emoji": "⏰",
+      "pronunciation": "/ˈɡoʊɪŋ ɔf/"
+    },
+    {
+      "id": "v-wakeup-03",
+      "type": "vocabulary",
+      "category": "wakeup",
+      "word": "asleep",
+      "meaning": "잠든",
+      "emoji": "😴",
+      "pronunciation": "/əˈsliːp/"
+    },
+    {
+      "id": "v-wakeup-04",
+      "type": "vocabulary",
+      "category": "wakeup",
+      "word": "hide",
+      "meaning": "숨기다",
+      "emoji": "🙈",
+      "pronunciation": "/haɪd/"
+    },
+    {
+      "id": "v-wakeup-05",
+      "type": "vocabulary",
+      "category": "wakeup",
+      "word": "wake up",
+      "meaning": "일어나다, 깨우다",
+      "emoji": "🌅",
+      "pronunciation": "/weɪk ʌp/"
+    },
+    {
+      "id": "v-wakeup-06",
+      "type": "vocabulary",
+      "category": "wakeup",
+      "word": "oversleep",
+      "meaning": "늦잠자다",
+      "emoji": "😪",
+      "pronunciation": "/ˌoʊvərˈsliːp/"
+    },
+    {
+      "id": "v-wakeup-07",
+      "type": "vocabulary",
+      "category": "wakeup",
+      "word": "stretch",
+      "meaning": "기지개를 켜다",
+      "emoji": "🤸",
+      "pronunciation": "/stretʃ/"
+    },
+    {
+      "id": "v-wakeup-08",
+      "type": "vocabulary",
+      "category": "wakeup",
+      "word": "make my bed",
+      "meaning": "침대를 정리하다",
+      "emoji": "🛏️",
+      "pronunciation": "/meɪk maɪ bed/"
+    },
+    {
+      "id": "s-wakeup-01",
+      "type": "sentence",
+      "category": "wakeup",
+      "text": "I hear a noise.",
+      "translation": "나는 소리를 듣는다.",
+      "targetWords": [
+        "hear"
+      ],
+      "relatedVocabIds": [
+        "v-wakeup-01"
+      ]
+    },
+    {
+      "id": "s-wakeup-02",
+      "type": "sentence",
+      "category": "wakeup",
+      "text": "It's my alarm clock going off.",
+      "translation": "내 알람시계가 울리고 있다.",
+      "targetWords": [
+        "going off"
+      ],
+      "relatedVocabIds": [
+        "v-wakeup-02"
+      ]
+    },
+    {
+      "id": "s-wakeup-03",
+      "type": "sentence",
+      "category": "wakeup",
+      "text": "The alarm clock goes off at 7 o'clock.",
+      "translation": "알람시계가 7시에 울린다.",
+      "targetWords": [
+        "goes off"
+      ],
+      "relatedVocabIds": [
+        "v-wakeup-02"
+      ]
+    },
+    {
+      "id": "s-wakeup-04",
+      "type": "sentence",
+      "category": "wakeup",
+      "text": "I'm still asleep in my cozy bed.",
+      "translation": "나는 여전히 아늑한 침대에서 자고 있다.",
+      "targetWords": [
+        "asleep"
+      ],
+      "relatedVocabIds": [
+        "v-wakeup-03"
+      ]
+    },
+    {
+      "id": "w-wakeup-01",
+      "type": "workbook",
+      "category": "wakeup",
+      "question": "I _____ a noise.",
+      "options": [
+        "hear",
+        "listen",
+        "sound",
+        "voice"
+      ],
+      "correctAnswer": "hear",
+      "explanation": "'hear'는 자연스럽게 들리는 소리를 듣는다는 의미입니다.",
+      "relatedSentenceId": "s-wakeup-01"
+    },
+    {
+      "id": "w-wakeup-02",
+      "type": "workbook",
+      "category": "wakeup",
+      "question": "The alarm clock is _____ at 7 o'clock.",
+      "options": [
+        "going off",
+        "ringing",
+        "making noise",
+        "sounding"
+      ],
+      "correctAnswer": "going off",
+      "explanation": "'going off'는 알람이 설정된 시간에 울리기 시작한다는 의미입니다.",
+      "relatedSentenceId": "s-wakeup-03"
+    },
+    {
+      "id": "v-breakfast-01",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "make toast",
+      "meaning": "토스트 만들다",
+      "emoji": "🍞",
+      "pronunciation": "/meɪk toʊst/"
+    },
+    {
+      "id": "v-breakfast-02",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "toast",
+      "meaning": "굽다, 토스트하다",
+      "emoji": "🔥",
+      "pronunciation": "/toʊst/"
+    },
+    {
+      "id": "v-breakfast-03",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "burnt",
+      "meaning": "탄",
+      "emoji": "🥵",
+      "pronunciation": "/bɜːrnt/"
+    },
+    {
+      "id": "v-breakfast-04",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "burned",
+      "meaning": "태웠다",
+      "emoji": "🔥",
+      "pronunciation": "/bɜːrnd/"
+    },
+    {
+      "id": "v-breakfast-05",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "fry eggs",
+      "meaning": "계란 튀기다",
+      "emoji": "🍳",
+      "pronunciation": "/fraɪ egz/"
+    },
+    {
+      "id": "v-breakfast-06",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "sunny-side up",
+      "meaning": "한쪽면만 익힌 계란",
+      "emoji": "🍳",
+      "pronunciation": "/ˈsʌni saɪd ʌp/"
+    },
+    {
+      "id": "v-breakfast-07",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "over easy",
+      "meaning": "양면을 살짝 익힌 계란",
+      "emoji": "🍳",
+      "pronunciation": "/ˈoʊvər ˈiːzi/"
+    },
+    {
+      "id": "v-breakfast-08",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "make orange juice",
+      "meaning": "오렌지 주스 만들다",
+      "emoji": "🍊",
+      "pronunciation": "/meɪk ˈɔːrɪndʒ dʒuːs/"
+    },
+    {
+      "id": "v-breakfast-09",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "juice",
+      "meaning": "즙을 짜다",
+      "emoji": "🧃",
+      "pronunciation": "/dʒuːs/"
+    },
+    {
+      "id": "v-breakfast-10",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "put into",
+      "meaning": "~에 넣다",
+      "emoji": "⬇️",
+      "pronunciation": "/pʊt ˈɪntuː/"
+    },
+    {
+      "id": "v-breakfast-11",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "press",
+      "meaning": "누르다",
+      "emoji": "👆",
+      "pronunciation": "/pres/"
+    },
+    {
+      "id": "v-breakfast-12",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "pour into",
+      "meaning": "~에 붓다",
+      "emoji": "🥛",
+      "pronunciation": "/pɔːr ˈɪntuː/"
+    },
+    {
+      "id": "v-breakfast-13",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "microwave",
+      "meaning": "전자레인지에 돌리다",
+      "emoji": "📡",
+      "pronunciation": "/ˈmaɪkroʊweɪv/"
+    },
+    {
+      "id": "v-breakfast-14",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "warm up",
+      "meaning": "데우다",
+      "emoji": "🔥",
+      "pronunciation": "/wɔːrm ʌp/"
+    },
+    {
+      "id": "v-breakfast-15",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "enjoy",
+      "meaning": "즐기다",
+      "emoji": "😋",
+      "pronunciation": "/ɪnˈdʒɔɪ/"
+    },
+    {
+      "id": "v-breakfast-16",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "spill",
+      "meaning": "흘리다",
+      "emoji": "💧",
+      "pronunciation": "/spɪl/"
+    },
+    {
+      "id": "v-breakfast-17",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "soak up",
+      "meaning": "흡수하다",
+      "emoji": "🧽",
+      "pronunciation": "/soʊk ʌp/"
+    },
+    {
+      "id": "v-breakfast-18",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "lick up",
+      "meaning": "핥아먹다",
+      "emoji": "👅",
+      "pronunciation": "/lɪk ʌp/"
+    },
+    {
+      "id": "v-breakfast-19",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "skip breakfast",
+      "meaning": "아침을 거르다",
+      "emoji": "🚫",
+      "pronunciation": "/skɪp ˈbrekfəst/"
+    },
+    {
+      "id": "v-breakfast-20",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "enough time to",
+      "meaning": "~할 충분한 시간",
+      "emoji": "⏰",
+      "pronunciation": "/ɪˈnʌf taɪm tuː/"
+    },
+    {
+      "id": "v-breakfast-21",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "pick up",
+      "meaning": "사다, 가져오다",
+      "emoji": "🛒",
+      "pronunciation": "/pɪk ʌp/"
+    },
+    {
+      "id": "v-breakfast-22",
+      "type": "vocabulary",
+      "category": "breakfast",
+      "word": "latte",
+      "meaning": "라떼",
+      "emoji": "☕",
+      "pronunciation": "/ˈlɑːteɪ/"
+    },
+    {
+      "id": "s-breakfast-01",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I make toast for breakfast.",
+      "translation": "나는 아침에 토스트를 만든다.",
+      "targetWords": [
+        "make toast"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-01"
+      ]
+    },
+    {
+      "id": "s-breakfast-02",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I toast two slices of bread.",
+      "translation": "나는 빵 두 조각을 굽는다.",
+      "targetWords": [
+        "toast"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-02"
+      ]
+    },
+    {
+      "id": "s-breakfast-03",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "Oops! I smell burnt toast.",
+      "translation": "앗! 탄 토스트 냄새가 난다.",
+      "targetWords": [
+        "burnt"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-03"
+      ]
+    },
+    {
+      "id": "s-breakfast-04",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I burned the toast.",
+      "translation": "나는 토스트를 태웠다.",
+      "targetWords": [
+        "burned"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-04"
+      ]
+    },
+    {
+      "id": "s-breakfast-05",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I fry eggs for breakfast.",
+      "translation": "나는 아침에 계란을 튀긴다.",
+      "targetWords": [
+        "fry eggs"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-05"
+      ]
+    },
+    {
+      "id": "s-breakfast-06",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I like fried eggs sunny-side up.",
+      "translation": "나는 한쪽면만 익힌 계란을 좋아한다.",
+      "targetWords": [
+        "sunny-side up"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-06"
+      ]
+    },
+    {
+      "id": "s-breakfast-07",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "But my sister likes fried eggs over easy.",
+      "translation": "하지만 내 여동생은 양면을 살짝 익힌 계란을 좋아한다.",
+      "targetWords": [
+        "over easy"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-07"
+      ]
+    },
+    {
+      "id": "s-breakfast-08",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I make orange juice for breakfast.",
+      "translation": "나는 아침에 오렌지 주스를 만든다.",
+      "targetWords": [
+        "make orange juice"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-08"
+      ]
+    },
+    {
+      "id": "s-breakfast-09",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I juice two oranges.",
+      "translation": "나는 오렌지 두 개의 즙을 짠다.",
+      "targetWords": [
+        "juice"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-09"
+      ]
+    },
+    {
+      "id": "s-breakfast-10",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I put oranges and a spoonful of honey into the blender.",
+      "translation": "나는 오렌지와 꿀 한 숟가락을 블렌더에 넣는다.",
+      "targetWords": [
+        "put",
+        "into"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-10"
+      ]
+    },
+    {
+      "id": "s-breakfast-11",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I press the power button on the blender.",
+      "translation": "나는 블렌더의 전원 버튼을 누른다.",
+      "targetWords": [
+        "press"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-11"
+      ]
+    },
+    {
+      "id": "s-breakfast-12",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I pour some milk into a large bowl.",
+      "translation": "나는 큰 그릇에 우유를 붓는다.",
+      "targetWords": [
+        "pour",
+        "into"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-12"
+      ]
+    },
+    {
+      "id": "s-breakfast-13",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I microwave it for 2 minutes.",
+      "translation": "나는 그것을 2분 동안 전자레인지에 돌린다.",
+      "targetWords": [
+        "microwave"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-13"
+      ]
+    },
+    {
+      "id": "s-breakfast-14",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "The microwave beeps.",
+      "translation": "전자레인지가 삐 소리를 낸다.",
+      "targetWords": [
+        "microwave"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-13"
+      ]
+    },
+    {
+      "id": "s-breakfast-15",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I warm up milk for my dog.",
+      "translation": "나는 우리 강아지를 위해 우유를 데운다.",
+      "targetWords": [
+        "warm up"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-14"
+      ]
+    },
+    {
+      "id": "s-breakfast-16",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "I enjoy my great breakfast.",
+      "translation": "나는 훌륭한 아침을 즐긴다.",
+      "targetWords": [
+        "enjoy",
+        "breakfast"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-15"
+      ]
+    },
+    {
+      "id": "s-breakfast-17",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "Oops! I spill a cup of juice.",
+      "translation": "앗! 나는 주스 한 잔을 흘렸다.",
+      "targetWords": [
+        "spill"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-16"
+      ]
+    },
+    {
+      "id": "s-breakfast-18",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "The toast soaks up the juice.",
+      "translation": "토스트가 주스를 흡수한다.",
+      "targetWords": [
+        "soaks up"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-17"
+      ]
+    },
+    {
+      "id": "s-breakfast-19",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "The tablecloth gets soaked with the juice.",
+      "translation": "식탁보가 주스에 젖는다.",
+      "targetWords": [
+        "soaked"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-17"
+      ]
+    },
+    {
+      "id": "s-breakfast-20",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "The dog licks up the juice that spilled on the floor.",
+      "translation": "강아지가 바닥에 흘린 주스를 핥아먹는다.",
+      "targetWords": [
+        "licks up"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-18"
+      ]
+    },
+    {
+      "id": "s-breakfast-21",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "My sister skips breakfast.",
+      "translation": "내 여동생은 아침을 거른다.",
+      "targetWords": [
+        "skips",
+        "breakfast"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-19"
+      ]
+    },
+    {
+      "id": "s-breakfast-22",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "She doesn't have enough time to eat.",
+      "translation": "그녀는 먹을 충분한 시간이 없다.",
+      "targetWords": [
+        "enough time to"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-20"
+      ]
+    },
+    {
+      "id": "s-breakfast-23",
+      "type": "sentence",
+      "category": "breakfast",
+      "text": "She'll pick up a latte instead.",
+      "translation": "그녀는 대신 라떼를 사올 것이다.",
+      "targetWords": [
+        "pick up",
+        "latte"
+      ],
+      "relatedVocabIds": [
+        "v-breakfast-21",
+        "v-breakfast-22"
+      ]
+    }
+  ],
+  "learningPlan": {
+    "totalDays": 14,
+    "days": [
+      {
+        "day": 1,
+        "title": "학습 방법 소개",
+        "modes": [
+          {
+            "type": "introduction",
+            "contentIds": []
+          }
+        ]
+      },
+      {
+        "day": 2,
+        "title": "훑어보기 (28-141p)",
+        "pageRange": "28_141",
+        "learningMethod": "skim",
+        "modes": [
+          {
+            "type": "skimming-vocab",
+            "displayName": "단어",
+            "contentIds": [
+              "v-wakeup-01",
+              "v-wakeup-02",
+              "v-wakeup-03",
+              "v-wakeup-04",
+              "v-wakeup-05",
+              "v-wakeup-06",
+              "v-wakeup-07",
+              "v-wakeup-08",
+              "v-breakfast-01",
+              "v-breakfast-02",
+              "v-breakfast-03",
+              "v-breakfast-04",
+              "v-breakfast-05",
+              "v-breakfast-06",
+              "v-breakfast-07",
+              "v-breakfast-08",
+              "v-breakfast-09",
+              "v-breakfast-10",
+              "v-breakfast-11",
+              "v-breakfast-12",
+              "v-breakfast-13",
+              "v-breakfast-14",
+              "v-breakfast-15",
+              "v-breakfast-16",
+              "v-breakfast-17",
+              "v-breakfast-18",
+              "v-breakfast-19",
+              "v-breakfast-20",
+              "v-breakfast-21",
+              "v-breakfast-22"
+            ]
+          },
+          {
+            "type": "skimming-sentence",
+            "displayName": "문장",
+            "contentIds": [
+              "s-wakeup-01",
+              "s-wakeup-02",
+              "s-wakeup-03",
+              "s-wakeup-04",
+              "s-breakfast-01",
+              "s-breakfast-02",
+              "s-breakfast-03",
+              "s-breakfast-04",
+              "s-breakfast-05",
+              "s-breakfast-06",
+              "s-breakfast-07",
+              "s-breakfast-08",
+              "s-breakfast-09",
+              "s-breakfast-10",
+              "s-breakfast-11",
+              "s-breakfast-12",
+              "s-breakfast-13",
+              "s-breakfast-14",
+              "s-breakfast-15",
+              "s-breakfast-16",
+              "s-breakfast-17",
+              "s-breakfast-18",
+              "s-breakfast-19",
+              "s-breakfast-20",
+              "s-breakfast-21",
+              "s-breakfast-22",
+              "s-breakfast-23"
+            ]
+          }
+        ]
+      },
+      {
+        "day": 3,
+        "title": "훑어보기 (28-75p)",
+        "pageRange": "28_75",
+        "learningMethod": "skim",
+        "modes": [
+          {
+            "type": "skimming-vocab",
+            "displayName": "단어",
+            "contentIds": [
+              "v-wakeup-01",
+              "v-wakeup-02",
+              "v-wakeup-03",
+              "v-wakeup-04",
+              "v-wakeup-05",
+              "v-wakeup-06",
+              "v-wakeup-07",
+              "v-wakeup-08",
+              "v-breakfast-01",
+              "v-breakfast-02",
+              "v-breakfast-03",
+              "v-breakfast-04",
+              "v-breakfast-05",
+              "v-breakfast-06",
+              "v-breakfast-07",
+              "v-breakfast-08",
+              "v-breakfast-09",
+              "v-breakfast-10",
+              "v-breakfast-11",
+              "v-breakfast-12",
+              "v-breakfast-13",
+              "v-breakfast-14",
+              "v-breakfast-15",
+              "v-breakfast-16",
+              "v-breakfast-17",
+              "v-breakfast-18",
+              "v-breakfast-19",
+              "v-breakfast-20",
+              "v-breakfast-21",
+              "v-breakfast-22"
+            ]
+          },
+          {
+            "type": "skimming-sentence",
+            "displayName": "문장",
+            "contentIds": [
+              "s-wakeup-01",
+              "s-wakeup-02",
+              "s-wakeup-03",
+              "s-wakeup-04",
+              "s-breakfast-01",
+              "s-breakfast-02",
+              "s-breakfast-03",
+              "s-breakfast-04",
+              "s-breakfast-05",
+              "s-breakfast-06",
+              "s-breakfast-07",
+              "s-breakfast-08",
+              "s-breakfast-09",
+              "s-breakfast-10",
+              "s-breakfast-11",
+              "s-breakfast-12",
+              "s-breakfast-13",
+              "s-breakfast-14",
+              "s-breakfast-15",
+              "s-breakfast-16",
+              "s-breakfast-17",
+              "s-breakfast-18",
+              "s-breakfast-19",
+              "s-breakfast-20",
+              "s-breakfast-21",
+              "s-breakfast-22",
+              "s-breakfast-23"
+            ]
+          }
+        ]
+      },
+      {
+        "day": 4,
+        "title": "훑어보기 (76-105p)",
+        "modes": [
+          {
+            "type": "speaking-vocab",
+            "displayName": "단어",
+            "contentIds": []
+          },
+          {
+            "type": "speaking-sentence",
+            "displayName": "문장",
+            "contentIds": []
+          }
+        ]
+      },
+      {
+        "day": 5,
+        "title": "훑어보기 (106-141p)",
+        "modes": [
+          {
+            "type": "speaking-vocab",
+            "displayName": "단어",
+            "contentIds": []
+          },
+          {
+            "type": "speaking-sentence",
+            "displayName": "문장",
+            "contentIds": []
+          }
+        ]
+      },
+      {
+        "day": 6,
+        "title": "말해보기 (142-191p)",
+        "modes": [
+          {
+            "type": "speaking-vocab",
+            "displayName": "단어",
+            "contentIds": [
+              "v-wakeup-01",
+              "v-wakeup-02",
+              "v-wakeup-03",
+              "v-wakeup-04"
+            ]
+          },
+          {
+            "type": "speaking-sentence",
+            "displayName": "문장",
+            "contentIds": [
+              "s-wakeup-01",
+              "s-wakeup-02"
+            ]
+          }
+        ]
+      },
+      {
+        "day": 10,
+        "title": "Wake up (확인하기)",
+        "modes": [
+          {
+            "type": "workbook",
+            "displayName": "워크북",
+            "contentIds": [
+              "w-wakeup-01",
+              "w-wakeup-02"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

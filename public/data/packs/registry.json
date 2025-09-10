@@ -2,15 +2,17 @@
     "availablePacks": [
         {
             "id": "real-voca-basic",
+            "fileName": "real-voca-basic.min.json",
             "enabled": true,
             "priority": 1
         },
         {
             "id": "everyday-convo-3days",
+            "fileName": "everyday-convo-3days.min.json",
             "enabled": true,
             "priority": 2
         }
     ],
-    "version": "1.0.0",
-    "lastUpdated": "2025-09-09"
+    "version": "1.0.1",
+    "lastUpdated": "2025-09-10"
 }

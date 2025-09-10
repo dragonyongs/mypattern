@@ -18,7 +18,6 @@ import { useWorkbookLogic } from "@/hooks/useWorkbookLogic";
 
 import { QuestionCard } from "@/components/workbook/QuestionCard";
 import { AnswerOptions } from "@/components/workbook/AnswerOptions";
-import { ProgressIndicator } from "@/components/workbook/ProgressIndicator";
 import { ActionSection } from "@/components/workbook/ActionSection";
 import StudyNavigation from "@/shared/components/StudyNavigation";
 import { StudySidebar } from "@/shared/components/StudySidebar";

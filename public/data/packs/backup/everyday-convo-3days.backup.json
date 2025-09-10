@@ -1,0 +1,653 @@
+{
+  "id": "everyday-convo-3days",
+  "title": "Everyday English Basics",
+  "subtitle": "3일 만에 가장 자주 쓰는 기초회화 핵심 패턴",
+  "totalDays": 3,
+  "learningMethods": [
+    {
+      "phase": 1,
+      "name": "상상하고",
+      "icon": "Image",
+      "description": "단어를 보며 상황을 떠올리고 이미지로 기억합니다."
+    },
+    {
+      "phase": 2,
+      "name": "훑어보고",
+      "icon": "Search",
+      "description": "이미 아는 표현과 낯선 표현을 구분하며 전체를 빠르게 훑습니다."
+    },
+    {
+      "phase": 3,
+      "name": "말해보고",
+      "icon": "Mic",
+      "description": "짧은 문장을 소리 내어 말하며 입에 익힙니다."
+    },
+    {
+      "phase": 4,
+      "name": "확인하고",
+      "icon": "CheckSquare",
+      "description": "워크북 문제로 핵심 표현과 쓰임을 확인합니다."
+    }
+  ],
+  "categories": [
+    {
+      "id": "greetings",
+      "name": "Greetings & Small Talk",
+      "page": 10
+    },
+    {
+      "id": "at-a-cafe",
+      "name": "At a Cafe",
+      "page": 16
+    },
+    {
+      "id": "directions",
+      "name": "Asking for Directions",
+      "page": 22
+    }
+  ],
+  "contents": [
+    {
+      "id": "v-greet-01",
+      "type": "vocabulary",
+      "category": "greetings",
+      "word": "hey",
+      "meaning": "안녕",
+      "emoji": "👋",
+      "pronunciation": "/heɪ/"
+    },
+    {
+      "id": "v-greet-02",
+      "type": "vocabulary",
+      "category": "greetings",
+      "word": "what's up",
+      "meaning": "무슨 일이야?, 잘 지내?",
+      "emoji": "🤟",
+      "pronunciation": "/wʌts ʌp/"
+    },
+    {
+      "id": "v-greet-03",
+      "type": "vocabulary",
+      "category": "greetings",
+      "word": "how's it going",
+      "meaning": "어떻게 지내?",
+      "emoji": "🙂",
+      "pronunciation": "/haʊz ɪt ˈɡoʊɪŋ/"
+    },
+    {
+      "id": "v-greet-04",
+      "type": "vocabulary",
+      "category": "greetings",
+      "word": "pretty good",
+      "meaning": "꽤 좋아",
+      "emoji": "👍",
+      "pronunciation": "/ˈprɪti ɡʊd/"
+    },
+    {
+      "id": "v-greet-05",
+      "type": "vocabulary",
+      "category": "greetings",
+      "word": "not bad",
+      "meaning": "나쁘지 않아",
+      "emoji": "👌",
+      "pronunciation": "/nɑːt bæd/"
+    },
+    {
+      "id": "v-greet-06",
+      "type": "vocabulary",
+      "category": "greetings",
+      "word": "take care",
+      "meaning": "잘 지내(조심해)",
+      "emoji": "🫶",
+      "pronunciation": "/teɪk ker/"
+    },
+    {
+      "id": "s-greet-01",
+      "type": "sentence",
+      "category": "greetings",
+      "text": "Hey! What's up?",
+      "translation": "안녕! 뭐해?",
+      "targetWords": [
+        "hey",
+        "what's up"
+      ],
+      "relatedVocabIds": [
+        "v-greet-01",
+        "v-greet-02"
+      ]
+    },
+    {
+      "id": "s-greet-02",
+      "type": "sentence",
+      "category": "greetings",
+      "text": "Not bad. How's it going?",
+      "translation": "나쁘지 않아. 어떻게 지내?",
+      "targetWords": [
+        "not bad",
+        "how's it going"
+      ],
+      "relatedVocabIds": [
+        "v-greet-05",
+        "v-greet-03"
+      ]
+    },
+    {
+      "id": "s-greet-03",
+      "type": "sentence",
+      "category": "greetings",
+      "text": "Pretty good. Just heading to work.",
+      "translation": "꽤 좋아. 그냥 출근 중이야.",
+      "targetWords": [
+        "pretty good"
+      ],
+      "relatedVocabIds": [
+        "v-greet-04"
+      ]
+    },
+    {
+      "id": "s-greet-04",
+      "type": "sentence",
+      "category": "greetings",
+      "text": "Okay, take care.",
+      "translation": "알겠어, 잘 지내.",
+      "targetWords": [
+        "take care"
+      ],
+      "relatedVocabIds": [
+        "v-greet-06"
+      ]
+    },
+    {
+      "id": "s-greet-05",
+      "type": "sentence",
+      "category": "greetings",
+      "text": "Hey, how's it going?",
+      "translation": "안녕, 잘 지내?",
+      "targetWords": [
+        "hey",
+        "how's it going"
+      ],
+      "relatedVocabIds": [
+        "v-greet-01",
+        "v-greet-03"
+      ]
+    },
+    {
+      "id": "w-greet-01",
+      "type": "workbook",
+      "category": "greetings",
+      "question": "____! What's up?",
+      "options": [
+        "Hey",
+        "Thanks",
+        "Bye",
+        "Please"
+      ],
+      "correctAnswer": "Hey",
+      "explanation": "'Hey'는 친한 사이에서 자연스러운 인사말입니다.",
+      "relatedSentenceId": "s-greet-01"
+    },
+    {
+      "id": "w-greet-02",
+      "type": "workbook",
+      "category": "greetings",
+      "question": "Not _____. How's it going?",
+      "options": [
+        "bad",
+        "late",
+        "sure",
+        "busy"
+      ],
+      "correctAnswer": "bad",
+      "explanation": "'Not bad'는 '괜찮아'라는 의미의 흔한 응답입니다.",
+      "relatedSentenceId": "s-greet-02"
+    },
+    {
+      "id": "v-cafe-01",
+      "type": "vocabulary",
+      "category": "at-a-cafe",
+      "word": "I'd like",
+      "meaning": "~로 주세요",
+      "emoji": "☕",
+      "pronunciation": "/aɪd laɪk/"
+    },
+    {
+      "id": "v-cafe-02",
+      "type": "vocabulary",
+      "category": "at-a-cafe",
+      "word": "to go",
+      "meaning": "포장(가지고 가기)",
+      "emoji": "👜",
+      "pronunciation": "/tuː ɡoʊ/"
+    },
+    {
+      "id": "v-cafe-03",
+      "type": "vocabulary",
+      "category": "at-a-cafe",
+      "word": "for here",
+      "meaning": "매장에서 먹기",
+      "emoji": "🪑",
+      "pronunciation": "/fɔːr hɪr/"
+    },
+    {
+      "id": "v-cafe-04",
+      "type": "vocabulary",
+      "category": "at-a-cafe",
+      "word": "iced",
+      "meaning": "아이스",
+      "emoji": "🧊",
+      "pronunciation": "/aɪst/"
+    },
+    {
+      "id": "v-cafe-05",
+      "type": "vocabulary",
+      "category": "at-a-cafe",
+      "word": "hot",
+      "meaning": "뜨거운",
+      "emoji": "🔥",
+      "pronunciation": "/hɑːt/"
+    },
+    {
+      "id": "v-cafe-06",
+      "type": "vocabulary",
+      "category": "at-a-cafe",
+      "word": "receipt",
+      "meaning": "영수증",
+      "emoji": "🧾",
+      "pronunciation": "/rɪˈsiːt/"
+    },
+    {
+      "id": "s-cafe-01",
+      "type": "sentence",
+      "category": "at-a-cafe",
+      "text": "Hi, I'd like a small latte, please.",
+      "translation": "안녕하세요, 라테 작은 걸로 주세요.",
+      "targetWords": [
+        "I'd like"
+      ],
+      "relatedVocabIds": [
+        "v-cafe-01"
+      ]
+    },
+    {
+      "id": "s-cafe-02",
+      "type": "sentence",
+      "category": "at-a-cafe",
+      "text": "Iced or hot?",
+      "translation": "아이스로 드릴까요, 뜨겁게 드릴까요?",
+      "targetWords": [
+        "iced",
+        "hot"
+      ],
+      "relatedVocabIds": [
+        "v-cafe-04",
+        "v-cafe-05"
+      ]
+    },
+    {
+      "id": "s-cafe-03",
+      "type": "sentence",
+      "category": "at-a-cafe",
+      "text": "Iced, please. For here.",
+      "translation": "아이스로 주세요. 매장에서 먹을게요.",
+      "targetWords": [
+        "iced",
+        "for here"
+      ],
+      "relatedVocabIds": [
+        "v-cafe-04",
+        "v-cafe-03"
+      ]
+    },
+    {
+      "id": "s-cafe-04",
+      "type": "sentence",
+      "category": "at-a-cafe",
+      "text": "Make it to go.",
+      "translation": "포장해 주세요.",
+      "targetWords": [
+        "to go"
+      ],
+      "relatedVocabIds": [
+        "v-cafe-02"
+      ]
+    },
+    {
+      "id": "s-cafe-05",
+      "type": "sentence",
+      "category": "at-a-cafe",
+      "text": "Do you need the receipt?",
+      "translation": "영수증 필요하세요?",
+      "targetWords": [
+        "receipt"
+      ],
+      "relatedVocabIds": [
+        "v-cafe-06"
+      ]
+    },
+    {
+      "id": "w-cafe-01",
+      "type": "workbook",
+      "category": "at-a-cafe",
+      "question": "I'd _____ a medium coffee.",
+      "options": [
+        "like",
+        "love",
+        "prefer",
+        "drink"
+      ],
+      "correctAnswer": "like",
+      "explanation": "'I'd like'는 공손한 주문 표현입니다.",
+      "relatedSentenceId": "s-cafe-01"
+    },
+    {
+      "id": "w-cafe-02",
+      "type": "workbook",
+      "category": "at-a-cafe",
+      "question": "Make it _____. I'm in a hurry.",
+      "options": [
+        "to go",
+        "for here",
+        "iced",
+        "hot"
+      ],
+      "correctAnswer": "to go",
+      "explanation": "'to go'는 포장을 의미합니다.",
+      "relatedSentenceId": "s-cafe-04"
+    },
+    {
+      "id": "v-dir-01",
+      "type": "vocabulary",
+      "category": "directions",
+      "word": "excuse me",
+      "meaning": "실례합니다",
+      "emoji": "🙋",
+      "pronunciation": "/ɪkˈskjuːz miː/"
+    },
+    {
+      "id": "v-dir-02",
+      "type": "vocabulary",
+      "category": "directions",
+      "word": "look for",
+      "meaning": "~을 찾다",
+      "emoji": "🔎",
+      "pronunciation": "/lʊk fɔːr/"
+    },
+    {
+      "id": "v-dir-03",
+      "type": "vocabulary",
+      "category": "directions",
+      "word": "get to",
+      "meaning": "~에 가다, 도착하다",
+      "emoji": "📍",
+      "pronunciation": "/ɡet tuː/"
+    },
+    {
+      "id": "v-dir-04",
+      "type": "vocabulary",
+      "category": "directions",
+      "word": "go straight",
+      "meaning": "쭉 가다",
+      "emoji": "➡️",
+      "pronunciation": "/ɡoʊ streɪt/"
+    },
+    {
+      "id": "v-dir-05",
+      "type": "vocabulary",
+      "category": "directions",
+      "word": "turn left",
+      "meaning": "왼쪽으로 돌다",
+      "emoji": "⬅️",
+      "pronunciation": "/tɜːrn left/"
+    },
+    {
+      "id": "v-dir-06",
+      "type": "vocabulary",
+      "category": "directions",
+      "word": "turn right",
+      "meaning": "오른쪽으로 돌다",
+      "emoji": "➡️",
+      "pronunciation": "/tɜːrn raɪt/"
+    },
+    {
+      "id": "s-dir-01",
+      "type": "sentence",
+      "category": "directions",
+      "text": "Excuse me, I'm looking for the subway station.",
+      "translation": "실례합니다, 지하철역을 찾고 있어요.",
+      "targetWords": [
+        "excuse me",
+        "looking for"
+      ],
+      "relatedVocabIds": [
+        "v-dir-01",
+        "v-dir-02"
+      ]
+    },
+    {
+      "id": "s-dir-02",
+      "type": "sentence",
+      "category": "directions",
+      "text": "How do I get to City Hall?",
+      "translation": "시청에는 어떻게 가나요?",
+      "targetWords": [
+        "get to"
+      ],
+      "relatedVocabIds": [
+        "v-dir-03"
+      ]
+    },
+    {
+      "id": "s-dir-03",
+      "type": "sentence",
+      "category": "directions",
+      "text": "Go straight and turn left at the next street.",
+      "translation": "쭉 가다가 다음 길에서 좌회전하세요.",
+      "targetWords": [
+        "go straight",
+        "turn left"
+      ],
+      "relatedVocabIds": [
+        "v-dir-04",
+        "v-dir-05"
+      ]
+    },
+    {
+      "id": "s-dir-04",
+      "type": "sentence",
+      "category": "directions",
+      "text": "Then turn right at the corner.",
+      "translation": "그다음 모퉁이에서 우회전하세요.",
+      "targetWords": [
+        "turn right"
+      ],
+      "relatedVocabIds": [
+        "v-dir-06"
+      ]
+    },
+    {
+      "id": "s-dir-05",
+      "type": "sentence",
+      "category": "directions",
+      "text": "Go straight for two blocks, then turn left.",
+      "translation": "두 블록을 쭉 가서 왼쪽으로 도세요.",
+      "targetWords": [
+        "go straight",
+        "turn left"
+      ],
+      "relatedVocabIds": [
+        "v-dir-04",
+        "v-dir-05"
+      ]
+    },
+    {
+      "id": "w-dir-01",
+      "type": "workbook",
+      "category": "directions",
+      "question": "_____, is there a bank near here?",
+      "options": [
+        "Excuse me",
+        "Hey you",
+        "Sorry",
+        "Hello"
+      ],
+      "correctAnswer": "Excuse me",
+      "explanation": "길을 물을 때 공손하게 'Excuse me'로 시작합니다.",
+      "relatedSentenceId": "s-dir-01"
+    },
+    {
+      "id": "w-dir-02",
+      "type": "workbook",
+      "category": "directions",
+      "question": "Go _____ and turn left at the light.",
+      "options": [
+        "straight",
+        "ahead",
+        "forward",
+        "through"
+      ],
+      "correctAnswer": "straight",
+      "explanation": "'go straight'는 방향 안내의 가장 기본 표현입니다.",
+      "relatedSentenceId": "s-dir-03"
+    }
+  ],
+  "learningPlan": {
+    "totalDays": 3,
+    "days": [
+      {
+        "day": 1,
+        "title": "훑어보기 (전 범위)",
+        "pageRange": "10_24",
+        "learningMethod": "skim",
+        "modes": [
+          {
+            "type": "skimming-vocab",
+            "displayName": "단어",
+            "contentIds": [
+              "v-greet-01",
+              "v-greet-02",
+              "v-greet-03",
+              "v-greet-04",
+              "v-greet-05",
+              "v-greet-06",
+              "v-cafe-01",
+              "v-cafe-02",
+              "v-cafe-03",
+              "v-cafe-04",
+              "v-cafe-05",
+              "v-cafe-06",
+              "v-dir-01",
+              "v-dir-02",
+              "v-dir-03",
+              "v-dir-04",
+              "v-dir-05",
+              "v-dir-06"
+            ]
+          },
+          {
+            "type": "skimming-sentence",
+            "displayName": "문장",
+            "contentIds": [
+              "s-greet-01",
+              "s-greet-02",
+              "s-greet-03",
+              "s-greet-04",
+              "s-greet-05",
+              "s-cafe-01",
+              "s-cafe-02",
+              "s-cafe-03",
+              "s-cafe-04",
+              "s-cafe-05",
+              "s-dir-01",
+              "s-dir-02",
+              "s-dir-03",
+              "s-dir-04",
+              "s-dir-05"
+            ]
+          }
+        ]
+      },
+      {
+        "day": 2,
+        "title": "말해보기 (인사·카페)",
+        "modes": [
+          {
+            "type": "speaking-vocab",
+            "displayName": "단어 말하기",
+            "contentIds": [
+              "v-greet-01",
+              "v-greet-02",
+              "v-greet-03",
+              "v-greet-04",
+              "v-greet-05",
+              "v-greet-06",
+              "v-cafe-01",
+              "v-cafe-02",
+              "v-cafe-03",
+              "v-cafe-04",
+              "v-cafe-05",
+              "v-cafe-06"
+            ]
+          },
+          {
+            "type": "speaking-sentence",
+            "displayName": "문장 말하기",
+            "contentIds": [
+              "s-greet-01",
+              "s-greet-02",
+              "s-greet-03",
+              "s-greet-04",
+              "s-greet-05",
+              "s-cafe-01",
+              "s-cafe-02",
+              "s-cafe-03",
+              "s-cafe-04",
+              "s-cafe-05"
+            ]
+          }
+        ]
+      },
+      {
+        "day": 3,
+        "title": "말해보기+확인 (길찾기)",
+        "modes": [
+          {
+            "type": "speaking-vocab",
+            "displayName": "단어 말하기",
+            "contentIds": [
+              "v-dir-01",
+              "v-dir-02",
+              "v-dir-03",
+              "v-dir-04",
+              "v-dir-05",
+              "v-dir-06"
+            ]
+          },
+          {
+            "type": "speaking-sentence",
+            "displayName": "문장 말하기",
+            "contentIds": [
+              "s-dir-01",
+              "s-dir-02",
+              "s-dir-03",
+              "s-dir-04",
+              "s-dir-05"
+            ]
+          },
+          {
+            "type": "workbook",
+            "displayName": "워크북",
+            "contentIds": [
+              "w-greet-01",
+              "w-greet-02",
+              "w-cafe-01",
+              "w-cafe-02",
+              "w-dir-01",
+              "w-dir-02"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,5 +1,13 @@
 // src/shared/services/packDataService.ts
 import type { PackData, ContentItem, DayPlan } from "@/types";
+import {
+  generateWorkbookFromSentence,
+  GeneratedWorkbook,
+} from "@/shared/utils/packUtils";
+
+type PackDataWithGenerated = PackData & {
+  generatedWorkbooks?: GeneratedWorkbook[];
+};
 
 interface PackRegistry {
   availablePacks: Array<{
@@ -128,33 +136,82 @@ class PackDataService {
     }
   }
 
+  // helper: 문장 기반으로 generatedWorkbooks를 만든다 (캐시)
+  private ensureGeneratedWorkbooks(data: PackDataWithGenerated) {
+    if (data.generatedWorkbooks && data.generatedWorkbooks.length > 0) return;
+
+    const sentences = data.contents.filter((c) => c.type === "sentence");
+    const generated: GeneratedWorkbook[] = [];
+    for (const s of sentences) {
+      const ws = generateWorkbookFromSentence(s as any, data.contents);
+      generated.push(...ws);
+    }
+    data.generatedWorkbooks = generated;
+    // 로그
+    console.log(
+      `🧩 Generated ${generated.length} workbooks from sentences for pack ${data.id}`
+    );
+  }
+
   // 🔥 개선된 팩 데이터 로드
   async loadPackData(packId: string): Promise<PackData> {
-    if (this.cache.has(packId)) {
-      return this.cache.get(packId)!;
-    }
-
-    if (this.loadingPromises.has(packId)) {
+    if (this.cache.has(packId)) return this.cache.get(packId)!;
+    if (this.loadingPromises.has(packId))
       return this.loadingPromises.get(packId)!;
-    }
 
-    const promise = fetch(`/data/packs/${packId}.json`)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Pack ${packId} not found (${response.status})`);
+    // 시도할 후보 경로들 (우선순위)
+    const candidates = [
+      `/data/packs/${packId}.json`,
+      `/data/packs/${packId}.min.json`,
+      `/data/packs/${packId}-minimal.json`,
+    ];
+
+    const tryFetchSequential = async () => {
+      let lastErr: any = null;
+      for (const url of candidates) {
+        try {
+          console.debug(`[packDataService] trying to fetch pack:`, url);
+          const resp = await fetch(url);
+          if (!resp.ok) {
+            lastErr = new Error(`Fetch ${url} failed (${resp.status})`);
+            continue; // 다음 후보 시도
+          }
+          const data: PackDataWithGenerated = await resp.json();
+
+          // 최소 유효성 검사
+          if (!data.id || !data.title || !data.contents || !data.learningPlan) {
+            throw new Error(
+              `Invalid pack data structure for ${packId} at ${url}`
+            );
+          }
+
+          // 성공하면 해당 data와 url 반환
+          return { data, url };
+        } catch (e) {
+          lastErr = e;
+          console.warn(`[packDataService] fetch failed for ${url}:`, e);
+          // 다음 후보로 계속
         }
-        return response.json();
-      })
-      .then((data: PackData) => {
-        // 데이터 유효성 검증
-        if (!data.id || !data.title || !data.contents || !data.learningPlan) {
-          throw new Error(`Invalid pack data structure for ${packId}`);
+      }
+      throw lastErr;
+    };
+
+    const promise = tryFetchSequential()
+      .then(({ data, url }) => {
+        try {
+          // 1) generatedWorkbooks 생성
+          this.ensureGeneratedWorkbooks(data);
+
+          // 2) learningPlan 보정: w-* → generatedWorkbooks / sentence 기반으로 치환
+          this.ensureLearningPlanHasWorkbooks(data); // ← add this line
+        } catch (e) {
+          console.warn("⚠️ 워크북/학습플랜 후처리 중 오류 발생:", e);
         }
 
         this.cache.set(packId, data);
         this.loadingPromises.delete(packId);
         console.log(
-          `✅ Pack data loaded: ${packId} (${data.contents.length} items)`
+          `✅ Pack data loaded: ${packId} from ${url} (${data.contents.length} items)`
         );
         return data;
       })
@@ -166,6 +223,135 @@ class PackDataService {
 
     this.loadingPromises.set(packId, promise);
     return promise;
+  }
+
+  // ensureLearningPlanHasWorkbooks 개선판
+  private ensureLearningPlanHasWorkbooks(data: PackDataWithGenerated) {
+    if (!data.learningPlan || !Array.isArray(data.learningPlan.days)) return;
+
+    // ensure generated are created
+    if (!data.generatedWorkbooks || data.generatedWorkbooks.length === 0) {
+      try {
+        this.ensureGeneratedWorkbooks(data);
+      } catch (e) {
+        console.warn("ensureGeneratedWorkbooks failed:", e);
+      }
+    }
+
+    const genBySentence = new Map<string, GeneratedWorkbook[]>();
+    for (const g of data.generatedWorkbooks || []) {
+      const key = g.relatedSentenceId;
+      if (!genBySentence.has(key)) genBySentence.set(key, []);
+      genBySentence.get(key)!.push(g);
+    }
+
+    // fast lookup sets
+    const contentIdSet = new Set((data.contents || []).map((c) => c.id));
+    const sentenceIdSet = new Set(
+      (data.contents || [])
+        .filter((c) => c.type === "sentence")
+        .map((s) => s.id)
+    );
+
+    let mutated = false;
+
+    for (const day of data.learningPlan.days) {
+      day.modes = day.modes || [];
+
+      // 1) 기존 modes에서 workbook type이 있고 contentIds중 없는 id가 있는 경우 교정 시도
+      for (const mode of day.modes) {
+        if (!mode.contentIds || !Array.isArray(mode.contentIds)) continue;
+        const newIds: string[] = [];
+        let changedInMode = false;
+
+        for (const id of mode.contentIds) {
+          if (contentIdSet.has(id)) {
+            // 존재하면 그대로
+            newIds.push(id);
+            continue;
+          }
+
+          // 2) 누락된 id 처리: 만약 'w-...' 형식이면 's-...'로 시도해본다
+          if (typeof id === "string" && id.startsWith("w-")) {
+            const candidate = id.replace(/^w-/, "s-");
+            if (sentenceIdSet.has(candidate)) {
+              // sentence가 있으면 그 sentence 기반의 generatedWorkbooks로 치환
+              const gList = genBySentence.get(candidate) || [];
+              if (gList.length > 0) {
+                for (const g of gList) newIds.push(g.id);
+                changedInMode = true;
+                continue;
+              } else {
+                // sentence는 있으나 generatedWorkbooks가 없으면 그냥 push sentence id (fallback)
+                newIds.push(candidate);
+                changedInMode = true;
+                continue;
+              }
+            }
+          }
+
+          // 3) 마지막 fallback: id가 없고 대응 못하면 무시(로깅)
+          console.warn(
+            `ensureLearningPlanHasWorkbooks: missing contentId "${id}" in pack ${data.id}, day ${day.day}.`
+          );
+          // don't push missing id
+          changedInMode = true;
+        } // end for contentIds
+
+        if (changedInMode) {
+          mode.contentIds = newIds;
+          mutated = true;
+          console.log(
+            `Patched mode for day ${day.day} (type=${mode.type}): replaced missing workbook ids -> ${newIds.length} items.`
+          );
+        }
+      } // end for mode
+
+      // 4) 만약 workbook 모드 자체가 없고 day에 sentence ids가 있으면 새로 만들어 붙임
+      const hasWorkbookMode = day.modes.some((m: any) => m.type === "workbook");
+      if (!hasWorkbookMode) {
+        // collect sentence ids for this day
+        const sentenceIds = new Set<string>();
+        for (const mode of day.modes) {
+          const contentIds: string[] = mode.contentIds || mode.items || [];
+          for (const cid of contentIds) {
+            if (typeof cid === "string" && sentenceIdSet.has(cid))
+              sentenceIds.add(cid);
+            // also if it's a w-... and maps to s-..., add that
+            if (typeof cid === "string" && cid.startsWith("w-")) {
+              const cand = cid.replace(/^w-/, "s-");
+              if (sentenceIdSet.has(cand)) sentenceIds.add(cand);
+            }
+          }
+        }
+
+        if (sentenceIds.size > 0) {
+          const genIds: string[] = [];
+          for (const sid of sentenceIds) {
+            const arr = genBySentence.get(sid) || [];
+            for (const g of arr) genIds.push(g.id);
+          }
+          if (genIds.length > 0) {
+            day.modes.push({
+              type: "workbook",
+              displayName: "워크북 (자동생성)",
+              contentIds: genIds,
+            });
+            mutated = true;
+            console.log(
+              `Added runtime workbook mode to day ${day.day} with ${genIds.length} generated items.`
+            );
+          }
+        }
+      }
+    } // end for days
+
+    if (mutated) {
+      console.log(
+        "🔧 ensureLearningPlanHasWorkbooks: learningPlan patched for pack",
+        data.id
+      );
+    }
   }
 
   // 🔥 팩 존재 여부 확인
@@ -213,9 +399,26 @@ class PackDataService {
     return packData.learningPlan.days.find((d) => d.day === day) || null;
   }
 
-  getContentsByIds(packData: PackData, ids: string[]): ContentItem[] {
+  getContentsByIds(
+    packData: PackDataWithGenerated,
+    ids: string[]
+  ): ContentItem[] {
     const contentMap = new Map(packData.contents.map((c) => [c.id, c]));
-    return ids.map((id) => contentMap.get(id)).filter(Boolean) as ContentItem[];
+    // generatedWorkbooks도 맵으로
+    const genMap = new Map(
+      (packData.generatedWorkbooks || []).map((g) => [g.id, g])
+    );
+    return ids
+      .map((id) => contentMap.get(id) ?? genMap.get(id))
+      .filter(Boolean) as ContentItem[];
+  }
+
+  getAllWorkbooks(packData: PackDataWithGenerated) {
+    const orig = packData.contents.filter(
+      (c) => c.type === "workbook"
+    ) as any[];
+    const gen = packData.generatedWorkbooks || [];
+    return [...orig, ...gen];
   }
 
   // 🔥 캐시 관리
@@ -239,3 +442,10 @@ class PackDataService {
 }
 
 export const packDataService = new PackDataService();
+
+// dev helper: expose for debug console
+if (process.env.NODE_ENV !== "production") {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  (window as any).packDataService = packDataService;
+}

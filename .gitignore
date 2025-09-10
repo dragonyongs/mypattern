@@ -40,3 +40,4 @@ dist-ssr
 !tsconfig.json
 !tsconfig.node.json
 !/public/data/packs/*.json
+!/public/data/packs/backup/*.json
