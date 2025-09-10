@@ -23,6 +23,7 @@ import { useStudyProgressStore } from "@/stores/studyProgressStore";
 
 import StudyNavigation from "@/shared/components/StudyNavigation";
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
+import ActionButtons from "@/shared/components/ActionButtons";
 
 interface SentenceItem {
   id: string;
@@ -489,21 +490,14 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
 
             {/* Action */}
             <div className="mt-6">
-              {masteredCards.has(currentIndex) ? (
-                <button
-                  onClick={handleMarkAsNotMastered}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-200 text-gray-700 rounded-xl font-medium transition-all hover:bg-gray-300"
-                >
-                  <RotateCcw className="w-4 h-4" /> 다시 학습
-                </button>
-              ) : (
-                <button
-                  onClick={handleMarkAsMastered}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 text-white rounded-xl font-medium transition-all hover:bg-indigo-700"
-                >
-                  <Check className="w-4 h-4" /> 학습 완료
-                </button>
-              )}
+              <ActionButtons
+                isAnswered={masteredCards.has(currentIndex)}
+                canCheck={true}
+                onCheck={handleMarkAsMastered}
+                onRetry={handleMarkAsNotMastered}
+                checkText="학습 완료"
+                retryText="다시 학습"
+              />
             </div>
 
             {/* Complete */}

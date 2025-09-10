@@ -7,6 +7,7 @@ import React, {
   useRef,
 } from "react";
 import { PenTool, Check, RotateCcw } from "lucide-react";
+import { WORKBOOK_MESSAGES } from "@/constants/workbook.constants";
 
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
@@ -23,6 +24,7 @@ import StudyNavigation from "@/shared/components/StudyNavigation";
 import { StudySidebar } from "@/shared/components/StudySidebar";
 
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
+import ActionButtons from "@/shared/components/ActionButtons";
 
 import { shuffleWorkbookData } from "@/utils/workbook.utils";
 import type { WorkbookModeProps } from "@/types/workbook.types";
@@ -419,38 +421,37 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                       onSelect={handleAnswerSelect}
                     />
 
-                    <ActionSection
-                      isAnswered={isCurrentAnswered}
-                      isCorrect={isCurrentCorrect}
-                      correctAnswer={getCorrectAnswer(currentQuestion)}
-                      studyMode={localSettings.studyMode}
-                      showMeaningEnabled={localSettings.showMeaningEnabled}
-                      explanation={currentQuestion.explanation}
-                      showExplanation={showExplanation[currentIndex]}
-                      onToggleExplanation={handleToggleExplanation}
-                    />
+                    {!isCurrentAnswered && (
+                      <div className="text-center text-gray-400 text-sm">
+                        {
+                          WORKBOOK_MESSAGES.STUDY_HINTS[
+                            localSettings.studyMode.toUpperCase() as keyof typeof WORKBOOK_MESSAGES.STUDY_HINTS
+                          ]
+                        }
+                      </div>
+                    )}
+
+                    {isCurrentAnswered && (
+                      <ActionSection
+                        isCorrect={isCurrentCorrect}
+                        correctAnswer={getCorrectAnswer(currentQuestion)}
+                        studyMode={localSettings.studyMode}
+                        showMeaningEnabled={localSettings.showMeaningEnabled}
+                        explanation={currentQuestion.explanation}
+                        showExplanation={showExplanation[currentIndex]}
+                        onToggleExplanation={handleToggleExplanation}
+                      />
+                    )}
                   </QuestionCard>
                 </div>
 
-                <div className="mt-4">
-                  {!isCurrentAnswered ? (
-                    <button
-                      onClick={handleCheckAnswer}
-                      disabled={!selectedAnswers[currentIndex]}
-                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all"
-                    >
-                      <Check className="w-4 h-4" />
-                      정답 확인
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleRetry}
-                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-all"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      다시 풀기
-                    </button>
-                  )}
+                <div className="mt-6">
+                  <ActionButtons
+                    isAnswered={isCurrentAnswered}
+                    canCheck={!!selectedAnswers[currentIndex]}
+                    onCheck={handleCheckAnswer}
+                    onRetry={handleRetry}
+                  />
                 </div>
 
                 {isAllAnswered && (
