@@ -6,10 +6,11 @@ import {
   Book,
   Clock,
   Star,
-  CheckCircle,
+  CheckCircle2,
   AlertCircle,
   RefreshCcw,
   Loader2,
+  BarChart3,
 } from "lucide-react";
 
 import { useAppStore } from "@/stores/appStore";
@@ -20,7 +21,6 @@ import type { PackMetadata } from "@/shared/hooks/usePackData";
 const PackSelectPage: React.FC = () => {
   const navigate = useNavigate();
 
-  // 🔥 새로운 동적 훅 사용
   const { packs, loading, error, refetch } = useAvailablePacks();
 
   const {
@@ -37,17 +37,15 @@ const PackSelectPage: React.FC = () => {
 
   // 팩 선택 핸들러
   const handlePackSelect = async (packId: string) => {
-    if (selecting) return; // 중복 선택 방지
+    if (selecting) return;
 
     try {
       setSelecting(packId);
       console.log(`🎯 Selecting pack: ${packId}`);
 
-      // 팩 데이터 로드
       const packData = await loadPackById(packId);
 
       if (packData) {
-        // 진행 상황 확인하여 적절한 날짜로 이동
         const progress = getPackProgress(packId);
         const targetDay = progress?.lastStudiedDay || 1;
 
@@ -77,27 +75,41 @@ const PackSelectPage: React.FC = () => {
     return { completedDays, percentage, lastDay };
   };
 
-  // 레벨별 색상
-  const getLevelColor = (level?: string) => {
+  // 레벨별 스타일 - 미니멀하게 수정
+  const getLevelStyle = (level?: string) => {
     switch (level) {
       case "beginner":
-        return "bg-green-100 text-green-700";
+        return "bg-slate-100 text-slate-700";
       case "intermediate":
-        return "bg-yellow-100 text-yellow-700";
+        return "bg-slate-100 text-slate-700";
       case "advanced":
-        return "bg-red-100 text-red-700";
+        return "bg-slate-100 text-slate-700";
       default:
-        return "bg-gray-100 text-gray-700";
+        return "bg-slate-100 text-slate-700";
+    }
+  };
+
+  // 레벨 라벨
+  const getLevelLabel = (level?: string) => {
+    switch (level) {
+      case "beginner":
+        return "초급";
+      case "intermediate":
+        return "중급";
+      case "advanced":
+        return "고급";
+      default:
+        return level;
     }
   };
 
   // 로딩 상태
   if (!_hasHydrated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-600">앱 데이터 로딩 중...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-300 border-t-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-600">앱 데이터 로딩 중...</p>
         </div>
       </div>
     );
@@ -105,62 +117,54 @@ const PackSelectPage: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-4" />
-          <p className="text-gray-600">로그인이 필요합니다...</p>
+          <p className="text-slate-600">로그인이 필요합니다...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-blue-50">
+    <div className="min-h-screen bg-slate-50">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
         {/* 헤더 */}
-        <div className="flex items-center gap-4 mb-8">
-          {/* <button
-            onClick={() => navigate("/")}
-            className="p-2 hover:bg-white/50 rounded-full transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6 text-gray-700" />
-          </button> */}
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              학습할 팩을 선택하세요
-            </h1>
-            <p className="text-gray-600 mt-1">
-              각 팩은 체계적인 학습 계획과 다양한 학습 모드를 제공합니다.
-            </p>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">
+            학습할 팩을 선택하세요
+          </h1>
+          <p className="text-slate-600">
+            각 팩은 체계적인 학습 계획과 다양한 학습 모드를 제공합니다.
+          </p>
         </div>
 
         {/* 로딩 상태 */}
         {loading && (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-4" />
-              <p className="text-gray-600">학습팩을 불러오고 있습니다...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-300 border-t-blue-500 mx-auto mb-4"></div>
+              <p className="text-slate-600">학습팩을 불러오고 있습니다...</p>
             </div>
           </div>
         )}
 
         {/* 에러 상태 */}
         {error && !loading && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+          <div className="bg-white border border-slate-200 rounded-lg p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">
               <AlertCircle className="w-5 h-5 text-red-500" />
-              <h3 className="font-medium text-red-900">오류 발생</h3>
+              <h3 className="font-semibold text-slate-900">오류 발생</h3>
             </div>
-            <p className="text-red-700 mb-4">{error}</p>
-            <div className="text-sm text-red-600 mb-4">
+            <p className="text-slate-700 mb-4">{error}</p>
+            <div className="text-sm text-slate-600 mb-4 space-y-1">
               <p>• src/data/packs/registry.json 파일이 올바른지 확인해주세요</p>
               <p>• 해당 폴더에 JSON 팩 파일들이 있는지 확인해주세요</p>
               <p>• 로드된 팩 수: {packs?.length || 0}</p>
             </div>
             <button
               onClick={refetch}
-              className="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
             >
               <RefreshCcw className="w-4 h-4" />
               다시 시도
@@ -171,19 +175,19 @@ const PackSelectPage: React.FC = () => {
         {/* 팩이 없는 경우 */}
         {!loading && !error && packs.length === 0 && (
           <div className="text-center py-12">
-            <Book className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <Book className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">
               표시할 학습팩이 없습니다
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-slate-600 mb-4">
               src/data/packs 폴더에 JSON 팩 파일을 추가해 주세요.
             </p>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-slate-500 mb-4">
               로드된 팩 수: {packs?.length || 0}
             </div>
             <button
               onClick={refetch}
-              className="mt-4 flex items-center gap-2 px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg transition-colors mx-auto"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors mx-auto"
             >
               <RefreshCcw className="w-4 h-4" />
               새로고침
@@ -198,25 +202,26 @@ const PackSelectPage: React.FC = () => {
               const progressInfo = getPackProgressInfo(pack.id, pack.totalDays);
               const isSelected = selectedPackData?.id === pack.id;
               const isSelecting = selecting === pack.id;
+              const hasProgress = progressInfo.percentage > 0;
 
               return (
                 <div
                   key={pack.id}
                   className={`
-                    bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden border-2
+                    bg-white rounded-lg border-2 transition-all duration-200 overflow-hidden
                     ${
                       isSelected
-                        ? "border-indigo-500"
-                        : "border-transparent hover:border-indigo-200"
+                        ? "border-blue-500 shadow-lg"
+                        : "border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-md"
                     }
                     ${isSelecting ? "opacity-75" : ""}
                   `}
                 >
                   {/* 진행률 바 */}
-                  {progressInfo.percentage > 0 && (
-                    <div className="h-1 bg-gray-200">
+                  {hasProgress && (
+                    <div className="h-1 bg-slate-200">
                       <div
-                        className="h-1 bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all duration-500"
+                        className="h-1 bg-blue-500 transition-all duration-500"
                         style={{ width: `${progressInfo.percentage}%` }}
                       />
                     </div>
@@ -225,39 +230,42 @@ const PackSelectPage: React.FC = () => {
                   <div className="p-6">
                     {/* 헤더 */}
                     <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-bold text-slate-900 mb-1 truncate">
                           {pack.title || "제목 없음"}
                         </h3>
-                        <p className="text-gray-600 text-sm leading-relaxed">
+                        <p className="text-sm text-slate-600 leading-relaxed line-clamp-2">
                           {pack.subtitle || pack.description || "설명 없음"}
                         </p>
                       </div>
 
                       {isSelected && (
-                        <CheckCircle className="w-6 h-6 text-indigo-500 ml-4 flex-shrink-0" />
+                        <CheckCircle2 className="w-5 h-5 text-blue-500 ml-4 flex-shrink-0" />
                       )}
                     </div>
 
                     {/* 메타 정보 */}
-                    <div className="flex items-center gap-4 mb-4 text-sm text-gray-500">
-                      <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="flex items-center gap-1.5 text-sm text-slate-600">
                         <Clock className="w-4 h-4" />
                         <span>{pack.totalDays}일 과정</span>
                       </div>
 
                       {pack.level && (
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${getLevelColor(
+                          className={`px-2 py-1 rounded text-xs font-medium ${getLevelStyle(
                             pack.level
                           )}`}
                         >
-                          {pack.level === "beginner"
-                            ? "초급"
-                            : pack.level === "intermediate"
-                            ? "중급"
-                            : "고급"}
+                          {getLevelLabel(pack.level)}
                         </span>
+                      )}
+
+                      {hasProgress && (
+                        <div className="flex items-center gap-1.5 text-sm text-emerald-600">
+                          <BarChart3 className="w-4 h-4" />
+                          <span>{progressInfo.percentage}%</span>
+                        </div>
                       )}
                     </div>
 
@@ -267,7 +275,7 @@ const PackSelectPage: React.FC = () => {
                         {pack.tags.slice(0, 3).map((tag, index) => (
                           <span
                             key={index}
-                            className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-xs"
+                            className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium"
                           >
                             {tag}
                           </span>
@@ -276,17 +284,17 @@ const PackSelectPage: React.FC = () => {
                     )}
 
                     {/* 진행 상황 */}
-                    {progressInfo.percentage > 0 && (
-                      <div className="mb-4 p-3 bg-indigo-50 rounded-lg">
+                    {hasProgress && (
+                      <div className="mb-4 p-3 bg-slate-50 rounded-lg">
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-indigo-700 font-medium">
+                          <span className="text-slate-700 font-medium">
                             진행률: {progressInfo.percentage}%
                           </span>
-                          <span className="text-indigo-600">
+                          <span className="text-slate-600">
                             {progressInfo.completedDays}/{pack.totalDays}일 완료
                           </span>
                         </div>
-                        <div className="text-xs text-indigo-600 mt-1">
+                        <div className="text-xs text-slate-500 mt-1">
                           마지막 학습: Day {progressInfo.lastDay}
                         </div>
                       </div>
@@ -297,14 +305,16 @@ const PackSelectPage: React.FC = () => {
                       onClick={() => handlePackSelect(pack.id)}
                       disabled={isSelecting}
                       className={`
-                        w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200
+                        w-full py-3 px-4 rounded-lg font-medium transition-all duration-200
+                        flex items-center justify-center gap-2
                         ${
                           isSelected
-                            ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                            : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                            ? "bg-blue-600 text-white hover:bg-blue-700"
+                            : hasProgress
+                            ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                            : "bg-slate-900 text-white hover:bg-slate-800"
                         }
                         disabled:opacity-50 disabled:cursor-not-allowed
-                        flex items-center justify-center gap-2
                       `}
                     >
                       {isSelecting ? (
@@ -314,7 +324,7 @@ const PackSelectPage: React.FC = () => {
                         </>
                       ) : isSelected ? (
                         "현재 선택된 팩"
-                      ) : progressInfo.percentage > 0 ? (
+                      ) : hasProgress ? (
                         "이어서 학습하기"
                       ) : (
                         "학습 시작하기"
@@ -326,12 +336,12 @@ const PackSelectPage: React.FC = () => {
             })}
 
             {/* 새로운 팩 추가 예정 카드 */}
-            <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
-              <div className="text-gray-400 mb-3">
+            <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
+              <div className="text-slate-400 mb-3">
                 <Star className="w-8 h-8 mx-auto" />
               </div>
-              <h3 className="font-medium text-gray-600 mb-2">새로운 팩</h3>
-              <p className="text-sm text-gray-500">곧 추가될 예정입니다</p>
+              <h3 className="font-medium text-slate-600 mb-1">새로운 팩</h3>
+              <p className="text-sm text-slate-500">곧 추가될 예정입니다</p>
             </div>
           </div>
         )}

@@ -10,7 +10,8 @@ import { PenTool } from "lucide-react"; //, Check, RotateCcw
 // import { WORKBOOK_MESSAGES } from "@/constants/workbook.constants";
 
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
-import { useTTS } from "@/shared/hooks/useTTS";
+// import { useTTS } from "@/shared/hooks/useTTS";
+import EasySpeech from "easy-speech";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
 
 import { useWorkbookState } from "@/hooks/useWorkbookState";
@@ -41,6 +42,11 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     settings = {},
     onSettingsChange,
   }) => {
+    // 초기화만 추가하고 나머지는 거의 동일
+    useEffect(() => {
+      EasySpeech.init();
+    }, []);
+
     // 데이터
     const workbook = useMemo(() => {
       if (!Array.isArray(rawWorkbook) || rawWorkbook.length === 0) return [];
@@ -122,7 +128,18 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     // 로직
     const { getCorrectAnswer, saveProgress, restoreProgress } =
       useWorkbookLogic(packId, dayNumber, workbook);
-    const { speak, isSpeaking } = useTTS();
+    // const { speak, isSpeaking } = useTTS();
+    const speak = useCallback((text: string, options: TTSOptions = {}) => {
+      EasySpeech.speak({
+        text,
+        rate: options.rate || 0.9,
+        pitch: options.pitch || 1,
+        voice: EasySpeech.voices().find((v) =>
+          v.lang.includes(options.lang || "en-US")
+        ),
+      });
+    }, []);
+    const [isSpeaking, setIsSpeaking] = useState(false);
     const { markModeCompleted } = useDayProgress(packId, dayNumber);
 
     // 내비/타이머/refs
