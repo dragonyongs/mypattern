@@ -1,6 +1,6 @@
 // src/components/StudyInterface.tsx
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { shallow } from "zustand/shallow"; // 선택
+import { shallow } from "zustand/shallow";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -9,7 +9,12 @@ import {
   Image,
   Search,
   Mic,
-  // Settings,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  Settings,
+  Target,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { VocabularyMode } from "./study-modes/VocabularyMode";
@@ -42,10 +47,26 @@ export const StudyInterface: React.FC = () => {
     null
   );
   const [isSettingOpen, setIsSettingOpen] = useState(false);
+  const [studyTime, setStudyTime] = useState(0); // 학습 시간 추가
 
   const currentDay = parseInt(dayParam || "1", 10);
   const packData = useAppStore((state) => state.selectedPackData);
   const setCurrentDay = useAppStore((state) => state.setCurrentDay);
+
+  // 학습 시간 타이머
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setStudyTime((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // 시간 포맷팅
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   useEffect(() => {
     const open = () => setIsSettingOpen(true);
@@ -54,15 +75,8 @@ export const StudyInterface: React.FC = () => {
       window.removeEventListener("open-study-settings", open as EventListener);
   }, []);
 
-  // const currentTab = pathname.startsWith("/packs")
-  //   ? "packs"
-  //   : pathname.startsWith("/calendar")
-  //   ? "calendar"
-  //   : undefined; // 설정은 모달이므로 undefined
-
   const {
     setModeCompleted,
-    getSettings,
     getCurrentItemIndex,
     setCurrentItemIndex,
     getNextUncompletedIndex,
@@ -96,20 +110,17 @@ export const StudyInterface: React.FC = () => {
 
   // 3) settings 계산을 storeSettings에 반응하도록 변경
   const settings = useMemo(() => {
-    // 기본값
     const base = {
       showMeaningEnabled: false,
       autoProgressEnabled: true,
       studyMode: "immersive" as const,
       autoPlayOnSelect: false,
     };
+
     const merged = { ...base, ...(storeSettings || {}) };
-
-    // studyMode에 따른 표시 정책 일원화
     merged.showMeaningEnabled = merged.studyMode === "assisted";
-
     return merged;
-  }, [storeSettings]); // 🔥 storeSettings 변화에 반응
+  }, [storeSettings]);
 
   const dayPlan = useMemo(() => {
     if (!packData) return null;
@@ -252,32 +263,32 @@ export const StudyInterface: React.FC = () => {
   );
 
   // 🔥 아이템 완료 후 위치 업데이트 useEffect
-  useEffect(() => {
-    if (!lastCompletedItem || !packData || !currentMode) return;
+  // useEffect(() => {
+  //   if (!lastCompletedItem || !packData || !currentMode) return;
 
-    const modeData = getModeData(currentMode);
-    const completedItemIndex = modeData.findIndex(
-      (item) => item.id === lastCompletedItem
-    );
+  //   const modeData = getModeData(currentMode);
+  //   const completedItemIndex = modeData.findIndex(
+  //     (item) => item.id === lastCompletedItem
+  //   );
 
-    if (completedItemIndex >= 0) {
-      const nextIndex = Math.min(completedItemIndex + 1, modeData.length - 1);
+  //   if (completedItemIndex >= 0) {
+  //     const nextIndex = Math.min(completedItemIndex + 1, modeData.length - 1);
 
-      setCurrentItemIndex(packData.id, currentDay, currentMode, nextIndex);
+  //     setCurrentItemIndex(packData.id, currentDay, currentMode, nextIndex);
 
-      console.log(`📍 Position updated: ${completedItemIndex} → ${nextIndex}`);
-    }
+  //     console.log(`📍 Position updated: ${completedItemIndex} → ${nextIndex}`);
+  //   }
 
-    // 처리 완료 후 초기화
-    setLastCompletedItem(null);
-  }, [
-    lastCompletedItem,
-    packData,
-    currentMode,
-    currentDay,
-    getModeData,
-    setCurrentItemIndex,
-  ]);
+  //   // 처리 완료 후 초기화
+  //   setLastCompletedItem(null);
+  // }, [
+  //   lastCompletedItem,
+  //   packData,
+  //   currentMode,
+  //   currentDay,
+  //   getModeData,
+  //   setCurrentItemIndex,
+  // ]);
 
   const handleBack = useCallback(() => {
     navigate("/calendar");
@@ -627,6 +638,10 @@ export const StudyInterface: React.FC = () => {
     [setSettingsForPack]
   );
 
+  // 완료된 모드 수 계산
+  const completedModeCount = studyModes.filter((mode) => mode.completed).length;
+  const totalModeCount = studyModes.length;
+
   // ✅ 조건부 렌더링
   if (!isDayAccessible) {
     const previousDay = currentDay - 1;
@@ -746,61 +761,71 @@ export const StudyInterface: React.FC = () => {
       <div className="min-h-screen bg-gray-50">
         {/* 헤더 */}
         <div className="bg-white border-b border-gray-200 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleBack}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </button>
-            <div className="flex-1">
-              <h1 className="font-semibold text-gray-900">Day {currentDay}</h1>
-              <p className="text-sm text-gray-600">{dayPlan.title}</p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBack}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors -ml-2"
+              >
+                <ChevronLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">
+                  Day {currentDay}
+                </h1>
+                <p className="text-xs text-gray-500">{dayPlan.title}</p>
+              </div>
             </div>
-            {/* <button
-              onClick={() => setIsSettingOpen((p) => !p)}
-              className="lg:hidden w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-all"
-            >
-              <Settings className="w-5 h-5 text-gray-600" />
-            </button> */}
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <Clock className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-600">
+                  {formatTime(studyTime)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                  <span className="text-xs font-bold text-purple-600">
+                    {completedModeCount}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-500">
+                  / {totalModeCount}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
-        {/* 모드 탭 */}
-        <div className="bg-white border-b border-gray-200 px-4 py-3">
-          <div className="flex gap-2 overflow-x-auto p-2">
-            {studyModes.map(
-              ({ key, label, icon: Icon, completed, available, progress }) => (
+          {/* 모드 탭 */}
+          <div className="flex bg-gray-50 rounded-lg p-1">
+            {studyModes.map((mode) => {
+              const Icon = mode.icon;
+              return (
                 <button
-                  key={key}
-                  onClick={() => available && handleModeChange(key)}
-                  disabled={!available}
-                  className={`
-                  flex items-center gap-2.5 px-4 py-2.5 rounded-lg font-medium text-sm whitespace-nowrap
-                  transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1
-                  ${
-                    currentMode === key
-                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25 scale-105"
-                      : available
-                      ? completed
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:shadow-sm"
-                        : "bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 hover:text-slate-900 hover:shadow-sm"
-                      : "bg-slate-50 text-slate-400 border border-slate-100 cursor-not-allowed opacity-50"
-                  }
-                `}
+                  key={mode.key}
+                  onClick={() => mode.available && handleModeChange(mode.key)}
+                  disabled={!mode.available}
+                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                    currentMode === mode.key
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : mode.completed
+                      ? "text-gray-700 hover:text-black"
+                      : mode.available
+                      ? "text-gray-600 hover:text-gray-900"
+                      : "text-gray-400 opacity-50 cursor-not-allowed"
+                  }`}
                 >
                   <Icon className="w-4 h-4" />
-                  <span>{label}</span>
-                  {/* {progress && progress.total > 0 && (
-                    <span className="text-xs opacity-75">
-                      ({progress.completed}/{progress.total})
-                    </span>
-                  )} */}
-                  {completed && <CheckCircle2 className="w-4 h-4" />}
+                  <span>{mode.label}</span>
+                  {mode.completed && (
+                    <CheckCircle2 className="w-3 h-3 text-green-600" />
+                  )}
                 </button>
-              )
-            )}
+              );
+            })}
           </div>
         </div>
+
         {/* 컨텐츠 영역 */}
         <div className="flex-1">{renderContent()}</div>
         {/* 완료 모달 */}

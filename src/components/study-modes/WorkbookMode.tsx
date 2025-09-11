@@ -19,12 +19,14 @@ import { useWorkbookLogic } from "@/hooks/useWorkbookLogic";
 import { QuestionCard } from "@/components/workbook/QuestionCard";
 import { AnswerOptions } from "@/components/workbook/AnswerOptions";
 import { ActionSection } from "@/components/workbook/ActionSection";
-import StudyNavigation from "@/shared/components/StudyNavigation";
+// import StudyNavigation from "@/shared/components/_StudyNavigation";
+import StudyPagination from "@/shared/components/StudyPagination";
+
 import { StudySidebar } from "@/shared/components/StudySidebar";
 
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
 import ActionButtons from "@/shared/components/ActionButtons";
-import ProgressDots from "@/shared/components/ProgressDots";
+import ProgressDots from "@/shared/components/_ProgressDots";
 
 import { shuffleWorkbookData } from "@/utils/workbook.utils";
 import type { WorkbookModeProps } from "@/types/workbook.types";
@@ -387,7 +389,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     return (
       <div
         key={componentKey}
-        className="flex h-full min-h-[calc(100vh-154px)] bg-gray-50 font-sans pb-20 lg:pb-0"
+        className="flex h-full min-h-[calc(100vh-130px)] bg-gray-50 font-sans pb-20 lg:pb-0"
       >
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* 본문+사이드바 2열 */}
@@ -436,11 +438,13 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                     )}
                   </QuestionCard>
                 </div>
-                <ProgressDots
-                  total={workbook.length} // useMemo로 만든 workbook 배열 사용
+                <StudyPagination
                   currentIndex={currentIndex}
-                  correct={correctAnswers} // 정답(초록)
-                  answered={answeredQuestions} // 답변됨(오답 포함, 빨강)
+                  totalItems={workbook.length}
+                  completed={correctAnswers}
+                  secondary={answeredQuestions}
+                  onPrev={goToPrev}
+                  onNext={goToNext}
                   onIndexChange={goToIndex}
                 />
 
@@ -459,13 +463,6 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                     onComplete={handleComplete}
                   />
                 )}
-
-                <StudyNavigation
-                  currentIndex={currentIndex}
-                  totalCount={workbook.length}
-                  onPrev={goToPrev}
-                  onNext={goToNext}
-                />
               </div>
             </div>
 

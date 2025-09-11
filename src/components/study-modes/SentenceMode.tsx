@@ -13,10 +13,9 @@ import { useTTS } from "@/shared/hooks/useTTS";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
 import { StudySidebar } from "@/shared/components/StudySidebar";
 import { useStudyProgressStore } from "@/stores/studyProgressStore";
-import StudyNavigation from "@/shared/components/StudyNavigation";
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
 import ActionButtons from "@/shared/components/ActionButtons";
-import ProgressDots from "@/shared/components/ProgressDots";
+import StudyPagination from "@/shared/components/StudyPagination";
 
 interface SentenceItem {
   id: string;
@@ -408,7 +407,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   }
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-217px)] lg:min-h-[calc(100vh-154px)] bg-gray-50 font-sans pb-20 lg:pb-0">
+    <div className="flex h-full min-h-[calc(100vh-217px)] lg:min-h-[calc(100vh-130px)] bg-gray-50 font-sans pb-20 lg:pb-0">
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Main */}
         <main
@@ -474,12 +473,16 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
               </div>
             </div>
 
-            {/* Progress Dots */}
-            <ProgressDots
-              total={items.length}
+            {/* StudyPagination */}
+            <StudyPagination
               currentIndex={currentIndex}
-              completed={masteredCards}
-              secondary={studiedCards}
+              totalItems={items.length}
+              completed={masteredCards} // Set<number>
+              secondary={studiedCards} // Set<number>
+              // correct={correctAnswers} // Set<number>
+              // answered={answeredQuestions} // Set<number>
+              onPrev={goToPrev}
+              onNext={goToNext}
               onIndexChange={goToIndex}
             />
 
@@ -502,14 +505,14 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
             />
 
             {/* Navigation */}
-            <div className="mt-6">
+            {/* <div className="mt-6">
               <StudyNavigation
                 currentIndex={currentIndex}
                 total={items.length}
                 onPrev={goToPrev}
                 onNext={goToNext}
               />
-            </div>
+            </div> */}
           </div>
         </main>
       </div>

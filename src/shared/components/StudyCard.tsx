@@ -55,8 +55,10 @@ export const StudyCard: React.FC<StudyCardProps> = ({
       onClick={onToggleMeaning}
     >
       {isMastered && (
-        <div className="absolute top-4 right-4 bg-green-100 text-green-600 px-2.5 py-1 rounded-full text-xs font-bold">
-          학습 완료
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <div className="inline-block bg-green-100 text-green-600  px-3 py-1 rounded-full text-sm font-bold">
+            학습 완료
+          </div>
         </div>
       )}
 

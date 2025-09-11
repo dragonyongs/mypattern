@@ -7,13 +7,13 @@ import React, {
   useRef,
 } from "react";
 import {
-  ArrowLeft,
-  Volume2,
+  // ArrowLeft,
+  // Volume2,
   Target,
-  ChevronLeft,
-  ChevronRight,
-  Check,
-  RotateCcw,
+  // ChevronLeft,
+  // ChevronRight,
+  // Check,
+  // RotateCcw,
 } from "lucide-react";
 
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
@@ -23,10 +23,11 @@ import { useStudyProgressStore } from "@/stores/studyProgressStore";
 import { StudySidebar } from "@/shared/components/StudySidebar";
 
 import StudyCard from "@/shared/components/StudyCard";
-import StudyNavigation from "@/shared/components/StudyNavigation";
+// import StudyNavigation from "@/shared/components/_StudyNavigation";
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
 import ActionButtons from "@/shared/components/ActionButtons";
-import ProgressDots from "@/shared/components/ProgressDots";
+// import ProgressDots from "@/shared/components/ProgressDots";
+import StudyPagination from "@/shared/components/StudyPagination";
 
 interface VocabularyItem {
   id: string;
@@ -458,7 +459,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
   }
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-217px)] lg:min-h-[calc(100vh-152px)] bg-gray-50 font-sans pb-20 lg:pb-0">
+    <div className="flex h-full min-h-[calc(100vh-217px)] lg:min-h-[calc(100vh-130px)] bg-gray-50 font-sans pb-20 lg:pb-0">
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Main Content Area */}
         <main
@@ -486,12 +487,14 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               handleComplete={handleComplete}
             />
 
-            {/* Progress Dots */}
-            <ProgressDots
-              total={items.length}
+            {/* StudyPagination */}
+            <StudyPagination
               currentIndex={currentIndex}
-              completed={masteredCards} // 완료(숙달)된 카드
-              // 필요시 studied 등 보조 상태가 있으면 secondary로 전달
+              totalItems={items.length}
+              completed={masteredCards} // Set<number>
+              secondary={studiedCards} // Set<number>
+              onPrev={goToPrev}
+              onNext={goToNext}
               onIndexChange={goToIndex}
             />
 
@@ -512,16 +515,6 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               isAllMastered={isAllMastered}
               onComplete={handleComplete}
             />
-
-            {/* Navigation */}
-            <div className="mt-6">
-              <StudyNavigation
-                currentIndex={currentIndex}
-                total={items.length}
-                onPrev={goToPrev}
-                onNext={goToNext}
-              />
-            </div>
           </div>
         </main>
       </div>
