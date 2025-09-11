@@ -16,6 +16,7 @@ import { useStudyProgressStore } from "@/stores/studyProgressStore";
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
 import ActionButtons from "@/shared/components/ActionButtons";
 import StudyPagination from "@/shared/components/StudyPagination";
+import StudyCard from "@/shared/components/StudyCard";
 
 interface SentenceItem {
   id: string;
@@ -414,9 +415,25 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
           className="flex-1 flex flex-col justify-center items-center p-4 overflow-y-auto"
           {...swipeHandlers}
         >
-          <div className="w-full max-w-2xl">
+          <div className="w-full max-w-xl">
             {/* Sentence Card */}
-            <div
+            <StudyCard
+              mode="sentence"
+              sentence={currentItem.text}
+              meaning={currentItem.translation}
+              usage={currentItem.usage}
+              targetWords={currentItem.targetWords}
+              isMastered={masteredCards.has(currentIndex)}
+              isSpeaking={isSpeaking}
+              showMeaning={showTranslation}
+              studyMode={localSettings.studyMode}
+              showMeaningEnabled={localSettings.showMeaningEnabled}
+              onToggleMeaning={handleToggleTranslation}
+              onSpeak={handleSpeak}
+              onMarkAsMastered={handleMarkAsMastered}
+              onMarkAsNotMastered={handleMarkAsNotMastered}
+            />
+            {/* <div
               className="relative bg-white rounded-2xl shadow-lg p-8 text-center cursor-pointer transition-transform active:scale-95"
               onClick={handleToggleTranslation}
             >
@@ -471,7 +488,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
                   </p>
                 )}
               </div>
-            </div>
+            </div> */}
 
             {/* StudyPagination */}
             <StudyPagination

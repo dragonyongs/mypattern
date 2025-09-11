@@ -4,13 +4,13 @@ import { useNavigate } from "react-router-dom";
 import {
   Calendar,
   Lock,
-  CheckCircle,
+  Check,
   Play,
   ArrowLeft,
   BookOpen,
-  MessageSquare,
-  PenTool,
-  Lightbulb,
+  BarChart3,
+  Clock,
+  Info,
 } from "lucide-react";
 
 import { useAppStore } from "../stores/appStore";
@@ -20,25 +20,128 @@ type StatCardProps = {
   icon: React.ComponentType<any>;
   value: number | string;
   label: string;
-  colorClass?: string;
+  variant?: "primary" | "success" | "warning" | "info";
 };
 
 const StatCard: React.FC<StatCardProps> = ({
   icon: Icon,
   value,
   label,
-  colorClass = "",
-}) => (
-  <div className="bg-white p-4 rounded-xl shadow-sm flex items-center border border-slate-200">
-    <div className={`mr-4 p-3 rounded-lg ${colorClass}`}>
-      <Icon className="h-5 w-5 text-white" />
+  variant = "primary",
+}) => {
+  const iconColors = {
+    primary: "text-slate-600",
+    success: "text-emerald-600", // 성공은 초록색으로
+    warning: "text-slate-600",
+    info: "text-blue-600", // 현재 날짜는 파란색으로
+  };
+
+  return (
+    <div className="bg-white rounded-lg p-5 border border-slate-200 hover:border-slate-300 transition-colors">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="text-2xl font-semibold text-slate-900 mb-1">
+            {value}
+          </div>
+          <div className="text-sm font-medium text-slate-500">{label}</div>
+        </div>
+        <div className="ml-4 flex-shrink-0">
+          <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center">
+            <Icon className={`h-5 w-5 ${iconColors[variant]}`} />
+          </div>
+        </div>
+      </div>
     </div>
-    <div>
-      <p className="text-2xl font-bold text-slate-800">{value}</p>
-      <p className="text-sm font-medium text-slate-500">{label}</p>
+  );
+};
+
+type StudyModeIndicatorProps = {
+  modes: Array<{
+    type: "vocab" | "sentence" | "workbook";
+    count: number;
+    completed: boolean;
+  }>;
+  isCompleted?: boolean; // 완료된 카드인지 여부
+};
+
+const StudyModeIndicator: React.FC<StudyModeIndicatorProps> = ({
+  modes,
+  isCompleted = false,
+}) => {
+  if (modes.length === 0) return null;
+
+  const modeLabels = {
+    vocab: "단어",
+    sentence: "문장",
+    workbook: "문제",
+  };
+
+  const completedCount = modes.filter((mode) => mode.completed).length;
+
+  return (
+    <div className="space-y-3">
+      {/* 전체 진행 상태 */}
+      <div className="flex items-center justify-between text-xs">
+        <span className={isCompleted ? "text-slate-400" : "text-slate-500"}>
+          진행상태
+        </span>
+        <span
+          className={`font-medium ${
+            isCompleted ? "text-green-700" : "text-slate-700"
+          }`}
+        >
+          {completedCount}/{modes.length}
+        </span>
+      </div>
+
+      {/* 학습 유형별 표시 */}
+      <div>
+        {modes.map((mode, idx) => (
+          <div
+            key={idx}
+            className={`flex items-center justify-between py-1.5 px-2 rounded text-xs ${
+              isCompleted ? "bg-white/10" : "bg-slate-50"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-1.5 h-1.5 rounded-full ${
+                  mode.completed
+                    ? isCompleted
+                      ? "bg-emerald-300"
+                      : "bg-slate-300"
+                    : isCompleted
+                    ? "bg-slate-400"
+                    : "bg-slate-300"
+                }`}
+              />
+              <span
+                className={`font-medium ${
+                  mode.completed
+                    ? isCompleted
+                      ? "text-emerald-500"
+                      : "text-slate-700"
+                    : isCompleted
+                    ? "text-slate-400"
+                    : "text-slate-300"
+                }`}
+              >
+                {modeLabels[mode.type]}
+              </span>
+            </div>
+            <span
+              className={`font-medium ${
+                isCompleted ? "text-slate-400" : "text-slate-500"
+              }`}
+            >
+              {mode.count}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 type DayCardProps = {
   day: any;
@@ -75,104 +178,109 @@ const DayCardInner: React.FC<DayCardProps> = ({
 
   const isDay1Introduction = day.day === 1 && day.type === "introduction";
 
+  const studyModes = [];
+  if (day.showVocab && day.vocabCount > 0) {
+    studyModes.push({
+      type: "vocab" as const,
+      count: day.vocabCount,
+      completed: vocabCompleted,
+    });
+  }
+  if (day.showSentence && day.sentenceCount > 0) {
+    studyModes.push({
+      type: "sentence" as const,
+      count: day.sentenceCount,
+      completed: sentenceCompleted,
+    });
+  }
+  if (day.showWorkbook && day.workbookCount > 0) {
+    studyModes.push({
+      type: "workbook" as const,
+      count: day.workbookCount,
+      completed: workbookCompleted,
+    });
+  }
+
   const handleClick = () => {
     if (status === "locked") return;
     if (typeof onSelect === "function") onSelect(day);
   };
 
+  const getCardStyle = () => {
+    switch (status) {
+      case "locked":
+        return "border-slate-200 bg-slate-50 cursor-not-allowed opacity-50";
+      case "completed":
+        return "border-green-500 bg-white text-green-600 hover:bg-green-50"; // 초록색으로 변경
+      case "current":
+        return "border-blue-500 bg-white hover:bg-blue-50 ring-2 ring-blue-100"; // 파란색 포인트
+      default:
+        return "border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300";
+    }
+  };
+
+  const getStatusIcon = () => {
+    switch (status) {
+      case "locked":
+        return <Lock className="w-3.5 h-3.5 text-slate-400" />;
+      case "completed":
+        return <Check className="w-3.5 h-3.5 text-white" />;
+      case "current":
+        return <Play className="w-3.5 h-3.5 text-blue-500" />; // 파란색으로
+      default:
+        return null;
+    }
+  };
+
+  const textColor =
+    status === "completed" ? "text-green-600" : "text-slate-900";
+  const subtextColor =
+    status === "completed" ? "text-slate-800" : "text-slate-500";
+
   return (
     <div
       onClick={handleClick}
       className={`
-        relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:shadow-md
-        ${
-          status === "locked"
-            ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-60"
-            : status === "completed"
-            ? "border-green-200 bg-green-50 hover:bg-green-100"
-            : status === "current"
-            ? "border-blue-400 bg-blue-50 hover:bg-blue-100 shadow-md"
-            : "border-gray-200 bg-white hover:bg-gray-50"
-        }
+        relative p-4 rounded-lg border-2 transition-all duration-150 cursor-pointer
+        ${getCardStyle()}
       `}
     >
-      <div className="absolute top-3 right-3">
-        {status === "locked" && <Lock className="w-4 h-4 text-gray-400" />}
-        {status === "completed" && (
-          <CheckCircle className="w-4 h-4 text-green-600" />
-        )}
-        {status === "current" && <Play className="w-4 h-4 text-blue-600" />}
-      </div>
+      <div className="absolute top-3 right-3">{getStatusIcon()}</div>
 
-      <div className="mb-2">
-        <div className="flex justify-between items-center gap-2 mb-1">
-          <span className="text-lg font-bold text-gray-800">Day {day.day}</span>
+      <div className="pr-6 mb-4">
+        <div className="flex items-baseline gap-2 mb-1">
+          <span className={`text-sm font-bold ${textColor}`}>
+            Day {day.day}
+          </span>
+          {day.pageRange && (
+            <span className={`text-xs font-medium ${subtextColor}`}>
+              p.{day.pageRange.replace("_", "-")}
+            </span>
+          )}
         </div>
-        {/* 제목을 2줄로 제한하고 말줄임표 처리 */}
-        <h3 className="text-sm font-medium text-gray-700 mb-2 line-clamp-2 overflow-hidden">
+        <h3
+          className={`text-sm font-medium leading-tight line-clamp-2 ${textColor}`}
+        >
           {day.title}
         </h3>
       </div>
 
-      {/* Day 1 특별 표시 */}
       {isDay1Introduction ? (
-        <div className="flex items-center gap-1 mb-3 text-xs text-gray-500">
-          <Lightbulb className="w-3 h-3" />
-          <span>학습 방법 소개</span>
+        <div
+          className={`px-2 py-1 rounded text-xs font-medium ${
+            status === "completed"
+              ? "bg-white/20 text-white"
+              : "bg-slate-100 text-slate-700"
+          }`}
+        >
+          학습 안내
         </div>
       ) : (
-        /* 일반 학습 단계는 도트 + 카운트로 간결하게 */
-        <div className="space-y-2">
-          {/* 학습 진행 상태 도트 */}
-          {(day.showVocab || day.showSentence || day.showWorkbook) && (
-            <div className="flex gap-2">
-              {day.showVocab && (
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    vocabCompleted ? "bg-green-500" : "bg-gray-200"
-                  }`}
-                  title="단어 학습"
-                />
-              )}
-              {day.showSentence && (
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    sentenceCompleted ? "bg-blue-500" : "bg-gray-200"
-                  }`}
-                  title="문장 학습"
-                />
-              )}
-              {day.showWorkbook && (
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    workbookCompleted ? "bg-purple-500" : "bg-gray-200"
-                  }`}
-                  title="워크북"
-                />
-              )}
-            </div>
-          )}
-
-          {/* 콘텐츠 정보를 한 줄로 간결하게 */}
-          <div className="flex gap-2 text-xs text-gray-500">
-            {day.showVocab && day.vocabCount > 0 && (
-              <span>단어 {day.vocabCount}</span>
-            )}
-            {day.showSentence && day.sentenceCount > 0 && (
-              <span>문장 {day.sentenceCount}</span>
-            )}
-            {day.showWorkbook && day.workbookCount > 0 && (
-              <span>문제 {day.workbookCount}</span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 페이지 범위 */}
-      {day.pageRange && (
-        <div className="mt-2 text-xs text-gray-400">
-          p.{day.pageRange.replace("_", "-")}
-        </div>
+        // 완료된 카드에서도 학습 정보 표시
+        <StudyModeIndicator
+          modes={studyModes}
+          isCompleted={status === "completed"}
+        />
       )}
     </div>
   );
@@ -183,25 +291,20 @@ const DayCard = React.memo(DayCardInner);
 export default function CalendarPage(): JSX.Element {
   const navigate = useNavigate();
 
-  // ✅ 모든 Hook을 컴포넌트 최상위에 배치
   const currentDay = useAppStore((state) => state.currentDay);
   const setCurrentDay = useAppStore((state) => state.setCurrentDay);
   const selectedPackData = useAppStore((state) => state.selectedPackData);
 
-  // [중요] hydration 상태 확인 - 항상 호출
   const hasHydrated = useStudyProgressStore((state) => state._hasHydrated);
-
   const getDayProgress = useStudyProgressStore((state) => state.getDayProgress);
   const getPackProgress = useStudyProgressStore(
     (state) => state.getPackProgress
   );
 
-  // packId 계산을 useMemo로 처리
   const packId = useMemo(() => {
     return selectedPackData?.id;
   }, [selectedPackData]);
 
-  // [중요] packId 유효성 검사 - useEffect는 항상 호출
   React.useEffect(() => {
     console.log("📋 CalendarPage - packId:", packId);
     console.log("📋 CalendarPage - selectedPackData:", selectedPackData);
@@ -210,7 +313,6 @@ export default function CalendarPage(): JSX.Element {
     }
   }, [packId, selectedPackData]);
 
-  // getDayStatus - 항상 호출하되 내부에서 조건 처리
   const getDayStatus = useCallback(
     (dayNumber: number): "current" | "completed" | "locked" | "available" => {
       if (!packId || packId === "undefined") {
@@ -247,7 +349,6 @@ export default function CalendarPage(): JSX.Element {
     [packId, getPackProgress]
   );
 
-  // calendarData useMemo 부분 수정
   const calendarData = useMemo(() => {
     if (!selectedPackData) return null;
 
@@ -257,19 +358,15 @@ export default function CalendarPage(): JSX.Element {
     let completedDaysCount = 0;
     const allDays: any[] = [];
 
-    // 페이지별 대표 카테고리 1-2개만 선택하는 헬퍼 함수
     const getMainCategoriesForPageRange = (pageRange: string) => {
       if (!pageRange || !categories) return [];
       const [startPage, endPage] = pageRange.split("_").map(Number);
       const pageCategories = categories.filter(
         (cat) => cat.page >= startPage && cat.page <= endPage
       );
-
-      // 최대 2개의 주요 카테고리만 반환
       return pageCategories.slice(0, 2);
     };
 
-    // 각 day의 modes에서 콘텐츠 카운트를 정확히 계산하는 함수
     const getContentCounts = (dayPlan: any) => {
       let vocabCount = 0,
         sentenceCount = 0,
@@ -300,7 +397,6 @@ export default function CalendarPage(): JSX.Element {
         const { vocabCount, sentenceCount, workbookCount } =
           getContentCounts(dayPlan);
 
-        // 학습 단계별 특별 처리
         let learningPhase = "";
         let hasContent = true;
         let displayTitle = dayPlan.title;
@@ -312,16 +408,13 @@ export default function CalendarPage(): JSX.Element {
           learningPhase = "skimming";
           hasContent = vocabCount > 0 || sentenceCount > 0;
 
-          // 모든 훑어보기 단계를 일관되게 표시
           if (dayPlan.pageRange) {
             const pageStart = dayPlan.pageRange.split("_")[0];
             const pageEnd = dayPlan.pageRange.split("_")[1];
 
             if (dayNum === 2) {
-              // Day 2는 전체 범위
               displayTitle = `훑어보기 (${pageStart}-${pageEnd}p)`;
             } else {
-              // Day 3-5는 대표 카테고리 1개만 + 페이지 범위
               const mainCategories = getMainCategoriesForPageRange(
                 dayPlan.pageRange
               );
@@ -337,7 +430,6 @@ export default function CalendarPage(): JSX.Element {
           hasContent = workbookCount > 0 || dayNum === 14;
         }
 
-        // 완료 상태 확인
         let isCompleted = false;
         try {
           const dp = getDayProgress(selectedPackData.id, dayNum);
@@ -358,13 +450,11 @@ export default function CalendarPage(): JSX.Element {
           sentenceCount,
           workbookCount,
           learningMethod: dayPlan.learningMethod || "introduction",
-          // 표시 여부 플래그 추가
           showVocab: vocabCount > 0,
           showSentence: sentenceCount > 0,
           showWorkbook: workbookCount > 0,
         });
       } else {
-        // JSON 데이터가 완전하지 않은 경우 기본값 생성
         allDays.push({
           day: dayNum,
           type: "locked",
@@ -392,41 +482,33 @@ export default function CalendarPage(): JSX.Element {
     };
   }, [selectedPackData, getDayProgress]);
 
-  // [수정] 더 단순하고 명확한 Day 선택 로직 - 항상 호출
   const handleDaySelect = useCallback(
     (day: any) => {
       const status = getDayStatus(day.day);
 
-      console.log(`Day ${day.day} clicked, status: ${status}`); // 디버깅용
+      console.log(`Day ${day.day} clicked, status: ${status}`);
 
       if (status === "locked") {
         console.log(`Day ${day.day} is locked`);
         return;
       }
 
-      // currentDay 설정
       setCurrentDay(day.day);
-
-      console.log(`Navigating to /study/${day.day}`); // 디버깅용
-
-      // 네비게이션
-      navigate(`/study/${day.day}`, {
-        replace: false,
-      });
+      console.log(`Navigating to /study/${day.day}`);
+      navigate(`/study/${day.day}`, { replace: false });
     },
     [getDayStatus, setCurrentDay, navigate]
   );
 
   const handleBack = useCallback(() => navigate("/"), [navigate]);
 
-  // ✅ 조건부 렌더링은 모든 Hook 호출 후에
-  // hydration 완료 전에는 로딩 표시
+  // 조건부 렌더링
   if (!hasHydrated) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-100">
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-lg font-medium text-gray-700">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-300 border-t-blue-500 mx-auto mb-4"></div>
+          <p className="text-base font-medium text-slate-700">
             학습 데이터 로딩 중...
           </p>
         </div>
@@ -434,18 +516,18 @@ export default function CalendarPage(): JSX.Element {
     );
   }
 
-  // packData가 없으면 에러 처리
   if (!selectedPackData || !packId) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-800">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-4">
+        <div className="text-center max-w-md">
+          <BookOpen className="mx-auto h-12 w-12 text-slate-400 mb-4" />
+          <h2 className="text-xl font-bold text-slate-900 mb-2">
             학습팩 정보가 없습니다
           </h2>
-          <p className="mt-2 text-gray-500">학습팩을 먼저 선택해주세요.</p>
+          <p className="text-slate-500 mb-6">학습팩을 먼저 선택해주세요.</p>
           <button
             onClick={() => navigate("/")}
-            className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded-lg"
+            className="px-6 py-3 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors"
           >
             홈으로 이동
           </button>
@@ -454,21 +536,18 @@ export default function CalendarPage(): JSX.Element {
     );
   }
 
-  if (!calendarData || !selectedPackData) {
+  if (!calendarData) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
-        <div className="text-center">
-          <BookOpen className="mx-auto h-12 w-12 text-slate-400" />
-          <h2 className="mt-4 text-xl font-semibold text-slate-700">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-4">
+        <div className="text-center max-w-md">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-300 border-t-blue-500 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-slate-800 mb-2">
             학습팩 로딩 중...
           </h2>
-          <p className="mt-2 text-slate-500">
-            데이터를 불러오고 있습니다. 문제가 지속되면 뒤로 가서 다시
-            시도해주세요.
-          </p>
+          <p className="text-slate-500 mb-6">데이터를 불러오고 있습니다.</p>
           <button
             onClick={handleBack}
-            className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             홈으로
@@ -484,88 +563,105 @@ export default function CalendarPage(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-20 lg:pb-0">
-      <header className="sticky top-0 bg-slate-50/80 backdrop-blur-lg z-10 border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-4 h-16">
+      {/* 헤더 */}
+      <header className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center justify-between h-16">
             <button
               onClick={handleBack}
-              className="hidden lg:flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-lg p-2 -ml-2"
+              className="hidden sm:flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-2 -ml-3 hover:bg-slate-50 rounded-lg transition-colors"
             >
-              <ArrowLeft size={18} />
+              <ArrowLeft size={16} />
               학습팩 선택
             </button>
-            <div className="flex-1">
-              <h1 className="text-lg font-bold text-slate-800">
+
+            <div className="flex-1 min-w-0 sm:ml-4">
+              <h1 className="text-lg font-bold text-slate-900 truncate">
                 {selectedPackData.title}
               </h1>
               {selectedPackData.subtitle && (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 truncate">
                   {selectedPackData.subtitle}
                 </p>
               )}
             </div>
-            <div className="text-right">
-              <Calendar className="h-6 w-6 text-slate-400 inline-block" />
-            </div>
+
+            <Calendar className="h-5 w-5 text-slate-400 flex-shrink-0 ml-2" />
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <main className="max-w-6xl mx-auto p-4 sm:p-6">
+        {/* 통계 섹션 */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <StatCard
-            icon={Calendar}
+            icon={Clock}
             value={totalDays}
             label="총 일수"
-            colorClass="bg-blue-500"
+            variant="primary"
+          />
+          <StatCard
+            icon={BarChart3}
+            value={availableDays}
+            label="학습 가능"
+            variant="warning"
+          />
+          <StatCard
+            icon={Check}
+            value={completedDays}
+            label="완료한 날"
+            variant="success"
           />
           <StatCard
             icon={Play}
-            value={availableDays}
-            label="학습 가능"
-            colorClass="bg-amber-500"
-          />
-          <StatCard
-            icon={CheckCircle}
-            value={completedDays}
-            label="완료한 날"
-            colorClass="bg-green-500"
-          />
-          <StatCard
-            icon={Lightbulb}
             value={currentDay}
             label="현재 날짜"
-            colorClass="bg-purple-500"
+            variant="info"
           />
         </div>
 
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-8">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-base font-bold text-slate-800">학습 진도</h3>
-            <span className="text-lg font-bold text-blue-600">
-              {completedDays}
-              <span className="text-sm font-medium text-slate-500">
-                /{totalDays}일 완료
-              </span>
-            </span>
+        {/* 진도 섹션 */}
+        <div className="bg-white rounded-lg p-6 border border-slate-200 mb-8">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 mb-1">
+                학습 진도
+              </h3>
+              <p className="text-sm text-slate-500">
+                현재 {availableDays}일 분량의 학습 콘텐츠가 준비되어 있습니다.
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-slate-900">
+                {completedDays}
+                <span className="text-sm text-slate-500 ml-1 font-normal">
+                  /{totalDays}일
+                </span>
+              </div>
+            </div>
           </div>
-          <p className="text-sm text-slate-500 mb-4">
-            현재 {availableDays}일 분량의 학습 콘텐츠가 준비되어 있습니다.
-          </p>
-          <div className="w-full bg-slate-200 rounded-full h-2.5">
-            <div
-              className="bg-blue-500 h-2.5 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${progressPercentage}%` }}
-            />
+
+          <div className="space-y-2">
+            <div className="w-full bg-slate-200 rounded-full h-2">
+              <div
+                className="bg-emerald-500 h-2 rounded-full transition-all duration-500" // 초록색으로 변경
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
+            <div className="text-xs font-medium text-slate-600">
+              {Math.round(progressPercentage)}% 완료
+            </div>
           </div>
         </div>
 
+        {/* 캘린더 그리드 */}
         <div className="mb-8">
-          <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
+          <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
             <Calendar className="mr-3 h-5 w-5 text-slate-500" />
             학습 캘린더
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {calendarData.allDays.map((d: any) => (
               <DayCard
                 key={d.day}
@@ -578,26 +674,34 @@ export default function CalendarPage(): JSX.Element {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs">
-          <div className="flex items-center space-x-4 text-slate-600">
-            <div className="flex items-center">
-              <span className="w-3 h-3 rounded-full bg-white border-2 border-slate-400 mr-2"></span>
-              학습 가능
+        {/* 범례 */}
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-white border-2 border-slate-300"></div>
+              <span className="text-slate-600">학습 가능</span>
             </div>
-            <div className="flex items-center">
-              <span className="w-3 h-3 rounded-full bg-green-50 border-2 border-green-200 mr-2"></span>
-              완료됨
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-emerald-500"></div>{" "}
+              {/* 초록색으로 */}
+              <span className="text-slate-600">완료됨</span>
             </div>
-            <div className="flex items-center">
-              <span className="w-3 h-3 rounded-full bg-slate-100 border-2 border-slate-200 mr-2"></span>
-              준비 중
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-slate-200"></div>
+              <span className="text-slate-600">준비 중</span>
             </div>
           </div>
-          <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-3 flex items-start w-full sm:w-auto mt-4 sm:mt-0">
-            <Lightbulb className="h-4 w-4 mr-2.5 flex-shrink-0 mt-0.5" />
-            <div>
-              <strong>학습 팁:</strong> 각 날짜를 클릭하여 학습을 시작하세요.
-              완료된 학습은 언제든지 복습할 수 있습니다.
+
+          <div className="bg-slate-100 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Info className="h-4 w-4 text-slate-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-slate-900 mb-1">학습 가이드</p>
+                <p className="text-slate-600">
+                  각 날짜를 클릭하여 학습을 시작하세요. 완료된 학습은 언제든지
+                  복습할 수 있습니다.
+                </p>
+              </div>
             </div>
           </div>
         </div>

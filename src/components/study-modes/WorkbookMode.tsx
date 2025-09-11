@@ -6,8 +6,8 @@ import React, {
   useState,
   useRef,
 } from "react";
-import { PenTool, Check, RotateCcw } from "lucide-react";
-import { WORKBOOK_MESSAGES } from "@/constants/workbook.constants";
+import { PenTool } from "lucide-react"; //, Check, RotateCcw
+// import { WORKBOOK_MESSAGES } from "@/constants/workbook.constants";
 
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
@@ -16,17 +16,16 @@ import { useDayProgress } from "@/shared/hooks/useAppHooks";
 import { useWorkbookState } from "@/hooks/useWorkbookState";
 import { useWorkbookLogic } from "@/hooks/useWorkbookLogic";
 
-import { QuestionCard } from "@/components/workbook/QuestionCard";
-import { AnswerOptions } from "@/components/workbook/AnswerOptions";
-import { ActionSection } from "@/components/workbook/ActionSection";
-// import StudyNavigation from "@/shared/components/_StudyNavigation";
+// import { QuestionCard } from "@/components/workbook/QuestionCard";
+// import { AnswerOptions } from "@/components/workbook/AnswerOptions";
+// import { ActionSection } from "@/components/workbook/ActionSection";
 import StudyPagination from "@/shared/components/StudyPagination";
 
 import { StudySidebar } from "@/shared/components/StudySidebar";
 
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
 import ActionButtons from "@/shared/components/ActionButtons";
-import ProgressDots from "@/shared/components/_ProgressDots";
+import { WorkbookCard } from "@/components/workbook/WorkbookCard";
 
 import { shuffleWorkbookData } from "@/utils/workbook.utils";
 import type { WorkbookModeProps } from "@/types/workbook.types";
@@ -396,9 +395,9 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
           <div className="flex-1 flex">
             {/* 왼쪽 본문: 중앙 카드 */}
             <div className="flex-1 flex items-center justify-center p-4">
-              <div className="w-full max-w-2xl">
+              <div className="w-full max-w-xl">
                 <div {...swipeHandlers}>
-                  <QuestionCard
+                  {/* <QuestionCard
                     question={currentQuestion}
                     isAnswered={isCurrentAnswered}
                     isCorrect={isCurrentCorrect}
@@ -436,7 +435,23 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                         onToggleExplanation={handleToggleExplanation}
                       />
                     )}
-                  </QuestionCard>
+                  </QuestionCard> */}
+                  <WorkbookCard
+                    question={
+                      currentQuestion.question || currentQuestion.sentence
+                    }
+                    options={currentQuestion.options || []}
+                    correctAnswer={getCorrectAnswer(currentQuestion)}
+                    explanation={currentQuestion.explanation}
+                    selectedAnswer={selectedAnswers[currentIndex]}
+                    showResult={showResult[currentIndex]}
+                    showExplanation={showExplanation[currentIndex]}
+                    isSpeaking={isSpeaking} // 🔥 공통 SpeakButton 사용
+                    isAnswered={isCurrentAnswered}
+                    onAnswerSelect={handleAnswerSelect}
+                    onSpeak={handleSpeak}
+                    onToggleExplanation={handleToggleExplanation}
+                  />
                 </div>
                 <StudyPagination
                   currentIndex={currentIndex}

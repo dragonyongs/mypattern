@@ -126,7 +126,7 @@ export const StudySidebar: React.FC<StudySidebarProps> = ({
                 : isMastered
                 ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                 : isStudied
-                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                ? "bg-orange-50 text-orange-700 border border-orange-200"
                 : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100";
               return (
                 <button

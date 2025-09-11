@@ -6,15 +6,7 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import {
-  // ArrowLeft,
-  // Volume2,
-  Target,
-  // ChevronLeft,
-  // ChevronRight,
-  // Check,
-  // RotateCcw,
-} from "lucide-react";
+import { Target } from "lucide-react";
 
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
@@ -23,10 +15,8 @@ import { useStudyProgressStore } from "@/stores/studyProgressStore";
 import { StudySidebar } from "@/shared/components/StudySidebar";
 
 import StudyCard from "@/shared/components/StudyCard";
-// import StudyNavigation from "@/shared/components/_StudyNavigation";
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
 import ActionButtons from "@/shared/components/ActionButtons";
-// import ProgressDots from "@/shared/components/ProgressDots";
 import StudyPagination from "@/shared/components/StudyPagination";
 
 interface VocabularyItem {
@@ -469,6 +459,7 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
           <div className="w-full max-w-xl">
             {/* Word Card (분리된 컴포넌트 사용) */}
             <StudyCard
+              mode="vocabulary"
               word={currentItem.word}
               pronunciation={currentItem.pronunciation}
               meaning={currentItem.meaning}
@@ -477,14 +468,12 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               isMastered={masteredCards.has(currentIndex)}
               isSpeaking={isSpeaking}
               showMeaning={showMeaning}
-              studyMode={localSettings.studyMode} // 🔥 로컬 설정 사용
-              showMeaningEnabled={localSettings.showMeaningEnabled} // 🔥 로컬 설정 사용
+              studyMode={localSettings.studyMode}
+              showMeaningEnabled={localSettings.showMeaningEnabled}
               onToggleMeaning={handleToggleMeaning}
               onSpeak={handleSpeak}
-              // onMarkAsMastered={handleMarkAsMastered}
-              // onMarkAsNotMastered={handleMarkAsNotMastered}
-              isAllMastered={isAllMastered}
-              handleComplete={handleComplete}
+              onMarkAsMastered={handleMarkAsMastered}
+              onMarkAsNotMastered={handleMarkAsNotMastered}
             />
 
             {/* StudyPagination */}
