@@ -345,7 +345,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       localSettings.autoProgressEnabled,
     ]);
 
-    const { clearItemProgress } = useWorkbookLogic(packId, dayNumber, workbook);
+    //const { clearItemProgress } = useWorkbookLogic(packId, dayNumber, workbook);
 
     // 14) 다시 풀기
     // WorkbookMode.tsx 내부 - handleRetry 함수만 교체
