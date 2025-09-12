@@ -16,7 +16,8 @@ import { StudySidebar } from "@/shared/components/StudySidebar";
 
 import StudyCard from "@/shared/components/StudyCard";
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
-import ActionButtons from "@/shared/components/ActionButtons";
+import CompleteButton from "@/shared/components/CompleteButton";
+import RetryButton from "@/shared/components/RetryButton";
 import StudyPagination from "@/shared/components/StudyPagination";
 
 interface VocabularyItem {
@@ -486,18 +487,6 @@ export const VocabularyMode: React.FC<VocabularyModeProps> = ({
               onNext={goToNext}
               onIndexChange={goToIndex}
             />
-
-            {/* Action */}
-            <div className="mt-6">
-              <ActionButtons
-                isAnswered={masteredCards.has(currentIndex)}
-                canCheck={true} // 단어 모드에서는 항상 가능
-                onCheck={handleMarkAsMastered}
-                onRetry={handleMarkAsNotMastered}
-                checkText="학습 완료"
-                retryText="다시 학습"
-              />
-            </div>
 
             {/* Complete Button */}
             <StudyCompleteButton

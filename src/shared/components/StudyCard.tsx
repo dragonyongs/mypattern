@@ -1,6 +1,9 @@
 import React, { useEffect, useCallback } from "react";
-import { Volume2, CheckCircle2, Check } from "lucide-react";
-import { SpeakButton } from "./SpeakButton";
+import { CheckCircle2 } from "lucide-react";
+import SpeakButton from "./SpeakButton";
+import CompleteButton from "./CompleteButton";
+import RetryButton from "./RetryButton";
+import MeaningButton from "./MeaningButton";
 
 export interface StudyCardProps {
   // 범용
@@ -47,6 +50,8 @@ export const StudyCard: React.FC<StudyCardProps> = ({
   showMeaningEnabled,
   onToggleMeaning,
   onSpeak,
+  onMarkAsMastered,
+  onMarkAsNotMastered,
 }) => {
   // 표시할 주요 텍스트 결정
   const mainText = mode === "vocabulary" ? word : sentence;
@@ -69,14 +74,11 @@ export const StudyCard: React.FC<StudyCardProps> = ({
   };
 
   return (
-    <div
-      className="relative bg-white rounded-2xl shadow-lg p-8 text-center cursor-pointer transition-transform active:scale-95"
-      onClick={onToggleMeaning}
-    >
+    <div className="relative bg-white rounded-2xl shadow-lg p-6 sm:p-8 text-center cursor-pointer transition-transform active:scale-95">
       {isMastered && (
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium mb-4">
           <CheckCircle2 className="w-4 h-4" />
-          학습 완료
+          <span className="hidden sm:inline">학습 완료</span>
         </div>
       )}
 
@@ -102,17 +104,19 @@ export const StudyCard: React.FC<StudyCardProps> = ({
           <p className="text-gray-500 mb-4">[{pronunciation}]</p>
         )}
 
-        {/* 발음 듣기 버튼 */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onSpeak(speakText!);
-          }}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-sm font-medium transition-all mb-6"
-        >
-          <Volume2 className="w-4 h-4" />
-          발음 듣기
-        </button>
+        {/* 액션 버튼 영역: 발음듣기, 학습완료/다시학습, 뜻보기 */}
+        <div className="flex justify-center gap-2 mb-4 mt-4">
+          <SpeakButton text={speakText!} onSpeak={onSpeak} />
+          {isMastered ? (
+            <RetryButton onClick={onMarkAsNotMastered} />
+          ) : (
+            <CompleteButton onClick={onMarkAsMastered} />
+          )}
+          {(studyMode === "assisted" ||
+            (studyMode === "immersive" && showMeaningEnabled)) && (
+            <MeaningButton onClick={onToggleMeaning} active={showMeaning} />
+          )}
+        </div>
 
         {/* 의미/번역 영역 */}
         {showMeaningEnabled && showMeaning ? (
@@ -123,12 +127,12 @@ export const StudyCard: React.FC<StudyCardProps> = ({
             )}
           </div>
         ) : (
-          <div className="text-gray-400 text-sm py-4">
+          <div className="text-gray-400 text-sm py-2">
             {studyMode === "immersive"
               ? mode === "vocabulary"
                 ? "영어로 의미를 생각해보세요"
                 : "영어로 의미를 생각해보세요"
-              : "탭하여 의미 확인"}
+              : "뜻보기로 의미 확인"}
           </div>
         )}
       </div>
