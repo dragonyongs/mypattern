@@ -107,17 +107,19 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
         {/* 질문 영역 */}
         <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 mb-6 border border-indigo-100">
           {/* 🔥 빈칸이 채워진 문제 문장 */}
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
+          <h2 className="text-xl font-bold text-gray-900">
             {renderQuestionWithAnswer()}
           </h2>
 
           {/* 🔥 공통 발음 듣기 버튼 (완성된 문장으로 TTS) */}
-          <SpeakButton
-            text={getCompleteTextForTTS()}
-            onSpeak={onSpeak}
-            isSpeaking={isSpeaking}
-            className="bg-white/70"
-          />
+          {selectedAnswer && (
+            <SpeakButton
+              text={getCompleteTextForTTS()}
+              onSpeak={onSpeak}
+              isSpeaking={isSpeaking}
+              className="mt-4 bg-white/70"
+            />
+          )}
         </div>
 
         {/* 선택지 */}

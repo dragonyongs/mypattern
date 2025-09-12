@@ -504,7 +504,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
             />
 
             {/* Action */}
-            <div className="mt-6">
+            {/* <div className="mt-6">
               <ActionButtons
                 isAnswered={masteredCards.has(currentIndex)}
                 canCheck={true}
@@ -513,7 +513,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
                 checkText="학습 완료"
                 retryText="다시 학습"
               />
-            </div>
+            </div> */}
 
             {/* Complete */}
             <StudyCompleteButton

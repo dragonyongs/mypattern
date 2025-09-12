@@ -28,7 +28,7 @@ class SeededRandom {
 /**
  * 시드 기반으로 배열을 일관성있게 섞기
  */
-function shuffleWithSeed<T>(array: T[], seedString: string): T[] {
+export function shuffleWithSeed<T>(array: T[], seedString: string): T[] {
   const rng = new SeededRandom(seedString);
   const shuffled = [...array];
 

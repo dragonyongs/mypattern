@@ -1,35 +1,40 @@
-// src/hooks/useWorkbookState.ts (수정됨)
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+// src/hooks/useWorkbookState.ts
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useStudyProgressStore } from "@/stores/studyProgressStore";
 import type { WorkbookItem } from "@/types/workbook.types";
 
 export const useWorkbookState = (
   workbook: WorkbookItem[],
   initialIndex = 0,
-  componentKey: string
+  componentKey: string,
+  restoreProgress: () => {
+    answered: Set<number>;
+    correct: Set<number>;
+    results: Record<number, boolean>;
+  }
 ) => {
-  // 개별 상태들을 직접 관리 (기존 방식 유지)
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [selectedAnswers, setSelectedAnswers] = useState<
     Record<number, string>
   >({});
-  const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(
-    new Set()
-  );
-  const [correctAnswers, setCorrectAnswers] = useState<Set<number>>(new Set());
+  const [answeredQuestions, setAnsweredQuestions] = useState(new Set<number>());
+  const [correctAnswers, setCorrectAnswers] = useState(new Set<number>());
   const [showResult, setShowResult] = useState<Record<number, boolean>>({});
   const [showExplanation, setShowExplanation] = useState<
     Record<number, boolean>
   >({});
 
-  const pendingSaveRef = useRef<Set<number>>(new Set());
-  const lastComponentKeyRef = useRef<string>(componentKey);
+  const pendingSaveRef = useRef(new Set<number>());
+  const lastComponentKeyRef = useRef(componentKey);
+  const [isRestored, setIsRestored] = useState(false);
 
-  // 완전 초기화 (componentKey 변경시)
+  // 🔥 스토어에서 하이드레이션 상태와 대기 함수 가져오기
+  const progressHydrated = useStudyProgressStore((s) => s._hasHydrated);
+  const waitForHydration = useStudyProgressStore((s) => s.waitForHydration);
+
+  // componentKey 변경 시 전체 초기화 + 복원 재시도
   const resetState = useCallback(() => {
-    if (lastComponentKeyRef.current === componentKey) {
-      console.log("🔄 WorkbookState - 동일한 키, 초기화 건너뜀:", componentKey);
-      return;
-    }
+    if (lastComponentKeyRef.current === componentKey) return;
 
     console.log("🔄 WorkbookState 초기화:", {
       from: lastComponentKeyRef.current,
@@ -42,61 +47,101 @@ export const useWorkbookState = (
     setCorrectAnswers(new Set());
     setShowResult({});
     setShowExplanation({});
+    setIsRestored(false); // 🔥 복원 상태도 리셋
     pendingSaveRef.current.clear();
 
     lastComponentKeyRef.current = componentKey;
   }, [initialIndex, componentKey]);
 
-  // componentKey 변경시 자동 초기화
   useEffect(() => {
     resetState();
   }, [resetState]);
 
-  const currentQuestion = useMemo(
-    () => workbook[currentIndex],
-    [workbook, currentIndex]
-  );
+  // 🔥 하이드레이션 대기 후 복원 실행
+  useEffect(() => {
+    let cancelled = false;
 
-  const progress = useMemo(() => {
-    return workbook.length > 0
-      ? (answeredQuestions.size / workbook.length) * 100
-      : 0;
-  }, [answeredQuestions.size, workbook.length]);
+    if (!workbook.length || isRestored) return;
 
-  const score = correctAnswers.size;
-  const isAllAnswered =
-    workbook.length > 0 && answeredQuestions.size === workbook.length;
-  const isCurrentAnswered = answeredQuestions.has(currentIndex);
-  const isCurrentCorrect = correctAnswers.has(currentIndex);
+    const performRestore = async () => {
+      try {
+        console.log(
+          "🔄 WorkbookState 복원 시작 - 하이드레이션 대기 중...",
+          componentKey
+        );
 
-  // 기존 방식과 동일하게 개별 상태들과 setter들을 반환
+        // 하이드레이션이 완료될 때까지 대기
+        if (!progressHydrated) {
+          await waitForHydration();
+        }
+
+        if (cancelled) return;
+
+        console.log(
+          "🔄 WorkbookState 하이드레이션 완료 - 복원 진행...",
+          componentKey
+        );
+
+        const { answered, correct, results } = restoreProgress();
+
+        if (!cancelled) {
+          setAnsweredQuestions(answered);
+          setCorrectAnswers(correct);
+          setShowResult(results);
+          setIsRestored(true);
+
+          console.log("✅ WorkbookState 복원 완료:", {
+            answered: answered.size,
+            correct: correct.size,
+          });
+        }
+      } catch (error) {
+        console.warn("⚠️ WorkbookState 복원 실패:", error);
+        if (!cancelled) {
+          setIsRestored(true); // 실패해도 다시 시도하지 않음
+        }
+      }
+    };
+
+    performRestore();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    workbook.length,
+    progressHydrated,
+    waitForHydration,
+    restoreProgress,
+    isRestored,
+    componentKey,
+  ]);
+
   return {
-    // 상태들
     currentIndex,
     selectedAnswers,
     answeredQuestions,
     correctAnswers,
     showResult,
     showExplanation,
-
-    // Setter들
     setCurrentIndex,
     setSelectedAnswers,
     setAnsweredQuestions,
     setCorrectAnswers,
     setShowResult,
     setShowExplanation,
-
-    // 계산된 값들
-    currentQuestion,
-    progress,
-    score,
-    isAllAnswered,
-    isCurrentAnswered,
-    isCurrentCorrect,
-
-    // Refs와 유틸리티
+    currentQuestion: workbook[currentIndex],
+    progress:
+      workbook.length > 0
+        ? (answeredQuestions.size / workbook.length) * 100
+        : 0,
+    score: correctAnswers.size,
+    isAllAnswered:
+      workbook.length > 0 && answeredQuestions.size === workbook.length,
+    isCurrentAnswered: answeredQuestions.has(currentIndex),
+    isCurrentCorrect: correctAnswers.has(currentIndex),
     pendingSaveRef,
     resetState,
+    isRestored,
   };
 };

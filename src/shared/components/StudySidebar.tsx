@@ -49,6 +49,25 @@ export const StudySidebar: React.FC<StudySidebarProps> = (props) => {
     handleAutoPlayChange,
   } = props;
 
+  useEffect(() => {
+    console.log("[sidebar] mounted");
+  }, []);
+  // useEffect(() => {
+  //   console.log(
+  //     "[sidebar] props",
+  //     "current",
+  //     currentIndex,
+  //     "studied",
+  //     studiedCards?.size,
+  //     "answered",
+  //     answeredQuestions?.size,
+  //     "mastered",
+  //     masteredCards?.size,
+  //     "correct",
+  //     correctAnswers?.size
+  //   );
+  // });
+
   // 1) 스크롤 컨테이너/아이템 참조
   const gridRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -56,8 +75,8 @@ export const StudySidebar: React.FC<StudySidebarProps> = (props) => {
   // 2) 공통 집계
   const totals = useMemo(() => {
     const total = items.length;
-    const studied = answeredQuestions?.size ?? studiedCards?.size ?? 0;
-    const mastered = correctAnswers?.size ?? masteredCards?.size ?? 0;
+    const studied = (answeredQuestions?.size ?? 0) || (studiedCards?.size ?? 0);
+    const mastered = (correctAnswers?.size ?? 0) || (masteredCards?.size ?? 0);
     return { total, studied, mastered };
   }, [
     items.length,
@@ -72,19 +91,35 @@ export const StudySidebar: React.FC<StudySidebarProps> = (props) => {
     () =>
       items.map((_, idx) => {
         const isCurrent = idx === currentIndex;
+
+        // 불리언 결합은 OR로
         const isMastered =
-          (correctAnswers?.has(idx) ?? masteredCards?.has(idx)) || false;
+          Boolean(masteredCards?.has(idx)) || Boolean(correctAnswers?.has(idx));
+
         const isStudied =
-          (answeredQuestions?.has(idx) ?? studiedCards?.has(idx)) || false;
+          Boolean(studiedCards?.has(idx)) ||
+          Boolean(answeredQuestions?.has(idx));
+
+        // if (idx === currentIndex) {
+        //   console.log("[sidebar] state@current", {
+        //     idx,
+        //     isMastered,
+        //     isStudied,
+        //     hasMastered: masteredCards?.has(idx),
+        //     hasCorrect: correctAnswers?.has(idx),
+        //     hasStudied: studiedCards?.has(idx),
+        //     hasAnswered: answeredQuestions?.has(idx),
+        //   });
+        // }
         return { isCurrent, isMastered, isStudied };
       }),
     [
       items,
       currentIndex,
-      correctAnswers,
       masteredCards,
-      answeredQuestions,
+      correctAnswers,
       studiedCards,
+      answeredQuestions,
     ]
   );
 
@@ -150,7 +185,9 @@ export const StudySidebar: React.FC<StudySidebarProps> = (props) => {
           <div className="text-sm text-slate-600 mb-3">학습 카드</div>
           <div
             ref={gridRef}
-            className="grid grid-cols-7 gap-2 overflow-y-auto h-[calc(100vh-45rem)] min-h-32 scroll-smooth"
+            className={`grid grid-cols-7 gap-2 overflow-y-auto scroll-smooth ${
+              totals.total < 28 ? "h-auto" : "h-[calc(100vh-45rem)] min-h-32"
+            }`}
           >
             {states.map(({ isCurrent, isMastered, isStudied }, idx) => {
               const base =

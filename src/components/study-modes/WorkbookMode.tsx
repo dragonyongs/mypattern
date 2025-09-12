@@ -6,7 +6,7 @@ import React, {
   useState,
   useRef,
 } from "react";
-import { PenTool } from "lucide-react"; //, Check, RotateCcw
+import { PenTool } from "lucide-react";
 
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
@@ -15,14 +15,17 @@ import { useDayProgress } from "@/shared/hooks/useAppHooks";
 import { useWorkbookState } from "@/hooks/useWorkbookState";
 import { useWorkbookLogic } from "@/hooks/useWorkbookLogic";
 import StudyPagination from "@/shared/components/StudyPagination";
-
 import { StudySidebar } from "@/shared/components/StudySidebar";
-
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
 import ActionButtons from "@/shared/components/ActionButtons";
 import { WorkbookCard } from "@/components/workbook/WorkbookCard";
 
-import { shuffleWorkbookData } from "@/utils/workbook.utils";
+import { shuffleWithSeed } from "@/utils/workbook.utils"; // PRNG + Fisher–Yates
+import {
+  getShuffledItem,
+  warmupShuffles,
+} from "@/utils/workbook.shuffle.runtime";
+
 import type { WorkbookModeProps } from "@/types/workbook.types";
 
 export const WorkbookMode = React.memo<WorkbookModeProps>(
@@ -36,19 +39,29 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     settings = {},
     onSettingsChange,
   }) => {
-    // 데이터
+    // 1) 원본 유지: 전역 일괄 셔플 제거
     const workbook = useMemo(() => {
       if (!Array.isArray(rawWorkbook) || rawWorkbook.length === 0) return [];
-      return shuffleWorkbookData(rawWorkbook);
+      return rawWorkbook;
     }, [rawWorkbook]);
 
+    const { getCorrectAnswer, saveProgress, restoreProgress } =
+      useWorkbookLogic(packId, dayNumber, workbook);
+
+    // 2) 세션/일자 단위 시드 키
+    const dayKey = useMemo(() => {
+      const d = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      return `${packId}-day-${dayNumber}-${d}`;
+    }, [packId, dayNumber]);
+
+    // 3) componentKey 유지(복원/키 관리)
     const componentKey = useMemo(() => {
       const baseKey = `${packId}-${dayNumber}-${workbook.length}`;
       const contentHash = workbook.map((it) => it.id).join("-");
       return `${baseKey}-${contentHash}`;
     }, [packId, dayNumber, workbook]);
 
-    // 로컬 설정
+    // 4) 로컬 설정
     const [localSettings, setLocalSettings] = useState(() => ({
       studyMode: "immersive" as const,
       showMeaningEnabled: false,
@@ -91,7 +104,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       [onSettingsChange]
     );
 
-    // 상태 훅
+    // 5) 상태 훅 — 반드시 상단에서 먼저 호출(훅의 규칙)
     const {
       currentIndex,
       selectedAnswers,
@@ -112,15 +125,53 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       isCurrentAnswered,
       isCurrentCorrect,
       pendingSaveRef,
-    } = useWorkbookState(workbook, initialItemIndex, componentKey);
+      isRestored, // 🔥 복원 완료 여부
+    } = useWorkbookState(
+      workbook,
+      initialItemIndex,
+      componentKey,
+      restoreProgress
+    );
 
-    // 로직
-    const { getCorrectAnswer, saveProgress, restoreProgress } =
-      useWorkbookLogic(packId, dayNumber, workbook);
+    useEffect(() => {
+      // 크기/참조 로그
+      console.log(
+        "[wb] answered size/ref",
+        answeredQuestions.size,
+        answeredQuestions
+      );
+      console.log("[wb] correct size/ref", correctAnswers.size, correctAnswers);
+      console.log("[wb] currentIndex", currentIndex);
+    }, [answeredQuestions, correctAnswers, currentIndex]);
+
+    const warmupRef = useRef<ReturnType<typeof warmupShuffles> | null>(null);
+
+    // 6) 현재 문제만 즉시 셔플
+    const shownItem = useMemo(() => {
+      if (!workbook.length) return undefined;
+      return getShuffledItem(workbook[currentIndex], dayKey, shuffleWithSeed);
+    }, [workbook, currentIndex, dayKey]);
+
+    // 7) 현재 인덱스 주변 k개 유휴 시간 워밍업
+    useEffect(() => {
+      if (!workbook.length) return;
+      // 이전 워밍업 작업 취소
+      warmupRef.current?.cancel();
+      // 새 범위 예약(반경 8 예시)
+      warmupRef.current = warmupShuffles(
+        workbook,
+        dayKey,
+        currentIndex,
+        8,
+        shuffleWithSeed
+      );
+      return () => warmupRef.current?.cancel();
+    }, [workbook, dayKey, currentIndex]);
+
+    // 8) 로직 훅
     const { speak, isSpeaking } = useTTS();
-    const { markModeCompleted } = useDayProgress(packId, dayNumber);
 
-    // 내비/타이머/refs
+    // 9) refs/내비
     const autoProgressTimeoutRef = useRef<number | null>(null);
     const currentIndexRef = useRef<number>(initialItemIndex);
     const answeredRef = useRef<Set<number>>(answeredQuestions);
@@ -144,7 +195,6 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       };
     }, []);
 
-    // 이동은 항상 navigateTo
     const navigateTo = useCallback(
       (index: number) => {
         if (autoProgressTimeoutRef.current) {
@@ -158,7 +208,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       [workbook.length, setCurrentIndex]
     );
 
-    // TTS: 단어/문장 모드와 동일 인자
+    // 10) TTS
     const handleSpeak = useCallback(
       (text: string) => {
         const toSay = (text || "").trim();
@@ -168,19 +218,25 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       [speak]
     );
 
-    // 복원(마운트 1회)
-    useEffect(() => {
-      const { answered, correct, results } = restoreProgress();
-      setAnsweredQuestions(answered);
-      setCorrectAnswers(correct);
-      setShowResult(results);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    // 11) 복원(마운트 1회)
+    // useEffect(() => {
+    //   const { answered, correct, results } = restoreProgress();
+    //   setAnsweredQuestions(answered);
+    //   setCorrectAnswers(correct);
+    //   setShowResult(results);
+    //   // eslint-disable-next-line react-hooks/exhaustive-deps
+    // }, []);
 
-    // 선택
+    // 12) 선택
     const handleAnswerSelect = useCallback(
       (answer: string) => {
-        if (isCurrentAnswered) return;
+        console.log("[wb] select", { idx: currentIndexRef.current, answer });
+        if (isCurrentAnswered) {
+          console.log("[wb] select ignored: already answered");
+          return;
+        }
+
+        // if (isCurrentAnswered) return;
         const idx = currentIndexRef.current;
         setSelectedAnswers((prev) => ({ ...prev, [idx]: answer }));
         if (localSettings.autoPlayOnSelect && currentQuestion) {
@@ -199,22 +255,41 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       ]
     );
 
-    // 정답 확인
+    // 13) 정답 확인
     const handleCheckAnswer = useCallback(() => {
       const idx = currentIndexRef.current;
       if (answeredRef.current.has(idx)) return;
 
       const selected = selectedAnswers[idx];
-      if (!selected) return;
+      console.log("[wb] check start", {
+        idx,
+        selected,
+        wasAnswered: answeredRef.current.has(idx),
+      });
+      if (answeredRef.current.has(idx)) {
+        console.log("[wb] early return: already checked");
+        return;
+      }
+      if (!selected) {
+        console.log("[wb] early return: no selection");
+        return;
+      }
+
+      // if (!selected) return;
 
       const correct = getCorrectAnswer(currentQuestion!);
       const isCorrect = selected === correct;
 
-      // 상태 반영
       setAnsweredQuestions((prev) => {
         const n = new Set(prev);
         n.add(idx);
         return n;
+      });
+      console.log("[wb] check done", {
+        idx,
+        isCorrect,
+        answeredSize: answeredRef.current.size + 1 /* 예상 */,
+        correctSize: correctRef.current.size + (isCorrect ? 1 : 0),
       });
       if (isCorrect) {
         setCorrectAnswers((prev) => {
@@ -225,9 +300,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       }
       setShowResult((prev) => ({ ...prev, [idx]: true }));
 
-      // ✅ 즉시 저장하여 이탈해도 복원 가능
       saveProgress(idx, isCorrect);
-      // pendingSaveRef.current.add(idx);
 
       if (localSettings.autoProgressEnabled) {
         if (autoProgressTimeoutRef.current) {
@@ -243,6 +316,13 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
         }
         if (nextIdx === -1) nextIdx = Math.min(idx + 1, workbook.length - 1);
 
+        console.log("[wb] after check", {
+          idx,
+          isCorrect,
+          answeredSize: answeredRef.current.size,
+          correctSize: correctRef.current.size,
+        });
+
         autoProgressTimeoutRef.current = window.setTimeout(() => {
           navigateTo(nextIdx);
           autoProgressTimeoutRef.current = null;
@@ -256,11 +336,19 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       setCorrectAnswers,
       setShowResult,
       saveProgress,
+      navigateTo,
+      workbook.length,
+      localSettings.autoProgressEnabled,
     ]);
 
-    // 다시 풀기(현재 카드만 리셋)
+    const { clearItemProgress } = useWorkbookLogic(packId, dayNumber, workbook);
+
+    // 14) 다시 풀기
     const handleRetry = useCallback(() => {
       const idx = currentIndexRef.current;
+
+      clearItemProgress(idx);
+
       pendingSaveRef.current.delete(idx);
 
       setAnsweredQuestions((prev) => {
@@ -294,6 +382,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       setShowResult,
       setShowExplanation,
       setSelectedAnswers,
+      pendingSaveRef,
     ]);
 
     const handleToggleExplanation = useCallback(() => {
@@ -301,7 +390,8 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       setShowExplanation((prev) => ({ ...prev, [idx]: !prev[idx] }));
     }, [setShowExplanation]);
 
-    // 다음/이전
+    // 15) 다음/이전
+    const { speak: _s } = useTTS(); // to avoid unused warning if needed
     const goToNext = useCallback(() => {
       const idx = currentIndexRef.current;
       if (pendingSaveRef.current.has(idx)) {
@@ -323,10 +413,10 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
 
     const goToIndex = useCallback(
       (i: number) => navigateTo(Math.max(0, Math.min(i, workbook.length - 1))),
-      [navigateTo]
+      [navigateTo, workbook.length]
     );
 
-    // 제스처/키
+    // 16) 제스처/키
     const swipeHandlers = useSwipeGesture({
       onSwipeLeft: goToNext,
       onSwipeRight: goToPrev,
@@ -341,7 +431,8 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       return () => window.removeEventListener("keydown", onKey);
     }, [goToNext, goToPrev, handleCheckAnswer]);
 
-    // 완료
+    // 17) 완료
+    const { markModeCompleted } = useDayProgress(packId, dayNumber);
     const handleComplete = useCallback(() => {
       pendingSaveRef.current.forEach((idx) => {
         const isCorrect = correctRef.current.has(idx);
@@ -352,7 +443,16 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       onComplete?.();
     }, [saveProgress, markModeCompleted, packId, onComplete]);
 
-    // 경계
+    // 사이드바 리렌더 보장용 refresh 키(얕은 비교 우회)
+    const answeredCount = answeredQuestions.size;
+    const correctCount = correctAnswers.size;
+    const sidebarKey = useMemo(
+      () =>
+        `sb-${componentKey}-${answeredCount}-${correctCount}-${currentIndex}`,
+      [componentKey, answeredCount, correctCount, currentIndex]
+    );
+
+    // 경계 처리
     if (!workbook.length) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
@@ -366,7 +466,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
         </div>
       );
     }
-    if (!currentQuestion) {
+    if (!shownItem) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
           <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -379,36 +479,34 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       );
     }
 
-    // 레이아웃: SentenceMode와 동일 2열 구조
+    // 레이아웃
     return (
       <div
         key={componentKey}
         className="flex h-full min-h-[calc(100vh-130px)] bg-gray-50 font-sans pb-20 lg:pb-0"
       >
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* 본문+사이드바 2열 */}
           <div className="flex-1 flex">
-            {/* 왼쪽 본문: 중앙 카드 */}
+            {/* 본문 */}
             <div className="flex-1 flex items-center justify-center p-4">
               <div className="w-full max-w-xl">
                 <div {...swipeHandlers}>
                   <WorkbookCard
-                    question={
-                      currentQuestion.question || currentQuestion.sentence
-                    }
-                    options={currentQuestion.options || []}
-                    correctAnswer={getCorrectAnswer(currentQuestion)}
-                    explanation={currentQuestion.explanation}
+                    question={shownItem.question || shownItem.sentence}
+                    options={shownItem.options || []} // 셔플된 옵션
+                    correctAnswer={shownItem.correctAnswer} // 결정적 정답
+                    explanation={shownItem.explanation}
                     selectedAnswer={selectedAnswers[currentIndex]}
                     showResult={showResult[currentIndex]}
                     showExplanation={showExplanation[currentIndex]}
-                    isSpeaking={isSpeaking} // 🔥 공통 SpeakButton 사용
+                    isSpeaking={isSpeaking}
                     isAnswered={isCurrentAnswered}
                     onAnswerSelect={handleAnswerSelect}
                     onSpeak={handleSpeak}
                     onToggleExplanation={handleToggleExplanation}
                   />
                 </div>
+
                 <StudyPagination
                   currentIndex={currentIndex}
                   totalItems={workbook.length}
@@ -437,15 +535,16 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
               </div>
             </div>
 
-            {/* 오른쪽 사이드바: 독립 컬럼 */}
+            {/* 사이드바: refresh 키로 리렌더 확정 */}
             <StudySidebar
+              key={sidebarKey}
               category={category}
               dayNumber={dayNumber}
               progress={progress}
               items={workbook}
               currentIndex={currentIndex}
-              studiedCards={answeredQuestions} // 학습됨 = 답안 확인 완료
-              masteredCards={correctAnswers} // 완료 = 정답 처리
+              studiedCards={answeredQuestions}
+              masteredCards={correctAnswers}
               score={score}
               onSelectIndex={goToIndex}
               settings={localSettings}

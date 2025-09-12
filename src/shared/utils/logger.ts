@@ -10,15 +10,11 @@ const LEVEL_ORDER: Record<Level, number> = {
 };
 
 // 환경 변수로 최소 출력 레벨 제어(기본: info)
-const MIN_LEVEL_NAME = (import.meta?.env?.VITE_LOG_LEVEL ??
-  process.env?.VITE_LOG_LEVEL ??
-  "info") as Level;
+const MIN_LEVEL_NAME = (import.meta?.env?.VITE_LOG_LEVEL ?? "info") as Level;
 const MIN_LEVEL = LEVEL_ORDER[MIN_LEVEL_NAME] ?? LEVEL_ORDER.info;
 
 // dev 여부
-const IS_DEV =
-  import.meta?.env?.MODE === "development" ||
-  process.env.NODE_ENV === "development";
+const IS_DEV = import.meta?.env?.MODE === "development";
 
 // 안전 순환 참조 처리
 function getCircularReplacer() {

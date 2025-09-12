@@ -105,7 +105,7 @@ export const StudyCard: React.FC<StudyCardProps> = ({
       <div className="text-center">
         {/* 이모지 (단어 모드에만) */}
         {mode === "vocabulary" && emoji && (
-          <div className="text-6xl mb-6">{emoji}</div>
+          <div className="text-6xl my-6">{emoji}</div>
         )}
 
         {/* 메인 텍스트 */}
