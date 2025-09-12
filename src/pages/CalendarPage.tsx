@@ -411,16 +411,7 @@ export default function CalendarPage(): JSX.Element {
           if (dayPlan.pageRange) {
             const pageStart = dayPlan.pageRange.split("_")[0];
             const pageEnd = dayPlan.pageRange.split("_")[1];
-
-            if (dayNum === 2) {
-              displayTitle = `훑어보기 (${pageStart}-${pageEnd}p)`;
-            } else {
-              const mainCategories = getMainCategoriesForPageRange(
-                dayPlan.pageRange
-              );
-              const categoryName = mainCategories[0]?.name || `${pageStart}p~`;
-              displayTitle = `${categoryName} (훑어보기)`;
-            }
+            displayTitle = `훑어보기 (${pageStart}-${pageEnd}p)`;
           }
         } else if (dayNum >= 6 && dayNum <= 9) {
           learningPhase = "speaking";

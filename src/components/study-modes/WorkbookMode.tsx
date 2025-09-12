@@ -7,19 +7,13 @@ import React, {
   useRef,
 } from "react";
 import { PenTool } from "lucide-react"; //, Check, RotateCcw
-// import { WORKBOOK_MESSAGES } from "@/constants/workbook.constants";
 
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
-// import { useTTS } from "@/shared/hooks/useTTS";
-import EasySpeech from "easy-speech";
+import { useTTS } from "@/shared/hooks/useTTS";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
 
 import { useWorkbookState } from "@/hooks/useWorkbookState";
 import { useWorkbookLogic } from "@/hooks/useWorkbookLogic";
-
-// import { QuestionCard } from "@/components/workbook/QuestionCard";
-// import { AnswerOptions } from "@/components/workbook/AnswerOptions";
-// import { ActionSection } from "@/components/workbook/ActionSection";
 import StudyPagination from "@/shared/components/StudyPagination";
 
 import { StudySidebar } from "@/shared/components/StudySidebar";
@@ -42,11 +36,6 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     settings = {},
     onSettingsChange,
   }) => {
-    // 초기화만 추가하고 나머지는 거의 동일
-    useEffect(() => {
-      EasySpeech.init();
-    }, []);
-
     // 데이터
     const workbook = useMemo(() => {
       if (!Array.isArray(rawWorkbook) || rawWorkbook.length === 0) return [];
@@ -128,18 +117,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     // 로직
     const { getCorrectAnswer, saveProgress, restoreProgress } =
       useWorkbookLogic(packId, dayNumber, workbook);
-    // const { speak, isSpeaking } = useTTS();
-    const speak = useCallback((text: string, options: TTSOptions = {}) => {
-      EasySpeech.speak({
-        text,
-        rate: options.rate || 0.9,
-        pitch: options.pitch || 1,
-        voice: EasySpeech.voices().find((v) =>
-          v.lang.includes(options.lang || "en-US")
-        ),
-      });
-    }, []);
-    const [isSpeaking, setIsSpeaking] = useState(false);
+    const { speak, isSpeaking } = useTTS();
     const { markModeCompleted } = useDayProgress(packId, dayNumber);
 
     // 내비/타이머/refs
@@ -414,45 +392,6 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
             <div className="flex-1 flex items-center justify-center p-4">
               <div className="w-full max-w-xl">
                 <div {...swipeHandlers}>
-                  {/* <QuestionCard
-                    question={currentQuestion}
-                    isAnswered={isCurrentAnswered}
-                    isCorrect={isCurrentCorrect}
-                    selectedAnswer={selectedAnswers[currentIndex]}
-                    onSpeak={handleSpeak}
-                    isSpeaking={isSpeaking}
-                  >
-                    <AnswerOptions
-                      options={currentQuestion.options}
-                      selectedAnswer={selectedAnswers[currentIndex]}
-                      correctAnswer={getCorrectAnswer(currentQuestion)}
-                      showResult={showResult[currentIndex] || false}
-                      isAnswered={isCurrentAnswered}
-                      onSelect={handleAnswerSelect}
-                    />
-
-                    {!isCurrentAnswered && (
-                      <div className="text-center text-gray-400 text-sm">
-                        {
-                          WORKBOOK_MESSAGES.STUDY_HINTS[
-                            localSettings.studyMode.toUpperCase() as keyof typeof WORKBOOK_MESSAGES.STUDY_HINTS
-                          ]
-                        }
-                      </div>
-                    )}
-
-                    {isCurrentAnswered && (
-                      <ActionSection
-                        isCorrect={isCurrentCorrect}
-                        correctAnswer={getCorrectAnswer(currentQuestion)}
-                        studyMode={localSettings.studyMode}
-                        showMeaningEnabled={localSettings.showMeaningEnabled}
-                        explanation={currentQuestion.explanation}
-                        showExplanation={showExplanation[currentIndex]}
-                        onToggleExplanation={handleToggleExplanation}
-                      />
-                    )}
-                  </QuestionCard> */}
                   <WorkbookCard
                     question={
                       currentQuestion.question || currentQuestion.sentence

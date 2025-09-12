@@ -79,7 +79,7 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-8 w-full">
+    <div className="bg-white rounded-2xl shadow-lg p-4 lg:p-8 w-full">
       <div className="text-center">
         {/* 🔥 학습 완료 뱃지 (기존 "문제 해결"에서 변경) */}
         {isAnswered && (

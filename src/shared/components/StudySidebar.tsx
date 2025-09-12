@@ -84,7 +84,7 @@ export const StudySidebar: React.FC<StudySidebarProps> = ({
   );
 
   return (
-    <aside className="hidden lg:block w-80 bg-white shadow-md">
+    <aside className="hidden lg:block w-90 bg-white shadow-md">
       {/* 헤더 */}
       <div className="p-6 h-full flex flex-col space-y-6">
         <div>
@@ -117,7 +117,7 @@ export const StudySidebar: React.FC<StudySidebarProps> = ({
         {/* 학습 카드(번호 칩) */}
         <div className="space-y-3 flex-1">
           <div className="text-sm text-slate-600 mb-3">학습 카드</div>
-          <div className="grid grid-cols-7 gap-2">
+          <div className="grid grid-cols-7 gap-2 overflow-y-auto h-[calc(100vh-45rem)]">
             {states.map(({ isCurrent, isMastered, isStudied }, idx) => {
               const base =
                 "w-8 h-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500";
