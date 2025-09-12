@@ -45,8 +45,12 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       return rawWorkbook;
     }, [rawWorkbook]);
 
-    const { getCorrectAnswer, saveProgress, restoreProgress } =
-      useWorkbookLogic(packId, dayNumber, workbook);
+    const {
+      getCorrectAnswer,
+      saveProgress,
+      restoreProgress,
+      clearItemProgress,
+    } = useWorkbookLogic(packId, dayNumber, workbook);
 
     // 2) 세션/일자 단위 시드 키
     const dayKey = useMemo(() => {
@@ -344,9 +348,11 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     const { clearItemProgress } = useWorkbookLogic(packId, dayNumber, workbook);
 
     // 14) 다시 풀기
+    // WorkbookMode.tsx 내부 - handleRetry 함수만 교체
     const handleRetry = useCallback(() => {
       const idx = currentIndexRef.current;
 
+      // 🔥 저장소에서도 완전히 삭제
       clearItemProgress(idx);
 
       pendingSaveRef.current.delete(idx);
@@ -376,7 +382,10 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
         delete copy[idx];
         return copy;
       });
+
+      console.log(`🔄 [RETRY] Reset state for index ${idx}`);
     }, [
+      clearItemProgress, // 🔥 추가
       setAnsweredQuestions,
       setCorrectAnswers,
       setShowResult,
