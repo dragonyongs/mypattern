@@ -1,6 +1,7 @@
+// src/shared/hooks/useTTS.ts
 import { useState, useCallback, useRef, useEffect } from "react";
 import EasySpeech from "easy-speech";
-import { logger } from "@/shared/utils/logger";
+import { logger as appLogger } from "@/shared/utils/logger";
 
 interface TTSOptions {
   lang?: string;
@@ -9,84 +10,156 @@ interface TTSOptions {
   voice?: string;
 }
 
+// 안전 로거: appLogger가 없거나 메서드가 없으면 console 대체
+const log = {
+  info: (...args: any[]) =>
+    (appLogger && typeof (appLogger as any).info === "function"
+      ? (appLogger as any).info
+      : console.info)(...args),
+  warn: (...args: any[]) =>
+    (appLogger && typeof (appLogger as any).warn === "function"
+      ? (appLogger as any).warn
+      : console.warn)(...args),
+  error: (...args: any[]) =>
+    (appLogger && typeof (appLogger as any).error === "function"
+      ? (appLogger as any).error
+      : console.error)(...args),
+};
+
+const isIOS = () =>
+  typeof navigator !== "undefined" &&
+  /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+  !(window as any).MSStream;
+
 export function useTTS() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const fallbackToNative = useRef(false);
+  const nativeReadyOnce = useRef(false);
+  const warned = useRef(false);
 
-  // EasySpeech 초기화
   useEffect(() => {
-    const initTTS = async () => {
+    const init = async () => {
       try {
-        await EasySpeech.init({
-          maxTimeout: 5000,
-          interval: 250,
-        });
+        await EasySpeech.init({ maxTimeout: 5000, interval: 250 });
         setIsInitialized(true);
+        fallbackToNative.current = false;
         setIsSupported(true);
-        logger.info("EasySpeech initialized successfully");
+        log.info("EasySpeech initialized");
       } catch (error) {
-        logger.warn("EasySpeech failed, falling back to native:", error);
+        if (!warned.current) {
+          log.info("EasySpeech not available, using native Web Speech API.");
+          warned.current = true;
+        }
         fallbackToNative.current = true;
         setIsSupported(
           typeof window !== "undefined" && "speechSynthesis" in window
         );
       }
     };
-
-    initTTS();
+    init();
   }, []);
+
+  const unlockNativeIfNeeded = () => {
+    try {
+      if (!nativeReadyOnce.current && window.speechSynthesis) {
+        const u = new SpeechSynthesisUtterance(" ");
+        u.volume = 0;
+        window.speechSynthesis.speak(u);
+        nativeReadyOnce.current = true;
+      }
+      if (window.speechSynthesis?.paused) {
+        window.speechSynthesis.resume();
+      }
+    } catch (e) {
+      log.warn("Native unlock skipped:", e);
+    }
+  };
+
+  const stopNative = () => {
+    try {
+      if (window.speechSynthesis?.speaking) {
+        window.speechSynthesis.cancel();
+      }
+    } catch (e) {
+      log.warn("Native stop failed:", e);
+    }
+  };
+
+  const stopEasy = () => {
+    try {
+      const canUseEasy =
+        isInitialized && typeof (EasySpeech as any).cancel === "function";
+      if (canUseEasy) (EasySpeech as any).cancel();
+    } catch (e) {
+      log.warn("EasySpeech stop failed:", e);
+    }
+  };
 
   const speak = useCallback(
     async (text: string, options: TTSOptions = {}) => {
-      if (!isSupported && !fallbackToNative.current) {
-        logger.warn("Speech synthesis not supported");
+      if (!text) return;
+      if (!(isSupported || fallbackToNative.current)) {
+        log.warn("Speech synthesis not supported");
         return;
       }
 
-      // 이전 음성 중지
-      stop();
+      // 이전 발화 정리
+      stopEasy();
+      stopNative();
 
       try {
-        if (isInitialized && !fallbackToNative.current) {
-          // EasySpeech 사용
-          const voices = EasySpeech.voices();
-          const selectedVoice =
-            voices.find((voice) =>
-              voice.lang.includes(options.lang || "en-US")
-            ) || voices[0];
+        const useEasy = isInitialized && !fallbackToNative.current;
+
+        if (useEasy) {
+          // 음성 목록 안전 획득
+          let voices: any[] = [];
+          try {
+            voices = (EasySpeech as any).voices?.() || [];
+          } catch {
+            voices = [];
+          }
+
+          const selected =
+            voices.find((v) => v?.lang?.includes(options.lang || "en-US")) ||
+            voices ||
+            undefined; // 보정: 배열 자체가 아닌 첫 음성/undefined
 
           setIsSpeaking(true);
 
-          await EasySpeech.speak({
+          await (EasySpeech as any).speak({
             text,
-            voice: selectedVoice,
-            rate: options.rate || 0.9,
-            pitch: options.pitch || 1,
+            voice: selected,
+            rate: options.rate ?? 0.9,
+            pitch: options.pitch ?? 1,
             volume: 1,
           });
 
           setIsSpeaking(false);
-        } else {
-          // 네이티브 Web Speech API 폴백
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.lang = options.lang || "en-US";
-          utterance.rate = options.rate || 0.9;
-          utterance.pitch = options.pitch || 1;
+          return;
+        }
 
-          utterance.onstart = () => setIsSpeaking(true);
-          utterance.onend = () => setIsSpeaking(false);
-          utterance.onerror = (e) => {
-            logger.error("TTS Error:", e);
+        // 네이티브
+        if (window.speechSynthesis) {
+          if (isIOS()) unlockNativeIfNeeded();
+
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = options.lang || "en-US";
+          u.rate = options.rate ?? 0.9;
+          u.pitch = options.pitch ?? 1;
+
+          u.onstart = () => setIsSpeaking(true);
+          u.onend = () => setIsSpeaking(false);
+          u.onerror = (e) => {
+            log.error("TTS Error:", e);
             setIsSpeaking(false);
           };
 
-          window.speechSynthesis.speak(utterance);
+          window.speechSynthesis.speak(u);
         }
-      } catch (error) {
-        logger.error("Speech failed:", error);
+      } catch (e) {
+        log.error("Speech failed:", e);
         setIsSpeaking(false);
       }
     },
@@ -95,51 +168,33 @@ export function useTTS() {
 
   const stop = useCallback(() => {
     try {
-      // EasySpeech 중지
-      if (isInitialized && EasySpeech.speaking()) {
-        EasySpeech.cancel();
-      }
-
-      // 네이티브 API 중지
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-
-      // 오디오 객체 중지 (필요시)
-      if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
-        currentAudioRef.current = null;
-      }
-
+      stopEasy();
+      stopNative();
       setIsSpeaking(false);
-    } catch (error) {
-      logger.error("Stop failed:", error);
+    } catch (e) {
+      log.error("Stop failed:", e);
       setIsSpeaking(false);
     }
-  }, [isInitialized]);
+  }, []);
 
   const pause = useCallback(() => {
     try {
-      if (isInitialized && EasySpeech.speaking()) {
-        // EasySpeech는 pause/resume이 제한적이므로 stop 사용
-        EasySpeech.cancel();
-        setIsSpeaking(false);
-      } else if (window.speechSynthesis?.speaking) {
+      stopEasy(); // EasySpeech는 pause 미지원 → cancel
+      if (window.speechSynthesis?.speaking) {
         window.speechSynthesis.pause();
       }
-    } catch (error) {
-      logger.error("Pause failed:", error);
+    } catch (e) {
+      log.error("Pause failed:", e);
     }
-  }, [isInitialized]);
+  }, []);
 
   const resume = useCallback(() => {
     try {
       if (window.speechSynthesis?.paused) {
         window.speechSynthesis.resume();
       }
-      // EasySpeech는 resume이 없으므로 재생성 필요
-    } catch (error) {
-      logger.error("Resume failed:", error);
+    } catch (e) {
+      log.error("Resume failed:", e);
     }
   }, []);
 

@@ -28,6 +28,8 @@ export interface StudyCardProps {
   studyMode: "immersive" | "assisted";
   showMeaningEnabled: boolean;
 
+  isSpeaking?: boolean;
+
   // 이벤트
   onToggleMeaning: () => void;
   onSpeak: (text: string) => void;
@@ -48,6 +50,7 @@ export const StudyCard: React.FC<StudyCardProps> = ({
   showMeaning,
   studyMode,
   showMeaningEnabled,
+  isSpeaking = false,
   onToggleMeaning,
   onSpeak,
   onMarkAsMastered,
@@ -72,6 +75,23 @@ export const StudyCard: React.FC<StudyCardProps> = ({
 
     return <span dangerouslySetInnerHTML={{ __html: highlightedText }} />;
   };
+
+  const handleCompleteClick = useCallback(
+    (e?: React.MouseEvent) => {
+      // ✅ 이벤트 중복 방지
+      e?.preventDefault();
+      e?.stopPropagation();
+
+      console.log("🎯 StudyCard Complete clicked:", {
+        studyMode,
+        showMeaningEnabled,
+        timestamp: Date.now(),
+      });
+
+      onMarkAsMastered();
+    },
+    [onMarkAsMastered, studyMode, showMeaningEnabled]
+  );
 
   return (
     <div className="relative bg-white rounded-2xl shadow-lg p-6 sm:p-8 text-center cursor-pointer transition-transform active:scale-95">
@@ -106,11 +126,16 @@ export const StudyCard: React.FC<StudyCardProps> = ({
 
         {/* 액션 버튼 영역: 발음듣기, 학습완료/다시학습, 뜻보기 */}
         <div className="flex justify-center gap-2 mb-4 mt-4">
-          <SpeakButton text={speakText!} onSpeak={onSpeak} />
+          <SpeakButton
+            text={speakText!}
+            onSpeak={onSpeak}
+            isSpeaking={isSpeaking}
+            disabled={isSpeaking}
+          />
           {isMastered ? (
             <RetryButton onClick={onMarkAsNotMastered} />
           ) : (
-            <CompleteButton onClick={onMarkAsMastered} />
+            <CompleteButton onClick={handleCompleteClick} />
           )}
           {(studyMode === "assisted" ||
             (studyMode === "immersive" && showMeaningEnabled)) && (

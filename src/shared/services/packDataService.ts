@@ -161,9 +161,9 @@ class PackDataService {
 
     // 시도할 후보 경로들 (우선순위)
     const candidates = [
-      `/data/packs/${packId}.json`,
+      // `/data/packs/${packId}.json`,
       `/data/packs/${packId}.min.json`,
-      `/data/packs/${packId}-minimal.json`,
+      // `/data/packs/${packId}-minimal.json`,
     ];
 
     const tryFetchSequential = async () => {

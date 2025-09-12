@@ -1,5 +1,5 @@
 // src/shared/components/StudySidebar.tsx
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useEffect, useCallback } from "react";
 import { StudySettingsPanel } from "./StudySettingsPanel";
 
 export interface StudySidebarProps {
@@ -30,25 +30,30 @@ export interface StudySidebarProps {
   handleAutoPlayChange?: (enabled: boolean) => void;
 }
 
-export const StudySidebar: React.FC<StudySidebarProps> = ({
-  category,
-  dayNumber,
-  progress,
-  items,
-  currentIndex,
-  masteredCards,
-  studiedCards,
-  correctAnswers,
-  answeredQuestions,
-  score,
-  onSelectIndex,
-  settings,
-  handleModeChange,
-  handleAutoProgressChange,
-  handleAutoPlayChange,
-  isSettingOpen,
-}) => {
-  // 공통 집계
+export const StudySidebar: React.FC<StudySidebarProps> = (props) => {
+  const {
+    category,
+    dayNumber,
+    progress,
+    items,
+    currentIndex,
+    masteredCards,
+    studiedCards,
+    correctAnswers,
+    answeredQuestions,
+    score,
+    onSelectIndex,
+    settings,
+    handleModeChange,
+    handleAutoProgressChange,
+    handleAutoPlayChange,
+  } = props;
+
+  // 1) 스크롤 컨테이너/아이템 참조
+  const gridRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // 2) 공통 집계
   const totals = useMemo(() => {
     const total = items.length;
     const studied = answeredQuestions?.size ?? studiedCards?.size ?? 0;
@@ -62,7 +67,7 @@ export const StudySidebar: React.FC<StudySidebarProps> = ({
     masteredCards,
   ]);
 
-  // 각 인덱스 상태 계산(현재/완료/학습됨)
+  // 3) 각 인덱스 상태 계산(현재/완료/학습됨)
   const states = useMemo(
     () =>
       items.map((_, idx) => {
@@ -82,6 +87,32 @@ export const StudySidebar: React.FC<StudySidebarProps> = ({
       studiedCards,
     ]
   );
+
+  // 4) 현재 인덱스가 보이지 않으면 '가까운' 위치로 스크롤
+  const ensureCurrentVisible = useCallback(() => {
+    const container = gridRef.current;
+    const el = itemRefs.current[currentIndex];
+    if (!container || !el) return;
+
+    // 컨테이너 기준 가시성 체크
+    const c = container.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const fullyVisible = r.top >= c.top && r.bottom <= c.bottom;
+
+    if (!fullyVisible) {
+      el.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
+      });
+    }
+  }, [currentIndex]);
+
+  // 5) 레이아웃 확정 후 1프레임 뒤에 실행 → 부드러운 스크롤
+  useEffect(() => {
+    const id = requestAnimationFrame(ensureCurrentVisible);
+    return () => cancelAnimationFrame(id);
+  }, [ensureCurrentVisible]);
 
   return (
     <aside className="hidden lg:block w-90 bg-white shadow-md">
@@ -117,7 +148,10 @@ export const StudySidebar: React.FC<StudySidebarProps> = ({
         {/* 학습 카드(번호 칩) */}
         <div className="space-y-3 flex-1">
           <div className="text-sm text-slate-600 mb-3">학습 카드</div>
-          <div className="grid grid-cols-7 gap-2 overflow-y-auto h-[calc(100vh-45rem)] min-h-32">
+          <div
+            ref={gridRef}
+            className="grid grid-cols-7 gap-2 overflow-y-auto h-[calc(100vh-45rem)] min-h-32 scroll-smooth"
+          >
             {states.map(({ isCurrent, isMastered, isStudied }, idx) => {
               const base =
                 "w-8 h-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500";
@@ -128,9 +162,11 @@ export const StudySidebar: React.FC<StudySidebarProps> = ({
                 : isStudied
                 ? "bg-orange-50 text-orange-700 border border-orange-200"
                 : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100";
+
               return (
                 <button
                   key={idx}
+                  ref={(el) => (itemRefs.current[idx] = el)}
                   type="button"
                   aria-label={`카드 ${idx + 1}`}
                   aria-pressed={isCurrent}
@@ -145,14 +181,12 @@ export const StudySidebar: React.FC<StudySidebarProps> = ({
         </div>
 
         {/* 설정 패널 */}
-        <div className="p-4">
-          <StudySettingsPanel
-            settings={settings}
-            handleModeChange={handleModeChange!}
-            handleAutoProgressChange={handleAutoProgressChange!}
-            handleAutoPlayChange={handleAutoPlayChange}
-          />
-        </div>
+        <StudySettingsPanel
+          settings={settings}
+          handleModeChange={handleModeChange!}
+          handleAutoProgressChange={handleAutoProgressChange!}
+          handleAutoPlayChange={handleAutoPlayChange}
+        />
       </div>
     </aside>
   );

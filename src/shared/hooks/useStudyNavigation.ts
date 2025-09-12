@@ -1,193 +1,174 @@
 // src/shared/hooks/useStudyNavigation.ts
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 
-export interface StudyNavigationConfig<T> {
-  items: T[];
-  initialIndex?: number;
-  onItemCompleted?: (item: T, index: number) => void;
-  onComplete?: () => void;
-  getItemProgress?: (item: T) => {
-    isCompleted: boolean;
-    lastStudied: Date | null;
-  };
-  settings?: {
-    autoProgressEnabled?: boolean;
-    skipCompletedItems?: boolean; // 🔥 완료된 아이템 건너뛸지 여부 제어
-  };
+export type StudyMode = "immersive" | "assisted";
+
+export interface StudySettings {
+  studyMode: StudyMode;
+  autoProgressEnabled: boolean;
+  autoPlay: boolean;
+  skipCompleted?: boolean;
 }
 
-export function useStudyNavigation<T extends { id: string }>({
-  items,
-  initialIndex = 0,
-  onItemCompleted,
-  onComplete,
-  getItemProgress,
-  settings = {},
-}: StudyNavigationConfig<T>) {
+export interface ProgressInfo {
+  isCompleted: boolean;
+  lastStudied?: string | null;
+}
+
+interface ItemBase {
+  id: string;
+}
+
+export default function useStudyNavigation<T extends ItemBase>(cfg: {
+  items: T[];
+  initialIndex?: number;
+  settings: StudySettings;
+  getProgress?: (item: T) => ProgressInfo;
+  onItemComplete?: (item: T, index: number) => void;
+  onComplete?: () => void;
+  speak?: (text: string) => void;
+}) {
   const {
-    autoProgressEnabled = true,
-    skipCompletedItems = false, // 🔥 기본값을 false로 설정하여 순차 진행 보장
-  } = settings;
+    items,
+    initialIndex = 0,
+    settings,
+    getProgress,
+    onItemComplete,
+    onComplete,
+    speak,
+  } = cfg;
 
-  // 🔥 상태 관리
-  const [currentIndex, setCurrentIndex] = useState(() => {
-    return Math.max(0, Math.min(initialIndex, items.length - 1));
-  });
+  const [index, setIndex] = useState(() =>
+    Math.min(Math.max(initialIndex, 0), Math.max(items.length - 1, 0))
+  );
+  const timeoutRef = useRef<number | null>(null);
 
-  const currentItem = useMemo(() => {
-    return items[currentIndex] || null;
-  }, [items, currentIndex]);
-
-  // 🔥 진행률 계산
-  const progress = useMemo(() => {
-    if (!items.length) return { completed: 0, total: 0, percentage: 0 };
-
-    const completedCount = items.filter((item) => {
-      const progress = getItemProgress?.(item);
-      return progress?.isCompleted ?? false;
-    }).length;
-
-    return {
-      completed: completedCount,
-      total: items.length,
-      percentage: Math.round((completedCount / items.length) * 100),
-    };
-  }, [items, getItemProgress]);
-
-  // 🔥 다음 아이템 찾기 (순차 진행 보장)
-  const findNextIndex = useCallback(
-    (fromIndex: number): number => {
-      if (!skipCompletedItems) {
-        // 🔥 순차 진행 모드: 단순히 다음 인덱스
-        return Math.min(fromIndex + 1, items.length - 1);
-      }
-
-      // 🔥 완료된 아이템 건너뛰기 모드 (기존 로직)
-      for (let i = fromIndex + 1; i < items.length; i++) {
-        const item = items[i];
-        const itemProgress = getItemProgress?.(item);
-        if (!itemProgress?.isCompleted) {
-          return i;
-        }
-      }
-      return Math.min(fromIndex + 1, items.length - 1);
+  const isCompleted = useCallback(
+    (i: number) => {
+      const item = items[i];
+      if (!item || !getProgress) return false;
+      return getProgress(item)?.isCompleted ?? false;
     },
-    [items, getItemProgress, skipCompletedItems]
+    [items, getProgress]
   );
 
-  // 🔥 이전 아이템 찾기
-  const findPrevIndex = useCallback((fromIndex: number): number => {
-    return Math.max(fromIndex - 1, 0);
-  }, []);
-
-  // 🔥 네비게이션 함수들
-  const goToNext = useCallback(() => {
-    setCurrentIndex((prevIndex) => {
-      const nextIndex = findNextIndex(prevIndex);
-      console.log(`🔄 Navigation: ${prevIndex} → ${nextIndex}`);
-      return nextIndex;
-    });
-  }, [findNextIndex]);
-
-  const goToPrev = useCallback(() => {
-    setCurrentIndex((prevIndex) => {
-      const prevIdx = findPrevIndex(prevIndex);
-      console.log(`🔄 Navigation: ${prevIndex} → ${prevIdx}`);
-      return prevIdx;
-    });
-  }, [findPrevIndex]);
-
-  const goToIndex = useCallback(
-    (index: number) => {
-      const targetIndex = Math.max(0, Math.min(index, items.length - 1));
-      setCurrentIndex(targetIndex);
+  const findNext = useCallback(
+    (from: number) => {
+      if (!settings.skipCompleted) return Math.min(from + 1, items.length - 1);
+      for (let i = from + 1; i < items.length; i++) {
+        if (!isCompleted(i)) return i;
+      }
+      return Math.min(from + 1, items.length - 1);
     },
-    [items.length]
+    [items.length, settings.skipCompleted, isCompleted]
   );
 
-  // 🔥 아이템 완료 처리
-  const handleItemComplete = useCallback(
-    (completed: boolean = true) => {
-      if (!currentItem) return;
+  const findPrev = useCallback((from: number) => Math.max(from - 1, 0), []);
 
-      console.log(`🎯 Item completed: ${currentItem.id} = ${completed}`);
+  // 내부 공통 이동: manual=false(자동)이면 게이트 적용
+  const move = useCallback(
+    (to: number, manual: boolean) => {
+      if (
+        !manual &&
+        (!settings.autoProgressEnabled || settings.studyMode === "immersive")
+      )
+        return;
+      const safe = Math.min(Math.max(to, 0), Math.max(items.length - 1, 0));
+      setIndex(safe);
 
-      // 상위 컴포넌트에 완료 알림
-      onItemCompleted?.(currentItem, currentIndex);
+      // 수동 이동만 TTS
+      if (manual && settings.autoPlay && speak && items[safe]) {
+        speak(items[safe].id);
+      }
 
-      // 🔥 자동 진행이 활성화되고, 완료된 경우에만 다음으로 이동
-      if (autoProgressEnabled && completed && currentIndex < items.length - 1) {
-        setTimeout(() => {
-          goToNext();
-        }, 300); // 약간의 딜레이로 UX 개선
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     },
     [
-      currentItem,
-      currentIndex,
-      onItemCompleted,
-      autoProgressEnabled,
-      items.length,
-      goToNext,
+      items,
+      settings.autoPlay,
+      settings.autoProgressEnabled,
+      settings.studyMode,
+      speak,
     ]
   );
 
-  // 🔥 모든 아이템 완료 확인
-  const isAllCompleted = useMemo(() => {
-    return progress.completed === progress.total && progress.total > 0;
-  }, [progress]);
+  // 수동 이동은 기본 manual = true
+  const goTo = useCallback(
+    (to: number, manual: boolean = true) => move(to, manual),
+    [move]
+  );
+  const next = useCallback(
+    (manual: boolean = true) => setIndex((i) => findNext(i)),
+    [findNext]
+  );
+  const prev = useCallback(
+    (manual: boolean = true) => setIndex((i) => findPrev(i)),
+    [findPrev]
+  );
 
-  // 🔥 현재 아이템 완료 상태
-  const isCurrentCompleted = useMemo(() => {
-    if (!currentItem) return false;
-    const itemProgress = getItemProgress?.(currentItem);
-    return itemProgress?.isCompleted ?? false;
-  }, [currentItem, getItemProgress]);
+  // 현재 아이템 완료 → 자동 진행은 manual=false로 위임
+  const completeCurrent = useCallback(
+    (completed: boolean = true) => {
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      if (!completed) return;
 
-  // 🔥 스와이프 제스처
+      const item = items[index];
+      if (item) onItemComplete?.(item, index);
+
+      if (settings.autoProgressEnabled && settings.studyMode === "assisted") {
+        timeoutRef.current = window.setTimeout(() => {
+          goTo(Math.min(index + 1, Math.max(items.length - 1, 0)), false); // 자동 이동
+        }, 400);
+      }
+    },
+    [
+      items,
+      index,
+      onItemComplete,
+      settings.autoProgressEnabled,
+      settings.studyMode,
+      goTo,
+    ]
+  );
+
+  // 스와이프/키보드: 수동 이동
   const swipeHandlers = useSwipeGesture({
-    onSwipeLeft: goToNext,
-    onSwipeRight: goToPrev,
+    onSwipeLeft: () => next(true),
+    onSwipeRight: () => prev(true),
   });
 
-  // 🔥 키보드 이벤트
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") goToNext();
-      else if (e.key === "ArrowLeft") goToPrev();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") next(true);
+      if (e.key === "ArrowLeft") prev(true);
     };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [next, prev]);
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goToNext, goToPrev]);
-
-  // 🔥 완료 체크
+  // 전체 완료 콜백
   useEffect(() => {
-    if (isAllCompleted) {
-      onComplete?.();
-    }
-  }, [isAllCompleted, onComplete]);
+    if (!items.length) return;
+    const all = items.every((_, i) => isCompleted(i));
+    if (all) onComplete?.();
+  }, [items, isCompleted, onComplete]);
 
   return {
-    // 상태
-    currentIndex,
-    currentItem,
-    progress,
-    isAllCompleted,
-    isCurrentCompleted,
-
-    // 네비게이션
-    goToNext,
-    goToPrev,
-    goToIndex,
-    canGoNext: currentIndex < items.length - 1,
-    canGoPrev: currentIndex > 0,
-
-    // 완료 처리
-    handleItemComplete,
-
-    // 이벤트 핸들러
+    index,
+    currentItem: items[index] ?? null,
+    canGoPrev: index > 0,
+    canGoNext: index < items.length - 1,
+    goTo,
+    next,
+    prev,
+    completeCurrent,
     swipeHandlers,
   };
 }

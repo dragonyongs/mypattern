@@ -1,7 +1,20 @@
-// StudySettingsPanel.tsx
-import React, { useCallback, useEffect } from "react";
+// src/shared/components/StudySettingsPanel.tsx
+import React, { useCallback, useEffect, useMemo } from "react";
 import { Brain, Lightbulb, Zap, Volume2 } from "lucide-react";
 import type { StudySettings } from "@/types";
+
+export interface StudySettingsPanelProps {
+  settings: Required<
+    Pick<
+      StudySettings,
+      "studyMode" | "autoProgressEnabled" | "autoPlayOnSelect"
+    >
+  >;
+  isSettingOpen?: boolean;
+  handleModeChange: (mode: "assisted" | "immersive") => void;
+  handleAutoProgressChange: (enabled: boolean) => void;
+  handleAutoPlayChange?: (enabled: boolean) => void;
+}
 
 export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
   settings,
@@ -10,7 +23,6 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
   handleAutoProgressChange,
   handleAutoPlayChange,
 }) => {
-  // 🔥 디버깅용 로그
   useEffect(() => {
     console.log("🔥 StudySettingsPanel rendered with:", {
       studyMode: settings.studyMode,
@@ -19,12 +31,22 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
     });
   }, [settings]);
 
-  // 🔥 터치 이벤트 최적화된 핸들러
+  const isImmersive = settings.studyMode === "immersive";
+
+  // 안내문구는 memo로 관리
+  const autoProgressHint = useMemo(
+    () =>
+      isImmersive
+        ? "몰입 모드에서는 자동 진행이 비활성화됩니다"
+        : "학습 완료 시 다음 카드로 자동 이동합니다",
+    [isImmersive]
+  );
+
+  // 모드 전환
   const handleAssistedClick = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log("🔥 Assisted mode clicked");
       handleModeChange("assisted");
     },
     [handleModeChange]
@@ -34,26 +56,26 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
     (e: React.MouseEvent | React.TouchEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log("🔥 Immersive mode clicked");
       handleModeChange("immersive");
     },
     [handleModeChange]
   );
 
+  // 자동 진행 토글
   const handleAutoProgressToggle = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const newValue = !settings.autoProgressEnabled;
-      console.log("🔥 Auto progress toggled:", newValue);
-      handleAutoProgressChange(newValue);
+      if (isImmersive) return; // 비활성 시 무시
+      handleAutoProgressChange(!settings.autoProgressEnabled);
     },
-    [handleAutoProgressChange, settings.autoProgressEnabled]
+    [isImmersive, settings.autoProgressEnabled, handleAutoProgressChange]
   );
 
   return (
     <div className="space-y-6">
-      {/* 학습 모드 설정 */}
+      {/* 학습 모드 */}
+      <div className="text-sm text-slate-600 mb-3">학습 설정</div>
       <div>
         <div className="space-y-2">
           <button
@@ -64,6 +86,7 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
                 ? "bg-indigo-50 border-2 border-indigo-600 text-indigo-600"
                 : "bg-gray-50 border-2 border-transparent text-gray-600 hover:bg-gray-100 active:bg-gray-200"
             }`}
+            aria-pressed={settings.studyMode === "assisted"}
           >
             <div className="flex items-center gap-3">
               <Lightbulb className="w-5 h-5" />
@@ -82,6 +105,7 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
                 ? "bg-indigo-50 border-2 border-indigo-600 text-indigo-600"
                 : "bg-gray-50 border-2 border-transparent text-gray-600 hover:bg-gray-100 active:bg-gray-200"
             }`}
+            aria-pressed={settings.studyMode === "immersive"}
           >
             <div className="flex items-center gap-3">
               <Brain className="w-5 h-5" />
@@ -94,28 +118,52 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
         </div>
       </div>
 
-      {/* 자동 진행 토글 */}
+      {/* 자동 진행 토글 (몰입 모드일 때 비활성) */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center gap-3">
-          <Zap className="w-5 h-5 text-gray-600" />
-          <span className="text-sm font-medium text-gray-700">자동 진행</span>
+          <Zap
+            className={`w-5 h-5 ${
+              isImmersive ? "text-gray-400" : "text-gray-600"
+            }`}
+          />
+          <div className="flex flex-col">
+            <span
+              className={`text-sm font-medium ${
+                isImmersive ? "text-gray-400" : "text-gray-700"
+              }`}
+            >
+              자동 진행
+            </span>
+            <span className="text-xs text-gray-400">{autoProgressHint}</span>
+          </div>
         </div>
+
         <button
           onClick={handleAutoProgressToggle}
           onTouchEnd={handleAutoProgressToggle}
+          disabled={isImmersive}
+          aria-disabled={isImmersive}
+          aria-label={autoProgressHint}
+          title={autoProgressHint}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors touch-manipulation ${
-            settings.autoProgressEnabled ? "bg-indigo-600" : "bg-gray-300"
+            isImmersive
+              ? "bg-gray-200 cursor-not-allowed"
+              : settings.autoProgressEnabled
+              ? "bg-indigo-600"
+              : "bg-gray-300"
           }`}
         >
           <span
             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-              settings.autoProgressEnabled ? "translate-x-6" : "translate-x-1"
+              settings.autoProgressEnabled && !isImmersive
+                ? "translate-x-6"
+                : "translate-x-1"
             }`}
           />
         </button>
       </div>
 
-      {/* 답 선택시 자동 재생 설정 */}
+      {/* 답 선택시 자동 재생 */}
       {handleAutoPlayChange && (
         <div className="flex items-center justify-between py-2">
           <div className="flex items-center gap-3">
@@ -130,12 +178,11 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
               checked={settings.autoPlayOnSelect || false}
               onChange={(e) => {
                 e.stopPropagation();
-                console.log("🔥 Auto play changed:", e.target.checked);
                 handleAutoPlayChange(e.target.checked);
               }}
               className="sr-only peer"
             />
-            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
           </label>
         </div>
       )}

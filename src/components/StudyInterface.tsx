@@ -1,5 +1,11 @@
 // src/components/StudyInterface.tsx
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from "react";
 import { shallow } from "zustand/shallow";
 import {
   ArrowLeft,
@@ -17,7 +23,7 @@ import {
   Target,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { VocabularyMode } from "./study-modes/VocabularyMode";
+import VocabularyMode from "./study-modes/VocabularyMode";
 import { SentenceMode } from "./study-modes/SentenceMode";
 import { WorkbookMode } from "./study-modes/WorkbookMode";
 import { LearningMethodIntro } from "./LearningMethodIntro";
@@ -38,16 +44,22 @@ type StudyMode =
   | "speaking-sentence"
   | "workbook";
 
+// 🔥 타입 정의 추가
+export type StudyModeType = "immersive" | "assisted";
+
 export const StudyInterface: React.FC = () => {
+  // ✅ ref를 사용하여 무한 반복 방지
+  const isInitializedRef = useRef(false);
+  const settingsInitializedRef = useRef(false);
+
   // ✅ 모든 hooks를 최상단에 호출
   const navigate = useNavigate();
-  // const { pathname } = useLocation();
   const { day: dayParam } = useParams<{ day: string }>();
   const [lastCompletedItem, setLastCompletedItem] = useState<string | null>(
     null
   );
   const [isSettingOpen, setIsSettingOpen] = useState(false);
-  const [studyTime, setStudyTime] = useState(0); // 학습 시간 추가
+  const [studyTime, setStudyTime] = useState(0);
 
   const currentDay = parseInt(dayParam || "1", 10);
   const packData = useAppStore((state) => state.selectedPackData);
@@ -108,19 +120,74 @@ export const StudyInterface: React.FC = () => {
     shallow
   );
 
-  // 3) settings 계산을 storeSettings에 반응하도록 변경
+  // 3) ✅ 설정 계산 최적화 (깊은 비교 방지)
   const settings = useMemo(() => {
-    const base = {
+    if (!packId) {
+      return {
+        showMeaningEnabled: false,
+        autoProgressEnabled: true,
+        studyMode: "immersive" as StudyModeType,
+        autoPlayOnSelect: false,
+      };
+    }
+
+    const base: StudySettings = {
       showMeaningEnabled: false,
       autoProgressEnabled: true,
-      studyMode: "immersive" as const,
+      studyMode: "immersive" as StudyModeType,
       autoPlayOnSelect: false,
     };
 
     const merged = { ...base, ...(storeSettings || {}) };
     merged.showMeaningEnabled = merged.studyMode === "assisted";
+
+    // ✅ 설정이 실제로 변경되었을 때만 로그 출력
+    if (settingsInitializedRef.current) {
+      console.log("🎯 Settings updated:", merged);
+    } else {
+      settingsInitializedRef.current = true;
+    }
+
     return merged;
-  }, [storeSettings]);
+  }, [packId, storeSettings]);
+
+  // ✅ 설정 핸들러 최적화 (불필요한 재생성 방지)
+  const handleSettingsChange = useCallback(
+    (newSettings: Partial<StudySettings>) => {
+      if (!packData) return;
+
+      // ✅ 실제 변경사항이 있을 때만 업데이트
+      const currentSettings = storeSettings || {};
+      const hasChanges = Object.keys(newSettings).some(
+        (key) =>
+          currentSettings[key as keyof StudySettings] !==
+          newSettings[key as keyof StudySettings]
+      );
+
+      if (hasChanges) {
+        console.log("🔄 Settings changing:", newSettings);
+        updateSettings(packData.id, newSettings);
+      }
+    },
+    [packData?.id, storeSettings, updateSettings]
+  );
+
+  const handleAutoProgressChange = useCallback(
+    (enabled: boolean) => {
+      handleSettingsChange({ autoProgressEnabled: enabled });
+    },
+    [handleSettingsChange]
+  );
+
+  const handleStudyModeChange = useCallback(
+    (mode: StudyModeType) => {
+      handleSettingsChange({
+        studyMode: mode,
+        showMeaningEnabled: mode === "assisted",
+      });
+    },
+    [handleSettingsChange]
+  );
 
   const dayPlan = useMemo(() => {
     if (!packData) return null;
@@ -184,7 +251,7 @@ export const StudyInterface: React.FC = () => {
     [packData, currentDay]
   );
 
-  // 🔥 학습 위치 계산 함수
+  // ✅ getInitialItemIndex 최적화 (콘솔 로그 줄이기)
   const getInitialItemIndex = useCallback(
     (mode: StudyMode) => {
       if (!packData) return 0;
@@ -200,25 +267,17 @@ export const StudyInterface: React.FC = () => {
         contentIds
       );
 
-      // 미완료 아이템이 있으면 그 위치로
       if (nextUncompletedIndex < contentIds.length) {
-        console.log(
-          `🎯 Mode ${mode}: Moving to uncompleted index ${nextUncompletedIndex}`
-        );
+        // ✅ 로그 빈도 줄이기
         return nextUncompletedIndex;
       }
 
-      // 모든 것이 완료된 경우 저장된 위치 사용
       const savedIndex = getCurrentItemIndex(packData.id, currentDay, mode);
       const finalIndex = Math.min(savedIndex, contentIds.length - 1);
-
-      console.log(
-        `🎯 Mode ${mode}: All completed, using saved index ${finalIndex}`
-      );
       return finalIndex;
     },
     [
-      packData,
+      packData?.id,
       currentDay,
       getModeData,
       getCurrentItemIndex,
@@ -238,57 +297,53 @@ export const StudyInterface: React.FC = () => {
         .getState()
         .setItemCompleted(packData.id, currentDay, itemId, completed);
 
-      // 2. 🔥 함수형 업데이트로 최신 상태 기반 계산
-      const modeData = getModeData(currentMode);
-      const currentItemIndex = modeData.findIndex((item) => item.id === itemId);
-
-      if (currentItemIndex >= 0) {
-        // 🔥 핵심: 함수형 업데이트 사용
-        setCurrentItemIndex(
-          packData.id,
-          currentDay,
-          currentMode,
-          (prevIndex) => {
-            const nextIndex = Math.min(
-              currentItemIndex + 1,
-              modeData.length - 1
-            );
-            console.log(`📍 Position updated: ${prevIndex} → ${nextIndex}`);
-            return nextIndex;
-          }
+      // 2. ✅ 자동 진행 설정 체크 추가
+      if (!settings.autoProgressEnabled) {
+        console.log(
+          "🚫 StudyInterface: Auto progress disabled - no position update"
         );
+        return;
+      }
+
+      if (settings.studyMode === "immersive") {
+        console.log("🚫 StudyInterface: Immersive mode - no position update");
+        return;
+      }
+
+      // 3. assisted 모드에서만 위치 업데이트
+      if (settings.studyMode === "assisted") {
+        const modeData = getModeData(currentMode);
+        const currentItemIndex = modeData.findIndex(
+          (item) => item.id === itemId
+        );
+
+        if (currentItemIndex >= 0) {
+          setCurrentItemIndex(
+            packData.id,
+            currentDay,
+            currentMode,
+            (prevIndex) => {
+              const nextIndex = Math.min(
+                currentItemIndex + 1,
+                modeData.length - 1
+              );
+              console.log(`📍 Position updated: ${prevIndex} → ${nextIndex}`);
+              return nextIndex;
+            }
+          );
+        }
       }
     },
-    [packData, currentDay, currentMode, getModeData, setCurrentItemIndex]
+    [
+      packData,
+      currentDay,
+      currentMode,
+      getModeData,
+      setCurrentItemIndex,
+      settings.autoProgressEnabled,
+      settings.studyMode,
+    ]
   );
-
-  // 🔥 아이템 완료 후 위치 업데이트 useEffect
-  // useEffect(() => {
-  //   if (!lastCompletedItem || !packData || !currentMode) return;
-
-  //   const modeData = getModeData(currentMode);
-  //   const completedItemIndex = modeData.findIndex(
-  //     (item) => item.id === lastCompletedItem
-  //   );
-
-  //   if (completedItemIndex >= 0) {
-  //     const nextIndex = Math.min(completedItemIndex + 1, modeData.length - 1);
-
-  //     setCurrentItemIndex(packData.id, currentDay, currentMode, nextIndex);
-
-  //     console.log(`📍 Position updated: ${completedItemIndex} → ${nextIndex}`);
-  //   }
-
-  //   // 처리 완료 후 초기화
-  //   setLastCompletedItem(null);
-  // }, [
-  //   lastCompletedItem,
-  //   packData,
-  //   currentMode,
-  //   currentDay,
-  //   getModeData,
-  //   setCurrentItemIndex,
-  // ]);
 
   const handleBack = useCallback(() => {
     navigate("/calendar");
@@ -390,18 +445,19 @@ export const StudyInterface: React.FC = () => {
     setCompletion({ open: false, completed: null });
   }, []);
 
-  // 🔥 모드 변경 핸들러 (안정화)
+  // ✅ 모드 변경 핸들러 최적화
   const handleModeChange = useCallback(
     (mode: StudyMode) => {
-      if (!packData) return;
+      if (!packData || currentMode === mode) return;
 
-      console.log(`🔄 Mode changing to: ${mode}`);
+      console.log(`🔄 Mode changing: ${currentMode} → ${mode}`);
       setCurrentMode(mode);
 
-      // 해당 모드의 최적 시작 위치 계산
+      // 위치 계산은 한 번만 수행
       const modeData = getModeData(mode);
-      const contentIds = modeData.map((item) => item.id);
+      if (modeData.length === 0) return;
 
+      const contentIds = modeData.map((item) => item.id);
       const savedIndex = getCurrentItemIndex(packData.id, currentDay, mode);
       const nextUncompletedIndex = getNextUncompletedIndex(
         packData.id,
@@ -416,11 +472,14 @@ export const StudyInterface: React.FC = () => {
           : Math.min(savedIndex, contentIds.length - 1);
 
       setCurrentItemIndex(packData.id, currentDay, mode, optimalIndex);
-      console.log(`🎯 Mode set to ${mode}, starting at index: ${optimalIndex}`);
+
+      // ✅ 한 번만 로그 출력
+      console.log(`✅ Mode set: ${mode}, index: ${optimalIndex}`);
     },
     [
-      packData,
+      packData?.id,
       currentDay,
+      currentMode, // ✅ 현재 모드 추가로 중복 호출 방지
       getModeData,
       getCurrentItemIndex,
       getNextUncompletedIndex,
@@ -483,27 +542,18 @@ export const StudyInterface: React.FC = () => {
     });
   }, [availableModeKeys, dayProgress, getModeProgress, labelMap]);
 
-  // ✅ 초기 모드 설정 Effect
+  // ✅ 초기 모드 설정 최적화
   useEffect(() => {
-    console.log("🔍 Initial mode setup:", {
-      availableModeKeys: availableModeKeys.length,
-      currentMode,
-      packData: !!packData,
-      dayPlan: !!dayPlan,
-    });
+    // 초기화가 이미 완료되었다면 실행하지 않음
+    if (isInitializedRef.current) return;
 
     if (availableModeKeys.length && !currentMode && packData && dayPlan) {
       const firstMode = availableModeKeys[0];
-      console.log(`🚀 Setting initial mode: ${firstMode}`);
+      console.log(`🚀 Initial mode: ${firstMode}`);
       handleModeChange(firstMode);
+      isInitializedRef.current = true;
     }
-  }, [
-    availableModeKeys.length,
-    currentMode,
-    packData,
-    dayPlan,
-    handleModeChange,
-  ]);
+  }, [availableModeKeys.length, currentMode, packData, dayPlan]); // handleModeChange 제거
 
   // ✅ Day 접근 권한 검증
   const isDayAccessible = useMemo(() => {
@@ -518,33 +568,33 @@ export const StudyInterface: React.FC = () => {
     return previousDayProgress?.isCompleted ?? false;
   }, [packData, currentDay]);
 
-  // ✅ 컨텐츠 렌더링 함수
+  // ✅ renderContent 의존성 배열 최적화
   const renderContent = useCallback(() => {
-    if (!currentMode) {
-      console.log("⚠️ No current mode set");
-      return null;
-    }
+    if (!currentMode) return null;
 
     const items = getModeData(currentMode);
     const learningMethod = getLearningMethod(currentMode);
     const contentType = getContentType(currentMode);
     const initialItemIndex = getInitialItemIndex(currentMode);
 
-    console.log(`📋 Rendering ${contentType} with ${items.length} items`);
-
+    // 🔥 공통 props에 설정 핸들러들 추가
     const commonProps = {
-      packId: packData.id,
+      packId: packData!.id,
       currentDay,
       dayNumber: currentDay,
       getItemProgress,
       onItemCompleted: handleItemCompleted,
       onComplete: () => handleModeComplete(currentMode),
       initialItemIndex,
+
+      // 🔥 핵심: 설정 관련 props 추가
       settings,
-      onSettingsChange: (s: StudySettings) => setSettingsForPack(s),
+      onSettingsChange: handleSettingsChange,
+      onAutoProgressChange: handleAutoProgressChange,
+      onStudyModeChange: handleStudyModeChange,
     };
 
-    const componentKey = `${currentMode}-${packData.id}-${currentDay}`;
+    const componentKey = `${currentMode}-${packData!.id}-${currentDay}`;
 
     switch (contentType) {
       case "vocab":
@@ -573,69 +623,48 @@ export const StudyInterface: React.FC = () => {
             key={componentKey}
             items={items}
             dayNumber={currentDay}
-            packId={packData.id}
+            packId={packData!.id}
             onComplete={() => handleModeComplete(currentMode)}
             onItemCompleted={handleItemCompleted}
             initialItemIndex={initialItemIndex}
             isSettingOpen={isSettingOpen}
             settings={settings}
+            onSettingsChange={handleSettingsChange}
+            onAutoProgressChange={handleAutoProgressChange}
+            onStudyModeChange={handleStudyModeChange}
           />
         );
       default:
-        console.log(`⚠️ Unknown content type: ${contentType}`);
         return <div>Unknown content type: {contentType}</div>;
     }
   }, [
     currentMode,
-    getModeData,
-    getLearningMethod,
-    getContentType,
-    getInitialItemIndex,
-    packData,
+    packData?.id, // ✅ packData 대신 packData?.id 사용
     currentDay,
-    getItemProgress,
-    handleItemCompleted,
-    handleModeComplete,
-    settings,
+    settings, // ✅ 설정 변경 시에만 리렌더링
+    // 함수들은 제거 (useCallback으로 이미 메모이제이션됨)
   ]);
 
-  const setSettingsForPack = React.useCallback(
-    (next: Partial<StudySettings>) => {
-      if (!packData) return;
-      updateSettings(packData.id, next); // ← setSettings 대신 updateSettings 사용
+  // 🔥 StudySettingsSheet용 핸들러들
+  const handleModeSetting = useCallback(
+    (mode: StudyModeType) => {
+      handleStudyModeChange(mode);
     },
-    [packData, updateSettings]
+    [handleStudyModeChange]
   );
 
-  const handleModeSetting = React.useCallback(
-    (mode: "assisted" | "immersive") => {
-      const newSettings: Partial<StudySettings> = {
-        studyMode: mode,
-        showMeaningEnabled: mode === "assisted",
-      };
-
-      console.log("🎯 Updating settings:", newSettings);
-      setSettingsForPack(newSettings);
-
-      // 🔥 강제 리렌더링을 위한 이벤트 디스패치
-      setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent("settings-updated", {
-            detail: newSettings,
-          })
-        );
-      }, 100);
+  const handleAutoProgressSetting = useCallback(
+    (enabled: boolean) => {
+      handleAutoProgressChange(enabled);
     },
-    [setSettingsForPack]
+    [handleAutoProgressChange]
   );
 
-  const handleAutoProgressSetting = React.useCallback(
-    (v: boolean) => setSettingsForPack({ autoProgressEnabled: v }),
-    [setSettingsForPack]
-  );
-  const handleAutoPlaySetting = React.useCallback(
-    (v: boolean) => setSettingsForPack({ autoPlayOnSelect: v }),
-    [setSettingsForPack]
+  const handleAutoPlaySetting = useCallback(
+    (enabled: boolean) => {
+      handleSettingsChange({ autoPlayOnSelect: enabled });
+    },
+    [handleSettingsChange]
   );
 
   // 완료된 모드 수 계산
@@ -828,6 +857,7 @@ export const StudyInterface: React.FC = () => {
 
         {/* 컨텐츠 영역 */}
         <div className="flex-1">{renderContent()}</div>
+
         {/* 완료 모달 */}
         <CompletionModal
           key={`${completion.completed}-${currentDay}`}
