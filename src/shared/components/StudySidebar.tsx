@@ -25,9 +25,9 @@ export interface StudySidebarProps {
     autoPlayOnSelect?: boolean;
   };
 
-  handleModeChange?: (mode: "assisted" | "immersive") => void;
-  handleAutoProgressChange?: (enabled: boolean) => void;
-  handleAutoPlayChange?: (enabled: boolean) => void;
+  handleModeChange: (mode: "assisted" | "immersive") => void;
+  handleAutoProgressChange: (enabled: boolean) => void;
+  handleAutoPlayChange: (enabled: boolean) => void;
 }
 
 export const StudySidebar: React.FC<StudySidebarProps> = (props) => {
