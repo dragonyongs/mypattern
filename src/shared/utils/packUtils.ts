@@ -34,6 +34,83 @@ export type GeneratedWorkbook = {
   relatedSentenceId: string;
 };
 
+export function shouldGenerateWorkbook(
+  dayPlan: any,
+  dayNumber: number
+): boolean {
+  if (!dayPlan?.modes) return false;
+
+  const workbookMode = dayPlan.modes.find(
+    (mode: any) => mode.type === "workbook"
+  );
+
+  // 워크북 모드가 없거나, contentIds가 비어있지 않으면 자동 생성하지 않음
+  if (!workbookMode || !Array.isArray(workbookMode.contentIds)) {
+    return false;
+  }
+
+  // contentIds가 비어있는 경우에만 자동 생성
+  return workbookMode.contentIds.length === 0;
+}
+
+// 🔥 수정된 함수: 조건부 워크북 생성
+export function generateWorkbookForDay(
+  dayPlan: any,
+  dayNumber: number,
+  allContents: Array<Vocabulary | Sentence>,
+  totalOptions = 4
+): GeneratedWorkbook[] {
+  // 자동 생성 조건 확인
+  if (!shouldGenerateWorkbook(dayPlan, dayNumber)) {
+    console.log(
+      `📝 Day ${dayNumber}: 워크북 자동 생성 조건에 맞지 않음 (contentIds가 비어있지 않거나 워크북 모드가 없음)`
+    );
+    return [];
+  }
+
+  console.log(`📝 Day ${dayNumber}: 워크북 자동 생성 시작`);
+
+  // 해당 일자의 문장 데이터 수집
+  const dayModes = dayPlan.modes || [];
+  const sentenceContentIds = new Set<string>();
+
+  // 해당 일자의 모든 모드에서 sentence 타입의 contentIds 수집
+  dayModes.forEach((mode: any) => {
+    if (mode.type?.includes("sentence") && Array.isArray(mode.contentIds)) {
+      mode.contentIds.forEach((id: string) => sentenceContentIds.add(id));
+    }
+  });
+
+  if (sentenceContentIds.size === 0) {
+    console.log(`📝 Day ${dayNumber}: 생성할 문장이 없어 워크북 생성 건너뜀`);
+    return [];
+  }
+
+  const sentences = allContents.filter(
+    (c): c is Sentence => c.type === "sentence" && sentenceContentIds.has(c.id)
+  );
+
+  const vocabs = allContents.filter(
+    (c): c is Vocabulary => c.type === "vocabulary"
+  );
+
+  const results: GeneratedWorkbook[] = [];
+
+  for (const sentence of sentences) {
+    const workbookItems = generateWorkbookFromSentence(
+      sentence,
+      [...sentences, ...vocabs],
+      totalOptions
+    );
+    results.push(...workbookItems);
+  }
+
+  console.log(
+    `📝 Day ${dayNumber}: ${results.length}개의 워크북 문제 생성 완료`
+  );
+  return results;
+}
+
 // 안전한 셔플 (Fisher-Yates)
 function shuffle<T>(arr: T[]) {
   const a = arr.slice();
@@ -74,7 +151,6 @@ export function generateOptionsForTarget(
   const final = shuffle([targetWord, ...chosen]);
   return final;
 }
-
 // 문장 -> 워크북 생성
 export function generateWorkbookFromSentence(
   sentence: Sentence,
@@ -84,6 +160,7 @@ export function generateWorkbookFromSentence(
   const vocabs = allContents.filter(
     (c): c is Vocabulary => c.type === "vocabulary"
   );
+
   const results: GeneratedWorkbook[] = [];
 
   for (const target of sentence.targetWords) {
@@ -93,10 +170,12 @@ export function generateWorkbookFromSentence(
       sentence.category,
       totalOptions
     );
+
     const question = sentence.text.replace(
       new RegExp(`\\b${escapeRegExp(target)}\\b`, "i"),
       "_____"
     );
+
     results.push({
       id: `gen-w:${sentence.id}:${target}`,
       question,
@@ -106,6 +185,7 @@ export function generateWorkbookFromSentence(
       relatedSentenceId: sentence.id,
     });
   }
+
   return results;
 }
 
@@ -118,15 +198,18 @@ export function materializeMinimalPack(pack: PackDataMinimal) {
   const sentences = pack.contents.filter(
     (c): c is Sentence => c.type === "sentence"
   );
+
   // targetWords 집합을 구해서 vocabulary 필터링
   const targetSet = new Set<string>();
   for (const s of sentences) {
     for (const t of s.targetWords) targetSet.add(t);
   }
+
   const vocabs = pack.contents.filter(
     (c): c is Vocabulary => c.type === "vocabulary"
   );
   const filteredVocab = vocabs.filter((v) => targetSet.has(v.word));
+
   return {
     sentences,
     targetVocabs: filteredVocab,
@@ -145,9 +228,11 @@ function bigramDice(a: string, b: string): number {
         if (i < arr.length - 1) acc.push(arr[i] + arr[i + 1]);
         return acc;
       }, []);
+
   const A = bigrams(a);
   const B = bigrams(b);
   if (A.length === 0 || B.length === 0) return 0;
+
   const intersection = A.filter((x, i) => B.includes(x)).length;
   return (2 * intersection) / (A.length + B.length);
 }
