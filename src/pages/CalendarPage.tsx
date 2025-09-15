@@ -31,9 +31,9 @@ const StatCard: React.FC<StatCardProps> = ({
 }) => {
   const iconColors = {
     primary: "text-slate-600",
-    success: "text-emerald-600", // 성공은 초록색으로
+    success: "text-emerald-600",
     warning: "text-slate-600",
-    info: "text-blue-600", // 현재 날짜는 파란색으로
+    info: "text-blue-600",
   };
 
   return (
@@ -61,7 +61,7 @@ type StudyModeIndicatorProps = {
     count: number;
     completed: boolean;
   }>;
-  isCompleted?: boolean; // 완료된 카드인지 여부
+  isCompleted?: boolean;
 };
 
 const StudyModeIndicator: React.FC<StudyModeIndicatorProps> = ({
@@ -80,7 +80,6 @@ const StudyModeIndicator: React.FC<StudyModeIndicatorProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* 전체 진행 상태 */}
       <div className="flex items-center justify-between text-xs">
         <span className={isCompleted ? "text-slate-400" : "text-slate-500"}>
           진행상태
@@ -93,8 +92,6 @@ const StudyModeIndicator: React.FC<StudyModeIndicatorProps> = ({
           {completedCount}/{modes.length}
         </span>
       </div>
-
-      {/* 학습 유형별 표시 */}
       <div>
         {modes.map((mode, idx) => (
           <div
@@ -176,7 +173,8 @@ const DayCardInner: React.FC<DayCardProps> = ({
       )
     : false;
 
-  const isDay1Introduction = day.day === 1 && day.type === "introduction";
+  // [수정] DayCard는 전달받은 day.type을 기준으로 렌더링하므로, 이 로직은 그대로 유지합니다.
+  const isDay1Introduction = day.type === "introduction";
 
   const studyModes = [];
   if (day.showVocab && day.vocabCount > 0) {
@@ -211,9 +209,9 @@ const DayCardInner: React.FC<DayCardProps> = ({
       case "locked":
         return "border-slate-200 bg-slate-50 cursor-not-allowed opacity-50";
       case "completed":
-        return "border-green-500 bg-white text-green-600 hover:bg-green-50"; // 초록색으로 변경
+        return "border-green-500 bg-white text-green-600 hover:bg-green-50";
       case "current":
-        return "border-blue-500 bg-white hover:bg-blue-50 ring-2 ring-blue-100"; // 파란색 포인트
+        return "border-blue-500 bg-white hover:bg-blue-50 ring-2 ring-blue-100";
       default:
         return "border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300";
     }
@@ -226,7 +224,7 @@ const DayCardInner: React.FC<DayCardProps> = ({
       case "completed":
         return <Check className="w-3.5 h-3.5 text-white" />;
       case "current":
-        return <Play className="w-3.5 h-3.5 text-blue-500" />; // 파란색으로
+        return <Play className="w-3.5 h-3.5 text-blue-500" />;
       default:
         return null;
     }
@@ -276,7 +274,6 @@ const DayCardInner: React.FC<DayCardProps> = ({
           학습 안내
         </div>
       ) : (
-        // 완료된 카드에서도 학습 정보 표시
         <StudyModeIndicator
           modes={studyModes}
           isCompleted={status === "completed"}
@@ -306,32 +303,26 @@ export default function CalendarPage(): JSX.Element {
   }, [selectedPackData]);
 
   React.useEffect(() => {
-    console.log("📋 CalendarPage - packId:", packId);
-    console.log("📋 CalendarPage - selectedPackData:", selectedPackData);
     if (packId === undefined || packId === "undefined") {
       console.error("❌ Invalid packId detected in CalendarPage");
     }
-  }, [packId, selectedPackData]);
+  }, [packId]);
 
   const getDayStatus = useCallback(
     (dayNumber: number): "current" | "completed" | "locked" | "available" => {
       if (!packId || packId === "undefined") {
-        console.warn("⚠️ Invalid packId in getDayStatus:", packId);
         return "locked";
       }
 
       const progress = getPackProgress(packId);
-      console.log(`📊 Checking Day ${dayNumber} status. Progress:`, progress);
 
       if (!progress) {
-        console.log(`❌ No progress found for ${packId}`);
         return dayNumber === 1 ? "available" : "locked";
       }
 
       const dayProgress = progress.progressByDay?.[dayNumber];
 
       if (dayProgress?.isCompleted) {
-        console.log(`✅ Day ${dayNumber} is completed`);
         return "completed";
       }
 
@@ -339,33 +330,23 @@ export default function CalendarPage(): JSX.Element {
 
       const prevDayProgress = progress.progressByDay?.[dayNumber - 1];
       if (prevDayProgress?.isCompleted) {
-        console.log(`🚀 Day ${dayNumber} is available (prev day completed)`);
         return "available";
       }
 
-      console.log(`🔒 Day ${dayNumber} is locked`);
       return "locked";
     },
     [packId, getPackProgress]
   );
 
+  // [핵심 수정] calendarData 생성 로직을 데이터 중심으로 변경
   const calendarData = useMemo(() => {
     if (!selectedPackData) return null;
 
-    const { learningPlan, contents, categories } = selectedPackData;
+    const { learningPlan } = selectedPackData;
     const totalDays = learningPlan?.totalDays || 14;
 
     let completedDaysCount = 0;
     const allDays: any[] = [];
-
-    const getMainCategoriesForPageRange = (pageRange: string) => {
-      if (!pageRange || !categories) return [];
-      const [startPage, endPage] = pageRange.split("_").map(Number);
-      const pageCategories = categories.filter(
-        (cat) => cat.page >= startPage && cat.page <= endPage
-      );
-      return pageCategories.slice(0, 2);
-    };
 
     const getContentCounts = (dayPlan: any) => {
       let vocabCount = 0,
@@ -386,7 +367,6 @@ export default function CalendarPage(): JSX.Element {
           }
         });
       }
-
       return { vocabCount, sentenceCount, workbookCount };
     };
 
@@ -397,29 +377,10 @@ export default function CalendarPage(): JSX.Element {
         const { vocabCount, sentenceCount, workbookCount } =
           getContentCounts(dayPlan);
 
-        let learningPhase = "";
-        let hasContent = true;
-        let displayTitle = dayPlan.title;
-
-        if (dayNum === 1) {
-          learningPhase = "introduction";
-          hasContent = true;
-        } else if (dayNum >= 2 && dayNum <= 5) {
-          learningPhase = "skimming";
-          hasContent = vocabCount > 0 || sentenceCount > 0;
-
-          if (dayPlan.pageRange) {
-            const pageStart = dayPlan.pageRange.split("_")[0];
-            const pageEnd = dayPlan.pageRange.split("_")[1];
-            displayTitle = `훑어보기 (${pageStart}-${pageEnd}p)`;
-          }
-        } else if (dayNum >= 6 && dayNum <= 9) {
-          learningPhase = "speaking";
-          hasContent = vocabCount > 0 || sentenceCount > 0;
-        } else if (dayNum >= 10 && dayNum <= 14) {
-          learningPhase = "checking";
-          hasContent = workbookCount > 0 || dayNum === 14;
-        }
+        // [수정] dayPlan의 mode type을 직접 확인하여 '학습 안내' 여부 결정
+        const isIntroDay =
+          dayPlan.modes?.some((mode: any) => mode.type === "introduction") ??
+          false;
 
         let isCompleted = false;
         try {
@@ -427,20 +388,26 @@ export default function CalendarPage(): JSX.Element {
           isCompleted = !!dp?.isCompleted;
           if (isCompleted) completedDaysCount++;
         } catch (e) {
-          // ignore
+          // ignore error
         }
 
         allDays.push({
           day: dayNum,
-          title: displayTitle,
-          type: learningPhase,
+          title: dayPlan.title,
+          // [수정] DayCard가 참조할 type을 isIntroDay 값에 따라 동적으로 설정
+          type: isIntroDay ? "introduction" : dayPlan.learningMethod || "study",
           pageRange: dayPlan.pageRange || null,
-          hasContent,
+          hasContent:
+            isIntroDay ||
+            vocabCount > 0 ||
+            sentenceCount > 0 ||
+            workbookCount > 0,
           isCompleted,
           vocabCount,
           sentenceCount,
           workbookCount,
-          learningMethod: dayPlan.learningMethod || "introduction",
+          learningMethod:
+            dayPlan.learningMethod || (isIntroDay ? "introduction" : "unknown"),
           showVocab: vocabCount > 0,
           showSentence: sentenceCount > 0,
           showWorkbook: workbookCount > 0,
@@ -476,16 +443,10 @@ export default function CalendarPage(): JSX.Element {
   const handleDaySelect = useCallback(
     (day: any) => {
       const status = getDayStatus(day.day);
-
-      console.log(`Day ${day.day} clicked, status: ${status}`);
-
       if (status === "locked") {
-        console.log(`Day ${day.day} is locked`);
         return;
       }
-
       setCurrentDay(day.day);
-      console.log(`Navigating to /study/${day.day}`);
       navigate(`/study/${day.day}`, { replace: false });
     },
     [getDayStatus, setCurrentDay, navigate]
@@ -493,7 +454,6 @@ export default function CalendarPage(): JSX.Element {
 
   const handleBack = useCallback(() => navigate("/"), [navigate]);
 
-  // 조건부 렌더링
   if (!hasHydrated) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -554,7 +514,6 @@ export default function CalendarPage(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-20 lg:pb-0">
-      {/* 헤더 */}
       <header className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
@@ -565,7 +524,6 @@ export default function CalendarPage(): JSX.Element {
               <ArrowLeft size={16} />
               학습팩 선택
             </button>
-
             <div className="flex-1 min-w-0 sm:ml-4">
               <h1 className="text-lg font-bold text-slate-900 truncate">
                 {selectedPackData.title}
@@ -576,14 +534,12 @@ export default function CalendarPage(): JSX.Element {
                 </p>
               )}
             </div>
-
             <Calendar className="h-5 w-5 text-slate-400 flex-shrink-0 ml-2" />
           </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto p-4 sm:p-6">
-        {/* 통계 섹션 */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <StatCard
             icon={Clock}
@@ -611,7 +567,6 @@ export default function CalendarPage(): JSX.Element {
           />
         </div>
 
-        {/* 진도 섹션 */}
         <div className="bg-white rounded-lg p-6 border border-slate-200 mb-8">
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -631,11 +586,10 @@ export default function CalendarPage(): JSX.Element {
               </div>
             </div>
           </div>
-
           <div className="space-y-2">
             <div className="w-full bg-slate-200 rounded-full h-2">
               <div
-                className="bg-emerald-500 h-2 rounded-full transition-all duration-500" // 초록색으로 변경
+                className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${progressPercentage}%` }}
               />
             </div>
@@ -645,13 +599,11 @@ export default function CalendarPage(): JSX.Element {
           </div>
         </div>
 
-        {/* 캘린더 그리드 */}
         <div className="mb-8">
           <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
             <Calendar className="mr-3 h-5 w-5 text-slate-500" />
             학습 캘린더
           </h2>
-
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {calendarData.allDays.map((d: any) => (
               <DayCard
@@ -665,7 +617,6 @@ export default function CalendarPage(): JSX.Element {
           </div>
         </div>
 
-        {/* 범례 */}
         <div className="space-y-6">
           <div className="flex flex-wrap items-center gap-6 text-sm">
             <div className="flex items-center gap-2">
@@ -673,8 +624,7 @@ export default function CalendarPage(): JSX.Element {
               <span className="text-slate-600">학습 가능</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-emerald-500"></div>{" "}
-              {/* 초록색으로 */}
+              <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
               <span className="text-slate-600">완료됨</span>
             </div>
             <div className="flex items-center gap-2">
@@ -682,7 +632,6 @@ export default function CalendarPage(): JSX.Element {
               <span className="text-slate-600">준비 중</span>
             </div>
           </div>
-
           <div className="bg-slate-100 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <Info className="h-4 w-4 text-slate-600 flex-shrink-0 mt-0.5" />
