@@ -8,7 +8,7 @@ import type {
   StudySettings,
 } from "@/types";
 
-const STORAGE_KEY = "study-progress-v7";
+const STORAGE_KEY = "study-progress-v1";
 
 type ItemProgress = { isCompleted: boolean; lastStudied: string | null };
 interface StudyProgressState {
