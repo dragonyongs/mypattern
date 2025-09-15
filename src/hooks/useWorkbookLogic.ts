@@ -8,10 +8,14 @@ export const useWorkbookLogic = (
   dayNumber: number,
   workbook: WorkbookItem[]
 ) => {
-  const { setItemCompleted, getItemProgress } = useStudyProgressStore();
+  const {
+    setItemCompleted,
+    getItemProgress,
+    clearItemProgress: clearItemProgressInStore,
+  } = useStudyProgressStore();
 
   const getCorrectAnswer = useCallback((question: WorkbookItem) => {
-    return question.correctAnswer || question.answer || "";
+    return (question as any).correctAnswer || (question as any).answer || "";
   }, []);
 
   const saveProgress = useCallback(
@@ -20,9 +24,6 @@ export const useWorkbookLogic = (
       if (item) {
         try {
           setItemCompleted(packId, dayNumber, item.id, isCorrect);
-          console.log(
-            `💾 [SAVE] Pack:${packId}, Day:${dayNumber}, Item:${item.id}, Result:${isCorrect}`
-          );
         } catch (error) {
           console.warn("[WorkbookLogic] Failed to save progress:", error);
         }
@@ -37,32 +38,23 @@ export const useWorkbookLogic = (
     const correct = new Set<number>();
     const results: Record<number, boolean> = {};
 
-    console.log(`🔄 [RESTORE] Starting for Pack:${packId}, Day:${dayNumber}`);
-
     workbook.forEach((item, index) => {
       const p = getItemProgress(packId, dayNumber, item.id);
 
-      console.log(`[RESTORE] Index:${index}, Item:${item.id}, Progress:`, p);
+      // p가 null이면 기록 자체가 없으므로 "미시도" 상태. 아무것도 하지 않음.
+      if (p === null) {
+        return;
+      }
 
-      // 시도 여부: 진행기록이 있으면 (isCompleted가 boolean이거나 lastStudied가 있음)
-      const wasAnswered =
-        !!p && (typeof p.isCompleted === "boolean" || !!p.lastStudied);
-
-      if (!wasAnswered) return;
-
-      answered.add(index); // 회색 칩 (시도함)
-
+      // p가 객체면 시도한 것으로 간주
+      answered.add(index);
       const isCorrect = p.isCompleted === true;
-      results[index] = isCorrect; // 🔥 실제 정답 여부만 저장
-
+      results[index] = isCorrect;
       if (isCorrect) {
-        correct.add(index); // 초록 칩 (정답)
+        correct.add(index);
       }
     });
 
-    console.log(
-      `✅ [RESTORE] Completed - answered:${answered.size}, correct:${correct.size}`
-    );
     return { answered, correct, results };
   }, [workbook, getItemProgress, packId, dayNumber]);
 
@@ -72,31 +64,23 @@ export const useWorkbookLogic = (
       const item = workbook[index];
       if (item) {
         try {
-          setItemCompleted(packId, dayNumber, item.id, false);
-          console.log(
-            `🗑️ [CLEAR] Pack:${packId}, Day:${dayNumber}, Item:${item.id}`
-          );
+          // 저장소에서 해당 아이템의 기록을 완전히 삭제
+          clearItemProgressInStore(packId, dayNumber, item.id);
         } catch (error) {
           console.warn("[WorkbookLogic] Failed to clear progress:", error);
         }
       }
     },
-    [packId, dayNumber, workbook, setItemCompleted]
+    [packId, dayNumber, workbook, clearItemProgressInStore]
   );
 
-  // 🔥 디버깅용 샘플 로그 (개발 시에만)
   useEffect(() => {
     if (!workbook.length) return;
-
     const sample = workbook.slice(0, 3).map((item, i) => ({
       index: i,
       id: item.id,
       progress: getItemProgress(packId, dayNumber, item.id),
     }));
-    console.log(
-      `[DEBUG] Pack:${packId}, Day:${dayNumber} - 첫 3개 샘플:`,
-      sample
-    );
   }, [workbook, packId, dayNumber, getItemProgress]);
 
   return {

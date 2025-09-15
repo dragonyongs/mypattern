@@ -170,7 +170,12 @@ export const StudyInterface: React.FC = () => {
   const getItemProgress = useCallback(
     (itemId: string) => {
       if (!packData) return { isCompleted: false, lastStudied: null };
-      return storeActions.getItemProgress(packData.id, currentDay, itemId);
+      const progress = storeActions.getItemProgress(
+        packData.id,
+        currentDay,
+        itemId
+      );
+      return progress ?? { isCompleted: false, lastStudied: null };
     },
     [packData?.id, currentDay, storeActions.getItemProgress]
   );
@@ -180,7 +185,7 @@ export const StudyInterface: React.FC = () => {
       const items = getModeData(mode);
       if (items.length === 0) return { completed: 0, total: 0, percentage: 0 };
       const completedCount = items.filter(
-        (item) => getItemProgress(item.id).isCompleted
+        (item) => getItemProgress(item.id)?.isCompleted
       ).length;
       return {
         completed: completedCount,
@@ -216,16 +221,6 @@ export const StudyInterface: React.FC = () => {
       return Math.min(savedIndex, contentIds.length - 1);
     },
     [packData, currentDay, getModeData]
-  );
-
-  // 🔥 수정: 첫 번째 비-introduction 모드를 정확히 반환
-  const selectInitialMode = useCallback(
-    (modes: StudyMode[]): StudyMode | null => {
-      const nonIntro = modes.filter((m) => m !== "introduction");
-      if (nonIntro.length > 0) return nonIntro[0];
-      return modes.length > 0 ? modes[0] : null;
-    },
-    []
   );
 
   // studyModes
@@ -422,13 +417,28 @@ export const StudyInterface: React.FC = () => {
   }, []);
 
   // 🔥 수정: console.log 제거
-  const getContentType = useCallback((mode: StudyMode) => {
-    if (mode === "introduction") return "introduction";
-    if (mode.includes("vocab")) return "vocab";
-    if (mode.includes("sentence")) return "sentence";
-    if (mode === "workbook") return "workbook";
+  const getContentType = useCallback((mode: StudyMode | null): string => {
+    const m = String(mode || "")
+      .toLowerCase()
+      .trim();
+    if (m === "introduction") return "introduction";
+    if (m.includes("vocab")) return "vocab";
+    if (m.includes("sentence")) return "sentence";
+    if (m === "workbook") return "workbook";
     return "unknown";
   }, []);
+
+  // 🔥 수정: 첫 번째 비-introduction 모드를 정확히 반환
+  const selectInitialMode = useCallback(
+    (modes: StudyMode[]): StudyMode | null => {
+      const nonIntro = modes.filter(
+        (m) => getContentType(m) !== "introduction"
+      );
+      if (nonIntro.length > 0) return nonIntro[0];
+      return modes.length > 0 ? modes[0] : null;
+    },
+    [getContentType]
+  );
 
   // renderContent — no hooks inside
   const renderContent = useCallback(() => {

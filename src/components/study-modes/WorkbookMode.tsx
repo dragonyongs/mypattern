@@ -515,17 +515,6 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                     onToggleExplanation={handleToggleExplanation}
                   />
                 </div>
-
-                <StudyPagination
-                  currentIndex={currentIndex}
-                  totalItems={workbook.length}
-                  completed={correctAnswers}
-                  secondary={answeredQuestions}
-                  onPrev={goToPrev}
-                  onNext={goToNext}
-                  onIndexChange={goToIndex}
-                />
-
                 <div className="mt-6">
                   <ActionButtons
                     isAnswered={isCurrentAnswered}
@@ -541,6 +530,15 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                     onComplete={handleComplete}
                   />
                 )}
+                <StudyPagination
+                  currentIndex={currentIndex}
+                  totalItems={workbook.length}
+                  completed={correctAnswers}
+                  secondary={answeredQuestions}
+                  onPrev={goToPrev}
+                  onNext={goToNext}
+                  onIndexChange={goToIndex}
+                />
               </div>
             </div>
 
