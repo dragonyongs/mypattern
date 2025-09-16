@@ -110,8 +110,10 @@ export const StudyCard: React.FC<StudyCardProps> = ({
 
         {/* 메인 텍스트 */}
         <h2
-          className={`font-bold text-gray-800 mb-4 ${
-            mode === "vocabulary" ? "text-3xl" : "text-xl leading-relaxed"
+          className={`font-bold mb-4 ${
+            mode === "vocabulary"
+              ? "text-3xl"
+              : "text-gray-300 text-xl leading-relaxed"
           }`}
         >
           {mode === "vocabulary"

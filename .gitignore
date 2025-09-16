@@ -41,3 +41,4 @@ dist-ssr
 !tsconfig.node.json
 !/public/data/packs/*.json
 !/public/data/packs/backup/*.json
+!vercel.json
