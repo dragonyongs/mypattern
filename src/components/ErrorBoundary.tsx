@@ -7,9 +7,14 @@ interface ErrorBoundaryState {
   error?: Error;
 }
 
+interface FallbackProps {
+  error?: Error;
+  resetError: () => void;
+}
+
 interface ErrorBoundaryProps {
   children: React.ReactNode;
-  fallback?: React.ComponentType<{ error?: Error; resetError: () => void }>;
+  fallback?: React.ComponentType<FallbackProps>;
   onReset?: () => void;
 }
 
@@ -17,20 +22,21 @@ export class ErrorBoundary extends React.Component<
   ErrorBoundaryProps,
   ErrorBoundaryState
 > {
+  static displayName = "ErrorBoundary";
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    // 상태만 갱신 (부수효과 금지)
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // 로깅 등 부수효과 여기서
     console.error("Error caught by ErrorBoundary:", error, errorInfo);
-
-    // 에러 로깅 서비스에 전송 (선택사항)
-    // logErrorToService(error, errorInfo);
   }
 
   resetError = () => {
@@ -41,7 +47,6 @@ export class ErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       const FallbackComponent = this.props.fallback;
-
       if (FallbackComponent) {
         return (
           <FallbackComponent
@@ -51,7 +56,6 @@ export class ErrorBoundary extends React.Component<
         );
       }
 
-      // 기본 에러 UI
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
           <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
@@ -63,8 +67,8 @@ export class ErrorBoundary extends React.Component<
               일시적인 오류로 학습 페이지를 불러올 수 없습니다.
             </p>
 
-            {/* 에러 세부사항 (개발 환경에서만) */}
-            {process.env.NODE_ENV === "development" && this.state.error && (
+            {/* 개발 환경에서만 에러 정보 표시 */}
+            {import.meta.env.DEV && this.state.error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-left">
                 <h3 className="text-sm font-semibold text-red-800 mb-1">
                   개발자 정보:
