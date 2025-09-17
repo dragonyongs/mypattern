@@ -12,6 +12,9 @@ import { useAppStore } from "@/stores/appStore";
 
 const STORAGE_KEY = "study-progress-v1";
 
+// Core 모드 타입만 사용 (store 내부 표준 키)
+type CoreMode = "vocab" | "sentence" | "workbook";
+
 type ItemProgress = { isCompleted: boolean; lastStudied: string | null };
 
 type ProgressState = Record<
@@ -38,7 +41,7 @@ interface StudyProgressActions {
   setModeCompleted: (
     packId: string,
     day: number,
-    modeType: string,
+    modeType: string, // 들어오는 건 자유롭게 받고 내부에서 정규화
     packData: PackData
   ) => void;
   setItemCompleted: (
@@ -114,6 +117,31 @@ const createDefaultStudySettings = (): StudySettings => ({
   ...defaultSettings,
 });
 
+// 들어오는 임의의 모드 문자열을 core 모드로 정규화
+const normalizeMode = (mode: string): CoreMode | null => {
+  const m = String(mode).toLowerCase();
+  if (m === "vocab" || m.includes("vocab")) return "vocab";
+  if (m === "sentence" || m.includes("sentence")) return "sentence";
+  if (m === "workbook") return "workbook";
+  return null; // introduction 등은 null 처리
+};
+
+const normalizeCompletedModes = (
+  obj: Record<string, any> | null | undefined
+) => {
+  const out: Record<CoreMode, boolean> = {
+    vocab: false,
+    sentence: false,
+    workbook: false,
+  };
+  if (!obj) return out;
+  Object.keys(obj).forEach((k) => {
+    const core = normalizeMode(k);
+    if (core) out[core] = !!obj[k];
+  });
+  return out;
+};
+
 const createEmptyDayProgress = (
   day: number
 ): DayProgress & {
@@ -160,7 +188,7 @@ function ensureDay(
   if (!byDay[day]) byDay[day] = createEmptyDayProgress(day);
   const d = byDay[day] as any;
   d.day = day;
-  d.completedModes = d.completedModes || {};
+  d.completedModes = normalizeCompletedModes(d.completedModes || {});
   d.completedItems = d.completedItems || {};
   d.items = d.items || {};
   d.currentItemIndexByMode = d.currentItemIndexByMode || {};
@@ -230,7 +258,7 @@ export const useStudyProgressStore = create<
               user_id: userId,
               pack_id: packId,
               day: dayNum,
-              completed_modes: dayPg.completedModes || {},
+              completed_modes: normalizeCompletedModes(dayPg.completedModes),
               is_completed: !!dayPg.isCompleted,
               last_studied_at: dayPg.lastStudiedAt ?? null,
               study_seconds: dayPg.studySeconds ?? 0,
@@ -315,8 +343,7 @@ export const useStudyProgressStore = create<
           if (dayRows.length > 0) {
             const { data: remoteDays = [] } = await supabase
               .from("day_progress")
-              .select("pack_id, day, last_studied_at")
-              .eq("user_id", userId);
+              .select("pack_id, day, last_studied_at");
 
             const remoteDayMap = new Map<string, string | null>();
             (remoteDays || []).forEach((d: any) =>
@@ -387,7 +414,10 @@ export const useStudyProgressStore = create<
                 : 0;
 
               if (remoteLast >= localLast) {
-                dayPg.completedModes = rd.completed_modes || {};
+                // 원격 completed_modes를 정규화
+                dayPg.completedModes = normalizeCompletedModes(
+                  rd.completed_modes || {}
+                );
                 dayPg.isCompleted = !!rd.is_completed;
                 (dayPg as any).studySeconds =
                   rd.study_seconds ?? (dayPg as any).studySeconds ?? 0;
@@ -474,7 +504,9 @@ export const useStudyProgressStore = create<
           const dayPg = pack.progressByDay?.[day];
           if (!dayPg) return null;
           (dayPg as any).day = day;
-          (dayPg as any).completedModes = dayPg.completedModes || {};
+          (dayPg as any).completedModes = normalizeCompletedModes(
+            dayPg.completedModes || {}
+          );
           (dayPg as any).completedItems = dayPg.completedItems || {};
           (dayPg as any).items = (dayPg as any).items || {};
           (dayPg as any).currentItemIndexByMode =
@@ -510,6 +542,8 @@ export const useStudyProgressStore = create<
                 }
               });
               dayPg.items = pruned;
+
+              // 과거 completedItems 형태도 보정
               if (
                 dayPg.completedItems &&
                 Object.keys(dayPg.completedItems).length > 0
@@ -517,13 +551,15 @@ export const useStudyProgressStore = create<
                 Object.keys(dayPg.completedItems).forEach((id) => {
                   if (pruned[id]) return;
                   const b = dayPg.completedItems[id];
-                  if (typeof b === "boolean") {
+                  if (typeof b === "boolean")
                     pruned[id] = { isCompleted: b, lastStudied: null };
-                  }
                 });
                 dayPg.items = pruned;
               }
-              dayPg.completedModes = dayPg.completedModes || {};
+
+              dayPg.completedModes = normalizeCompletedModes(
+                dayPg.completedModes || {}
+              );
               dayPg.currentItemIndexByMode = dayPg.currentItemIndexByMode || {};
               dayPg.studySeconds = dayPg.studySeconds ?? 0;
               byDay[dayNum] = dayPg;
@@ -608,22 +644,28 @@ export const useStudyProgressStore = create<
             !modeType
           )
             return;
+          const core = normalizeMode(modeType);
+          if (!core) return; // introduction 등은 저장하지 않음
+
           set((state) => {
             const progress = { ...state.progress };
             const pack = ensurePack(progress, packId);
             const dayPg = ensureDay(pack.progressByDay, day);
+
             dayPg.completedModes = {
-              ...dayPg.completedModes,
-              [modeType]: true,
+              ...normalizeCompletedModes(dayPg.completedModes),
+              [core]: true,
             };
 
+            // dayPlan에서 introduction 제외한 required 모드만 판정
             const dayPlan = packData?.learningPlan?.days.find(
               (d) => d.day === day
             );
             if (dayPlan) {
-              const allDone = (dayPlan.modes || []).every(
-                (m) => !!dayPg.completedModes[m.type]
-              );
+              const required = (dayPlan.modes || [])
+                .map((m) => normalizeMode(m.type))
+                .filter((m): m is CoreMode => !!m);
+              const allDone = required.every((m) => !!dayPg.completedModes[m]);
               if (allDone && !dayPg.isCompleted) {
                 dayPg.isCompleted = true;
                 dayPg.lastStudiedAt = new Date().toISOString() as any;
@@ -651,7 +693,9 @@ export const useStudyProgressStore = create<
                 user_id: userId,
                 pack_id: packId,
                 day,
-                completed_modes: cur.completedModes || {},
+                completed_modes: normalizeCompletedModes(
+                  cur.completedModes || {}
+                ),
                 is_completed: !!cur.isCompleted,
                 last_studied_at: cur.lastStudiedAt || new Date().toISOString(),
                 study_seconds: (cur as any).studySeconds ?? 0,
@@ -729,7 +773,9 @@ export const useStudyProgressStore = create<
                 day,
                 study_seconds: newSeconds,
                 last_studied_at: cur.lastStudiedAt || new Date().toISOString(),
-                completed_modes: cur.completedModes || {},
+                completed_modes: normalizeCompletedModes(
+                  cur.completedModes || {}
+                ),
                 is_completed: !!cur.isCompleted,
               },
               { onConflict: "user_id,pack_id,day" }
@@ -750,12 +796,14 @@ export const useStudyProgressStore = create<
 
         setCurrentItemIndex: (packId, day, mode, index) => {
           if (!packId || packId === "undefined") return;
+          const core = normalizeMode(mode);
+          if (!core) return;
           set((state) => {
             const progress = { ...state.progress };
             const pack = ensurePack(progress, packId);
             const dayPg = ensureDay(pack.progressByDay, day) as any;
             dayPg.currentItemIndexByMode = dayPg.currentItemIndexByMode || {};
-            dayPg.currentItemIndexByMode[mode] = index;
+            dayPg.currentItemIndexByMode[core] = index;
             pack.progressByDay[day] = dayPg;
             progress[packId] = pack;
             return { progress };
@@ -763,8 +811,10 @@ export const useStudyProgressStore = create<
         },
 
         getCurrentItemIndex: (packId, day, mode) => {
+          const core = normalizeMode(mode);
+          if (!core) return 0;
           const dp = get().getDayProgress(packId, day) as any;
-          return dp?.currentItemIndexByMode?.[mode] ?? 0;
+          return dp?.currentItemIndexByMode?.[core] ?? 0;
         },
 
         getNextUncompletedIndex: (packId, day, _mode, contentIds) => {

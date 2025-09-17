@@ -30,15 +30,8 @@ import { CompletionModal } from "@/shared/components/CompletionModal";
 import StudySettingsSheet from "@/shared/components/StudySettingsSheet";
 import type { StudySettings } from "@/types";
 
-type StudyMode =
-  | "introduction"
-  | "imagination-vocab"
-  | "skimming-vocab"
-  | "skimming-sentence"
-  | "speaking-vocab"
-  | "speaking-sentence"
-  | "workbook";
-
+// Core 모드만 사용해 store의 completedModes 및 dayPlan.modes와 일치시킴
+type StudyMode = "introduction" | "vocab" | "sentence" | "workbook";
 export type StudyModeType = "immersive" | "assisted";
 
 export const StudyInterface: React.FC = () => {
@@ -48,9 +41,9 @@ export const StudyInterface: React.FC = () => {
   const navigate = useNavigate();
   const { day: dayParam } = useParams<{ day: string }>();
 
-  // 누적 기준(sec)과 세션에서 쌓이는 초(sec) 관리
-  const baseSecondsRef = useRef<number>(0); // store/remote에서 온 누적 값
-  const sessionSecondsRef = useRef<number>(0); // 현재 세션에서만 쌓인 값
+  // 시간 기록 refs
+  const baseSecondsRef = useRef<number>(0); // 원격/스토어 누적
+  const sessionSecondsRef = useRef<number>(0); // 세션 누적
 
   // states
   const [isSettingOpen, setIsSettingOpen] = useState(false);
@@ -59,11 +52,8 @@ export const StudyInterface: React.FC = () => {
   const [completion, setCompletion] = useState<{
     open: boolean;
     completed: StudyMode | null;
-  }>({
-    open: false,
-    completed: null,
-  });
-  const currentDay = parseInt(dayParam || "1", 10);
+  }>({ open: false, completed: null });
+  const currentDay = Number.parseInt(dayParam || "1", 10);
 
   // App store: 필요한 값만
   const { packData, setCurrentDay } = useAppStore(
@@ -87,6 +77,7 @@ export const StudyInterface: React.FC = () => {
     }))
   );
 
+  // Day 진행 스냅샷
   const dayProgress = useStudyProgressStore(
     useShallow((state) =>
       packData
@@ -102,7 +93,7 @@ export const StudyInterface: React.FC = () => {
     const dp = state.getDayProgress(packData.id, currentDay) as any;
     const saved = Number(dp?.studySeconds ?? 0);
     baseSecondsRef.current = Number.isFinite(saved) ? saved : 0;
-    sessionSecondsRef.current = 0; // 새 세션 시작 시 0부터
+    sessionSecondsRef.current = 0;
     setStudyTime(baseSecondsRef.current + sessionSecondsRef.current);
   }, [packData?.id, currentDay]);
 
@@ -137,15 +128,17 @@ export const StudyInterface: React.FC = () => {
     window.addEventListener("touchstart", onActivity);
     window.addEventListener("focus", onFocus);
     window.addEventListener("blur", onBlur);
-    document.addEventListener("visibilitychange", () => {
+    const onVis = () => {
       isWindowFocusedRef.current = document.visibilityState === "visible";
-    });
+    };
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       window.removeEventListener("mousemove", onActivity);
       window.removeEventListener("keydown", onActivity);
       window.removeEventListener("touchstart", onActivity);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("blur", onBlur);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
 
@@ -158,7 +151,7 @@ export const StudyInterface: React.FC = () => {
     }
   }, [dayProgress?.studySeconds]);
 
-  // Active/Idle tracking의 tick에서 합산 표시 업데이트
+  // Active/Idle tick: 세션 누적·표시
   useEffect(() => {
     const tick = () => {
       if (!packData) return;
@@ -172,8 +165,7 @@ export const StudyInterface: React.FC = () => {
     return () => window.clearInterval(id);
   }, [packData, currentMode, isUserActive]);
 
-  // 진행 시간 flush: 진행도 store 호출
-  // 시간 플러시: 성공 시 baseSecondsRef에 합산, 표시 갱신
+  // 진행 시간 flush: store -> 원격
   const flushToServer = useCallback(async () => {
     if (!packData) {
       unsyncedSecondsRef.current = 0;
@@ -184,24 +176,20 @@ export const StudyInterface: React.FC = () => {
     unsyncedSecondsRef.current = 0;
     try {
       await storeActions.addStudySeconds(packData.id, currentDay, s);
-      baseSecondsRef.current += s; // 성공 시 로컬 기준 누적 반영
+      baseSecondsRef.current += s;
       setStudyTime(baseSecondsRef.current + sessionSecondsRef.current);
     } catch (err) {
       console.error("flushToServer error:", err);
-      // 실패 시 다시 누적
       unsyncedSecondsRef.current += s;
     }
   }, [packData, currentDay, storeActions]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      flushToServer().catch((e) => console.warn("periodic flush failed:", e));
+      void flushToServer();
     }, flushIntervalMs);
-
     const onVisibility = () => {
-      if (document.visibilityState !== "visible") {
-        flushToServer().catch((e) => console.warn("flush on blur failed:", e));
-      }
+      if (document.visibilityState !== "visible") void flushToServer();
     };
     const onBeforeUnload = () => {
       void flushToServer();
@@ -216,16 +204,23 @@ export const StudyInterface: React.FC = () => {
     };
   }, [flushToServer]);
 
-  // labels
+  // labels/icons
   const labelMap = useMemo(
     () => ({
       introduction: "소개",
-      "imagination-vocab": "상상",
-      "skimming-vocab": "단어",
-      "skimming-sentence": "문장",
-      "speaking-vocab": "말하기",
-      "speaking-sentence": "말하기",
+      vocab: "단어",
+      sentence: "문장",
       workbook: "워크북",
+    }),
+    []
+  );
+
+  const iconMap: Record<StudyMode, React.ComponentType> = useMemo(
+    () => ({
+      introduction: Book,
+      vocab: Search,
+      sentence: Mic,
+      workbook: PenTool,
     }),
     []
   );
@@ -260,13 +255,21 @@ export const StudyInterface: React.FC = () => {
     [packData?.id, currentDay]
   );
 
+  // dayPlan.modes[].type을 그대로 core StudyMode로 사용
   const availableModeKeys = useMemo<StudyMode[]>(() => {
     if (!dayPlan) return [];
     return dayPlan.modes
       .map((m) => m.type as StudyMode)
-      .filter((type): type is StudyMode => Boolean(type));
+      .filter(
+        (t) =>
+          t === "introduction" ||
+          t === "vocab" ||
+          t === "sentence" ||
+          t === "workbook"
+      );
   }, [dayPlan]);
 
+  // 접근 제어: 이전 Day 완료 여부
   const isDayAccessible = useMemo(() => {
     if (!packData || currentDay === 1) return Boolean(packData);
     const previousDay = currentDay - 1;
@@ -288,13 +291,16 @@ export const StudyInterface: React.FC = () => {
 
   const getItemProgress = useCallback(
     (itemId: string) => {
-      if (!packData) return { isCompleted: false, lastStudied: null };
+      if (!packData)
+        return { isCompleted: false, lastStudied: null as string | null };
       const progress = storeActions.getItemProgress(
         packData.id,
         currentDay,
         itemId
       );
-      return progress ?? { isCompleted: false, lastStudied: null };
+      return (
+        progress ?? { isCompleted: false, lastStudied: null as string | null }
+      );
     },
     [packData?.id, currentDay, storeActions.getItemProgress]
   );
@@ -340,25 +346,17 @@ export const StudyInterface: React.FC = () => {
   );
 
   const studyModes = useMemo(() => {
-    const iconMap: Record<StudyMode, React.ComponentType> = {
-      introduction: Book,
-      "imagination-vocab": Image,
-      "skimming-vocab": Search,
-      "skimming-sentence": Search,
-      "speaking-vocab": Mic,
-      "speaking-sentence": Mic,
-      workbook: PenTool,
-    };
     return availableModeKeys
       .map((key) => {
-        const completed = dayProgress?.completedModes[key] ?? false;
+        const Icon = iconMap[key] || Book;
+        const completed = dayProgress?.completedModes?.[key] ?? false;
         const hasContent =
           key === "workbook" ? getModeData(key).length > 0 : true;
         const progress = getModeProgress(key);
         return {
           key,
           label: labelMap[key] || key,
-          icon: iconMap[key] || Book,
+          icon: Icon,
           completed,
           available: hasContent,
           progress,
@@ -367,7 +365,14 @@ export const StudyInterface: React.FC = () => {
       .filter((m) =>
         m.key === "workbook" ? getModeData(m.key).length > 0 : true
       );
-  }, [availableModeKeys, dayProgress, labelMap, getModeData, getModeProgress]);
+  }, [
+    availableModeKeys,
+    dayProgress,
+    labelMap,
+    iconMap,
+    getModeData,
+    getModeProgress,
+  ]);
 
   // handlers
   const formatTime = useCallback((seconds: number) => {
@@ -425,58 +430,65 @@ export const StudyInterface: React.FC = () => {
 
   const handleBack = useCallback(() => navigate("/calendar"), [navigate]);
 
-  const getLearningMethod = useCallback((mode: StudyMode) => {
-    if (mode.includes("imagination")) return "imagine";
-    if (mode.includes("skimming")) return "skim";
-    if (mode.includes("speaking")) return "speak";
-    if (mode === "workbook") return "check";
-    if (mode === "introduction") return "intro";
-    return "default";
-  }, []);
+  // core 타입 반환
+  const getContentType = useCallback(
+    (mode: StudyMode | null): StudyMode | "unknown" => {
+      if (!mode) return "unknown";
+      return mode;
+    },
+    []
+  );
 
-  const getContentType = useCallback((mode: StudyMode | null): string => {
-    const m = String(mode || "")
-      .toLowerCase()
-      .trim();
-    if (m === "introduction") return "introduction";
-    if (m.includes("vocab")) return "vocab";
-    if (m.includes("sentence")) return "sentence";
-    if (m === "workbook") return "workbook";
-    return "unknown";
-  }, []);
-
+  // 초기 모드 선택: introduction 제외 우선
   const selectInitialMode = useCallback(
     (modes: StudyMode[]): StudyMode | null => {
-      const nonIntro = modes.filter(
-        (m) => getContentType(m) !== "introduction"
-      );
+      const nonIntro = modes.filter((m) => m !== "introduction");
       if (nonIntro.length > 0) return nonIntro[0];
       return modes.length > 0 ? modes[0] : null;
     },
-    [getContentType]
+    []
   );
 
+  // 모드 완료 처리: 반드시 core 타입으로 저장
   const handleModeComplete = useCallback(
     (completedMode: StudyMode) => {
       if (!packData || !dayPlan) return;
       if (completionProcessingRef.current) return;
       if (completion.open) return;
-      const already = dayProgress?.completedModes[completedMode];
-      if (already) return;
+      const coreType = getContentType(completedMode);
+      if (coreType === "unknown" || coreType === "introduction") {
+        // 소개는 완료 모드 저장 없이 다음으로
+        setCompletion({ open: true, completed: completedMode });
+        return;
+      }
+      const already = dayProgress?.completedModes?.[coreType];
+      if (already) {
+        setCompletion({ open: true, completed: completedMode });
+        return;
+      }
       completionProcessingRef.current = true;
       try {
+        // store: setModeCompleted(packId, day, modeType, packData)
         storeActions.setModeCompleted(
           packData.id,
           currentDay,
-          completedMode,
+          coreType,
           packData
         );
         setCompletion({ open: true, completed: completedMode });
       } finally {
-        // no-op
+        // 유지
       }
     },
-    [packData, dayPlan, currentDay, dayProgress, completion.open, storeActions]
+    [
+      packData,
+      dayPlan,
+      currentDay,
+      dayProgress,
+      completion.open,
+      storeActions,
+      getContentType,
+    ]
   );
 
   const handleModeChange = useCallback(
@@ -502,7 +514,7 @@ export const StudyInterface: React.FC = () => {
       setCurrentMode(next);
     } else {
       const nextDay = currentDay + 1;
-      const totalDays = packData?.learningPlan.totalDays ?? 14;
+      const totalDays = packData?.learningPlan?.days?.length ?? 14;
       if (nextDay <= totalDays) {
         setCurrentDay(nextDay);
         navigate("/calendar");
@@ -529,7 +541,6 @@ export const StudyInterface: React.FC = () => {
   const renderContent = useCallback(() => {
     if (!currentMode || !packData) return null;
     const items = getModeData(currentMode);
-    const learningMethod = getLearningMethod(currentMode);
     const contentType = getContentType(currentMode);
     const initialItemIndex = getInitialItemIndex(currentMode);
     const onModeComplete = () => handleModeComplete(currentMode);
@@ -547,8 +558,7 @@ export const StudyInterface: React.FC = () => {
       onSettingsChange: handleSettingsChange,
       onAutoProgressChange: handleAutoProgressChange,
       onStudyModeChange: handleStudyModeChange,
-      // 자동 진행은 도움 모드에서만
-      autoAdvance,
+      autoAdvance, // 도움 모드에서 자동 진행
     };
 
     const key = `${currentMode}-${packData.id}-${currentDay}`;
@@ -570,7 +580,7 @@ export const StudyInterface: React.FC = () => {
           <SentenceMode
             key={key}
             items={items}
-            learningMethod={learningMethod}
+            learningMethod="skim"
             {...baseProps}
           />
         );
@@ -587,7 +597,6 @@ export const StudyInterface: React.FC = () => {
     isSettingOpen,
     autoAdvance,
     getModeData,
-    getLearningMethod,
     getContentType,
     getInitialItemIndex,
     getItemProgress,
