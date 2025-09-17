@@ -26,7 +26,7 @@ export const ActionButtons = memo<ActionButtonsProps>(
           <button
             onClick={onCheck}
             disabled={!canCheck}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all"
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-full font-medium transition-all"
           >
             <Check className="w-4 h-4" />
             {checkText}
@@ -34,7 +34,7 @@ export const ActionButtons = memo<ActionButtonsProps>(
         ) : (
           <button
             onClick={onRetry}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-all"
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-gray-200 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full font-medium transition-all"
           >
             <RotateCcw className="w-4 h-4" />
             {retryText}

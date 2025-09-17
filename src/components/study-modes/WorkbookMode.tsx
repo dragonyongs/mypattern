@@ -501,6 +501,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
               <div className="w-full max-w-xl">
                 <div {...swipeHandlers}>
                   <WorkbookCard
+                    currentIndex={currentIndex}
                     question={shownItem.question || shownItem.sentence}
                     options={shownItem.options || []} // 셔플된 옵션
                     correctAnswer={shownItem.correctAnswer} // 결정적 정답
@@ -510,19 +511,21 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                     showExplanation={showExplanation[currentIndex]}
                     isSpeaking={isSpeaking}
                     isAnswered={isCurrentAnswered}
+                    onCheck={handleCheckAnswer}
+                    onRetry={handleRetry}
                     onAnswerSelect={handleAnswerSelect}
                     onSpeak={handleSpeak}
                     onToggleExplanation={handleToggleExplanation}
                   />
                 </div>
-                <div className="mt-6">
+                {/* <div className="mt-6">
                   <ActionButtons
                     isAnswered={isCurrentAnswered}
                     canCheck={!!selectedAnswers[currentIndex]}
                     onCheck={handleCheckAnswer}
                     onRetry={handleRetry}
                   />
-                </div>
+                </div> */}
 
                 {isAllAnswered && (
                   <StudyCompleteButton

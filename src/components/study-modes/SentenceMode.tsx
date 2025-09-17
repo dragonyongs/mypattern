@@ -368,23 +368,23 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   }, [markModeCompleted, packId, onComplete]);
 
   // 문장 하이라이트
-  const renderHighlightedSentence = useCallback(
-    (text: string, targetWords: string[] = []) => {
-      if (!targetWords.length) return text;
+  // const renderHighlightedSentence = useCallback(
+  //   (text: string, targetWords: string[] = []) => {
+  //     if (!targetWords.length) return text;
 
-      let highlightedText = text;
-      targetWords.forEach((word) => {
-        const regex = new RegExp(`\\b(${word})\\b`, "gi");
-        highlightedText = highlightedText.replace(
-          regex,
-          '<mark class="bg-indigo-50 text-indigo-800 px-1 py-0.5 rounded">$1</mark>'
-        );
-      });
+  //     let highlightedText = text;
+  //     targetWords.forEach((word) => {
+  //       const regex = new RegExp(`\\b(${word})\\b`, "gi");
+  //       highlightedText = highlightedText.replace(
+  //         regex,
+  //         '<mark class="bg-indigo-50 text-indigo-800 px-1 py-0.5 rounded">$1</mark>'
+  //       );
+  //     });
 
-      return <span dangerouslySetInnerHTML={{ __html: highlightedText }} />;
-    },
-    []
-  );
+  //     return <span dangerouslySetInnerHTML={{ __html: highlightedText }} />;
+  //   },
+  //   []
+  // );
 
   // swipe handlers
   const swipeHandlers = useSwipeGesture({
@@ -433,62 +433,6 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
               onMarkAsMastered={handleMarkAsMastered}
               onMarkAsNotMastered={handleMarkAsNotMastered}
             />
-            {/* <div
-              className="relative bg-white rounded-2xl shadow-lg p-8 text-center cursor-pointer transition-transform active:scale-95"
-              onClick={handleToggleTranslation}
-            >
-              {masteredCards.has(currentIndex) && (
-                <div className="absolute top-4 right-4 bg-green-100 text-green-600 px-2.5 py-1 rounded-full text-xs font-bold">
-                  학습 완료
-                </div>
-              )}
-
-              {currentItem.situation && (
-                <div className="text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full inline-block mb-4">
-                  [{currentItem.situation}]
-                </div>
-              )}
-
-              <h2 className="text-2xl font-bold text-gray-400 leading-relaxed mb-6">
-                {renderHighlightedSentence(
-                  currentItem.text,
-                  currentItem.targetWords
-                )}
-              </h2>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSpeak(currentItem.text);
-                }}
-                disabled={isSpeaking}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700 rounded-full text-sm font-medium transition-all disabled:opacity-50 mb-6"
-              >
-                <Volume2 className="w-4 h-4" />
-                {isSpeaking ? "재생중..." : "발음 듣기"}
-              </button>
-
-              <div className="h-20 pt-6 border-t border-gray-200 flex flex-col justify-center">
-                {localSettings.showMeaningEnabled && showTranslation ? (
-                  <div className="animate-in fade-in">
-                    <p className="text-xl font-semibold text-gray-800">
-                      {currentItem.translation}
-                    </p>
-                    {currentItem.usage && (
-                      <p className="text-sm text-gray-500 mt-2 italic">
-                        "{currentItem.usage}"
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400">
-                    {localSettings.studyMode === "immersive"
-                      ? "영어로 의미를 생각해보세요"
-                      : "탭하여 번역 보기"}
-                  </p>
-                )}
-              </div>
-            </div> */}
 
             {/* StudyPagination */}
             <StudyPagination
@@ -503,33 +447,11 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
               onIndexChange={goToIndex}
             />
 
-            {/* Action */}
-            {/* <div className="mt-6">
-              <ActionButtons
-                isAnswered={masteredCards.has(currentIndex)}
-                canCheck={true}
-                onCheck={handleMarkAsMastered}
-                onRetry={handleMarkAsNotMastered}
-                checkText="학습 완료"
-                retryText="다시 학습"
-              />
-            </div> */}
-
             {/* Complete */}
             <StudyCompleteButton
               isAllMastered={isAllMastered}
               onComplete={handleComplete}
             />
-
-            {/* Navigation */}
-            {/* <div className="mt-6">
-              <StudyNavigation
-                currentIndex={currentIndex}
-                total={items.length}
-                onPrev={goToPrev}
-                onNext={goToNext}
-              />
-            </div> */}
           </div>
         </main>
       </div>

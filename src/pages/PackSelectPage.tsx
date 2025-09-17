@@ -1,5 +1,5 @@
 // src/pages/PackSelectPage.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -29,39 +29,129 @@ const PackSelectPage: React.FC = () => {
     setCurrentDay,
     isAuthenticated,
     _hasHydrated,
+    enrollUserPack,
+    fetchUserPacks,
   } = useAppStore();
 
-  const { getPackProgress } = useStudyProgressStore();
+  const { getPackProgress, syncWithRemote } = useStudyProgressStore();
 
   const [selecting, setSelecting] = useState<string | null>(null);
 
+  // 서버에 등록된 팩 ID 집합 (마운트 시 로드)
+  const [enrolledSet, setEnrolledSet] = useState<Record<string, any> | null>(
+    null
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    const loadEnrolled = async () => {
+      if (!isAuthenticated) {
+        setEnrolledSet({});
+        return;
+      }
+      try {
+        const rows = await fetchUserPacks();
+        if (!mounted) return;
+        const map: Record<string, any> = {};
+        (rows || []).forEach((r: any) => {
+          if (r?.pack_id) map[r.pack_id] = r;
+        });
+        setEnrolledSet(map);
+      } catch (err) {
+        console.warn("Failed to fetch user_packs:", err);
+        setEnrolledSet({});
+      }
+    };
+    loadEnrolled();
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthenticated, fetchUserPacks]);
+
   // 팩 선택 핸들러
-  const handlePackSelect = async (packId: string) => {
-    if (selecting) return;
+  const handlePackSelect = useCallback(
+    async (packId: string) => {
+      if (selecting) return;
 
-    try {
-      setSelecting(packId);
-      console.log(`🎯 Selecting pack: ${packId}`);
+      try {
+        setSelecting(packId);
+        console.log(`🎯 Selecting pack: ${packId}`);
 
-      const packData = await loadPackById(packId);
+        const packData = await loadPackById(packId);
 
-      if (packData) {
+        if (!packData) throw new Error("팩 데이터를 로드할 수 없습니다");
+
         const progress = getPackProgress(packId);
         const targetDay = progress?.lastStudiedDay || 1;
 
+        // 이미 서버에 enroll 되어 있는지 확인 (최소화)
+        const alreadyEnrolled = !!(enrolledSet && enrolledSet[packId]);
+
+        // 인증된 유저이면 서버에 enroll 시도 (단, 중복 enroll 시 건너뜀)
+        if (isAuthenticated && !alreadyEnrolled) {
+          try {
+            await enrollUserPack(packId, {
+              last_day: targetDay,
+              status: "active",
+            });
+
+            // enroll 성공하면 enrolledSet 업데이트 (optimistic)
+            setEnrolledSet((prev) => ({
+              ...(prev || {}),
+              [packId]: { pack_id: packId, last_day: targetDay },
+            }));
+
+            // enroll한 뒤 원격과 진도 병합/동기화
+            try {
+              await syncWithRemote();
+            } catch (syncErr) {
+              console.warn("syncWithRemote after enroll failed:", syncErr);
+            }
+          } catch (e) {
+            // enroll 실패는 치명적이지 않음 — 사용자에게 안내하거나 콘솔 로깅
+            console.error("enrollUserPack failed (non-fatal):", e);
+            // (옵션) 사용자에게 안내: alert("서버에 팩 등록 중 오류가 발생했습니다. 로컬에서 계속합니다.")
+          }
+        } else if (isAuthenticated && alreadyEnrolled) {
+          // 이미 등록된 팩이면 최신 서버 메타와 병합/동기화 시도
+          try {
+            await syncWithRemote();
+          } catch (syncErr) {
+            console.warn(
+              "syncWithRemote when already enrolled failed:",
+              syncErr
+            );
+          }
+        } else {
+          // 비인증(데모) 사용자: 로컬 복원만 수행
+          console.log(
+            "User not authenticated — using local-only mode for pack selection"
+          );
+        }
+
+        // 로컬 currentDay 설정 및 이동 (항상 수행)
         setCurrentDay(targetDay);
         console.log(`📅 Moving to Day ${targetDay}`);
         navigate("/calendar");
-      } else {
-        throw new Error("팩 데이터를 로드할 수 없습니다");
+      } catch (err) {
+        console.error("❌ Pack selection failed:", err);
+        alert(err instanceof Error ? err.message : "팩 선택에 실패했습니다");
+      } finally {
+        setSelecting(null);
       }
-    } catch (err) {
-      console.error("❌ Pack selection failed:", err);
-      alert(err instanceof Error ? err.message : "팩 선택에 실패했습니다");
-    } finally {
-      setSelecting(null);
-    }
-  };
+    },
+    [
+      selecting,
+      loadPackById,
+      getPackProgress,
+      isAuthenticated,
+      enrollUserPack,
+      enrolledSet,
+      setCurrentDay,
+      navigate,
+      syncWithRemote,
+    ]
+  );
 
   // 진행률 계산
   const getPackProgressInfo = (packId: string, totalDays: number) => {

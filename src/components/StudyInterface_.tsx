@@ -48,10 +48,6 @@ export const StudyInterface: React.FC = () => {
   const navigate = useNavigate();
   const { day: dayParam } = useParams<{ day: string }>();
 
-  // 누적 기준(sec)과 세션에서 쌓이는 초(sec) 관리
-  const baseSecondsRef = useRef<number>(0); // store/remote에서 온 누적 값
-  const sessionSecondsRef = useRef<number>(0); // 현재 세션에서만 쌓인 값
-
   // states
   const [isSettingOpen, setIsSettingOpen] = useState(false);
   const [studyTime, setStudyTime] = useState(0);
@@ -63,9 +59,10 @@ export const StudyInterface: React.FC = () => {
     open: false,
     completed: null,
   });
+
   const currentDay = parseInt(dayParam || "1", 10);
 
-  // App store: 필요한 값만
+  // stores - 🔥 누락된 메소드들 추가
   const { packData, setCurrentDay } = useAppStore(
     useShallow((state) => ({
       packData: state.selectedPackData,
@@ -73,7 +70,6 @@ export const StudyInterface: React.FC = () => {
     }))
   );
 
-  // 진행도 store 액션들
   const storeActions = useStudyProgressStore(
     useShallow((state) => ({
       setModeCompleted: state.setModeCompleted,
@@ -83,7 +79,6 @@ export const StudyInterface: React.FC = () => {
       getDayProgress: state.getDayProgress,
       getNextUncompletedIndex: state.getNextUncompletedIndex,
       getCurrentItemIndex: state.getCurrentItemIndex,
-      addStudySeconds: state.addStudySeconds,
     }))
   );
 
@@ -95,128 +90,20 @@ export const StudyInterface: React.FC = () => {
     )
   );
 
-  // 현재 Day의 저장된 누적시간으로 초기화
+  // effects
   useEffect(() => {
-    if (!packData) return;
-    const state = useStudyProgressStore.getState();
-    const dp = state.getDayProgress(packData.id, currentDay) as any;
-    const saved = Number(dp?.studySeconds ?? 0);
-    baseSecondsRef.current = Number.isFinite(saved) ? saved : 0;
-    sessionSecondsRef.current = 0; // 새 세션 시작 시 0부터
-    setStudyTime(baseSecondsRef.current + sessionSecondsRef.current);
-  }, [packData?.id, currentDay]);
-
-  // Active/Idle tracking
-  const lastActivityRef = useRef<number>(Date.now());
-  const isWindowFocusedRef = useRef<boolean>(
-    document.visibilityState === "visible"
-  );
-  const unsyncedSecondsRef = useRef<number>(0);
-
-  const idleThresholdMs = 60_000;
-  const tickIntervalMs = 1000;
-  const flushIntervalMs = 15_000;
-
-  const isUserActive = useCallback(() => {
-    const focused = isWindowFocusedRef.current;
-    const delta = Date.now() - lastActivityRef.current;
-    return focused && delta < idleThresholdMs;
+    const timer = setInterval(() => setStudyTime((prev) => prev + 1), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    const onActivity = () => (lastActivityRef.current = Date.now());
-    const onFocus = () => {
-      isWindowFocusedRef.current = true;
-      lastActivityRef.current = Date.now();
-    };
-    const onBlur = () => {
-      isWindowFocusedRef.current = false;
-    };
-    window.addEventListener("mousemove", onActivity);
-    window.addEventListener("keydown", onActivity);
-    window.addEventListener("touchstart", onActivity);
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("blur", onBlur);
-    document.addEventListener("visibilitychange", () => {
-      isWindowFocusedRef.current = document.visibilityState === "visible";
-    });
-    return () => {
-      window.removeEventListener("mousemove", onActivity);
-      window.removeEventListener("keydown", onActivity);
-      window.removeEventListener("touchstart", onActivity);
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("blur", onBlur);
-    };
+    const open = () => setIsSettingOpen(true);
+    window.addEventListener("open-study-settings", open as EventListener);
+    return () =>
+      window.removeEventListener("open-study-settings", open as EventListener);
   }, []);
 
-  // 원격/스토어 동기화로 dayProgress.studySeconds가 바뀌면 반영(더 큰 값 채택)
-  useEffect(() => {
-    const saved = Number((dayProgress as any)?.studySeconds ?? 0);
-    if (Number.isFinite(saved) && saved > baseSecondsRef.current) {
-      baseSecondsRef.current = saved;
-      setStudyTime(baseSecondsRef.current + sessionSecondsRef.current);
-    }
-  }, [dayProgress?.studySeconds]);
-
-  // Active/Idle tracking의 tick에서 합산 표시 업데이트
-  useEffect(() => {
-    const tick = () => {
-      if (!packData) return;
-      if (isUserActive() && currentMode) {
-        sessionSecondsRef.current += 1;
-        unsyncedSecondsRef.current += 1;
-        setStudyTime(baseSecondsRef.current + sessionSecondsRef.current);
-      }
-    };
-    const id = window.setInterval(tick, tickIntervalMs);
-    return () => window.clearInterval(id);
-  }, [packData, currentMode, isUserActive]);
-
-  // 진행 시간 flush: 진행도 store 호출
-  // 시간 플러시: 성공 시 baseSecondsRef에 합산, 표시 갱신
-  const flushToServer = useCallback(async () => {
-    if (!packData) {
-      unsyncedSecondsRef.current = 0;
-      return;
-    }
-    const s = unsyncedSecondsRef.current;
-    if (!s || s <= 0) return;
-    unsyncedSecondsRef.current = 0;
-    try {
-      await storeActions.addStudySeconds(packData.id, currentDay, s);
-      baseSecondsRef.current += s; // 성공 시 로컬 기준 누적 반영
-      setStudyTime(baseSecondsRef.current + sessionSecondsRef.current);
-    } catch (err) {
-      console.error("flushToServer error:", err);
-      // 실패 시 다시 누적
-      unsyncedSecondsRef.current += s;
-    }
-  }, [packData, currentDay, storeActions]);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      flushToServer().catch((e) => console.warn("periodic flush failed:", e));
-    }, flushIntervalMs);
-
-    const onVisibility = () => {
-      if (document.visibilityState !== "visible") {
-        flushToServer().catch((e) => console.warn("flush on blur failed:", e));
-      }
-    };
-    const onBeforeUnload = () => {
-      void flushToServer();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("beforeunload", onBeforeUnload);
-      void flushToServer();
-    };
-  }, [flushToServer]);
-
-  // labels
+  // constants
   const labelMap = useMemo(
     () => ({
       introduction: "소개",
@@ -230,7 +117,6 @@ export const StudyInterface: React.FC = () => {
     []
   );
 
-  // settings
   const settings = useStudyProgressStore(
     useShallow((state) =>
       packData
@@ -249,16 +135,11 @@ export const StudyInterface: React.FC = () => {
     )
   );
 
-  const autoAdvance = useMemo(
-    () => settings.studyMode === "assisted" && !!settings.autoProgressEnabled,
-    [settings.studyMode, settings.autoProgressEnabled]
-  );
-
-  // plan / modes
-  const dayPlan = useMemo(
-    () => packData?.learningPlan.days.find((d) => d.day === currentDay) || null,
-    [packData?.id, currentDay]
-  );
+  const dayPlan = useMemo(() => {
+    return (
+      packData?.learningPlan.days.find((d) => d.day === currentDay) || null
+    );
+  }, [packData?.id, currentDay]);
 
   const availableModeKeys = useMemo<StudyMode[]>(() => {
     if (!dayPlan) return [];
@@ -320,6 +201,7 @@ export const StudyInterface: React.FC = () => {
       if (!packData) return 0;
       const modeData = getModeData(mode);
       if (!modeData.length) return 0;
+
       const contentIds = modeData.map((item) => item.id);
       const state = useStudyProgressStore.getState();
       const nextUncompletedIndex = state.getNextUncompletedIndex(
@@ -328,7 +210,9 @@ export const StudyInterface: React.FC = () => {
         mode,
         contentIds
       );
+
       if (nextUncompletedIndex < contentIds.length) return nextUncompletedIndex;
+
       const savedIndex = state.getCurrentItemIndex(
         packData.id,
         currentDay,
@@ -339,6 +223,7 @@ export const StudyInterface: React.FC = () => {
     [packData, currentDay, getModeData]
   );
 
+  // studyModes
   const studyModes = useMemo(() => {
     const iconMap: Record<StudyMode, React.ComponentType> = {
       introduction: Book,
@@ -349,6 +234,7 @@ export const StudyInterface: React.FC = () => {
       "speaking-sentence": Mic,
       workbook: PenTool,
     };
+
     return availableModeKeys
       .map((key) => {
         const completed = dayProgress?.completedModes[key] ?? false;
@@ -379,6 +265,7 @@ export const StudyInterface: React.FC = () => {
   const handleSettingsChange = useCallback(
     (next: Partial<StudySettings>) => {
       if (!packData?.id) return;
+      console.log("🔥 Settings changing:", next); // 디버깅 로그
       storeActions.updateSettings(packData.id, next);
     },
     [packData?.id, storeActions.updateSettings]
@@ -405,7 +292,7 @@ export const StudyInterface: React.FC = () => {
     (itemId: string, completed: boolean = true) => {
       if (!packData || !currentMode) return;
       const cur = storeActions.getItemProgress(packData.id, currentDay, itemId);
-      if (cur?.isCompleted !== completed) {
+      if (cur.isCompleted !== completed) {
         storeActions.setItemCompleted(
           packData.id,
           currentDay,
@@ -414,55 +301,21 @@ export const StudyInterface: React.FC = () => {
         );
       }
     },
-    [
-      packData,
-      currentDay,
-      currentMode,
-      storeActions.setItemCompleted,
-      storeActions.getItemProgress,
-    ]
+    [packData, currentDay, currentMode, storeActions.setItemCompleted]
   );
 
   const handleBack = useCallback(() => navigate("/calendar"), [navigate]);
 
-  const getLearningMethod = useCallback((mode: StudyMode) => {
-    if (mode.includes("imagination")) return "imagine";
-    if (mode.includes("skimming")) return "skim";
-    if (mode.includes("speaking")) return "speak";
-    if (mode === "workbook") return "check";
-    if (mode === "introduction") return "intro";
-    return "default";
-  }, []);
-
-  const getContentType = useCallback((mode: StudyMode | null): string => {
-    const m = String(mode || "")
-      .toLowerCase()
-      .trim();
-    if (m === "introduction") return "introduction";
-    if (m.includes("vocab")) return "vocab";
-    if (m.includes("sentence")) return "sentence";
-    if (m === "workbook") return "workbook";
-    return "unknown";
-  }, []);
-
-  const selectInitialMode = useCallback(
-    (modes: StudyMode[]): StudyMode | null => {
-      const nonIntro = modes.filter(
-        (m) => getContentType(m) !== "introduction"
-      );
-      if (nonIntro.length > 0) return nonIntro[0];
-      return modes.length > 0 ? modes[0] : null;
-    },
-    [getContentType]
-  );
-
+  // 🔥 수정: 자동 다음 모드 전환 로직 추가
   const handleModeComplete = useCallback(
     (completedMode: StudyMode) => {
       if (!packData || !dayPlan) return;
       if (completionProcessingRef.current) return;
       if (completion.open) return;
+
       const already = dayProgress?.completedModes[completedMode];
       if (already) return;
+
       completionProcessingRef.current = true;
       try {
         storeActions.setModeCompleted(
@@ -471,12 +324,39 @@ export const StudyInterface: React.FC = () => {
           completedMode,
           packData
         );
+
+        // 자동 다음 모드 전환
+        const seq = availableModeKeys;
+        const idx = seq.indexOf(completedMode);
+        const next = idx >= 0 && idx < seq.length - 1 ? seq[idx + 1] : null;
+
         setCompletion({ open: true, completed: completedMode });
+
+        if (next) {
+          // 잠깐 모달 표시 후 다음 모드로 전환
+          setTimeout(() => {
+            setCurrentMode(next);
+            setCompletion({ open: false, completed: null });
+            completionProcessingRef.current = false;
+          }, 1500);
+        } else {
+          completionProcessingRef.current = false;
+        }
       } finally {
-        // no-op
+        setTimeout(() => {
+          completionProcessingRef.current = false;
+        }, 2000);
       }
     },
-    [packData, dayPlan, currentDay, dayProgress, completion.open, storeActions]
+    [
+      packData,
+      dayPlan,
+      currentDay,
+      dayProgress,
+      completion.open,
+      storeActions,
+      availableModeKeys,
+    ]
   );
 
   const handleModeChange = useCallback(
@@ -498,18 +378,19 @@ export const StudyInterface: React.FC = () => {
     const seq = availableModeKeys;
     const idx = seq.indexOf(completion.completed);
     const next = idx >= 0 && idx < seq.length - 1 ? seq[idx + 1] : null;
+
     if (next) {
       setCurrentMode(next);
     } else {
       const nextDay = currentDay + 1;
-      const totalDays = packData?.learningPlan.totalDays ?? 14;
-      if (nextDay <= totalDays) {
+      if (nextDay <= (packData?.learningPlan.totalDays ?? 14)) {
         setCurrentDay(nextDay);
         navigate("/calendar");
       } else {
         navigate("/calendar");
       }
     }
+
     setCompletion({ open: false, completed: null });
     completionProcessingRef.current = false;
   }, [
@@ -526,12 +407,48 @@ export const StudyInterface: React.FC = () => {
     completionProcessingRef.current = false;
   }, []);
 
+  const getLearningMethod = useCallback((mode: StudyMode) => {
+    if (mode.includes("imagination")) return "imagine";
+    if (mode.includes("skimming")) return "skim";
+    if (mode.includes("speaking")) return "speak";
+    if (mode === "workbook") return "check";
+    if (mode === "introduction") return "intro";
+    return "default";
+  }, []);
+
+  // 🔥 수정: console.log 제거
+  const getContentType = useCallback((mode: StudyMode | null): string => {
+    const m = String(mode || "")
+      .toLowerCase()
+      .trim();
+    if (m === "introduction") return "introduction";
+    if (m.includes("vocab")) return "vocab";
+    if (m.includes("sentence")) return "sentence";
+    if (m === "workbook") return "workbook";
+    return "unknown";
+  }, []);
+
+  // 🔥 수정: 첫 번째 비-introduction 모드를 정확히 반환
+  const selectInitialMode = useCallback(
+    (modes: StudyMode[]): StudyMode | null => {
+      const nonIntro = modes.filter(
+        (m) => getContentType(m) !== "introduction"
+      );
+      if (nonIntro.length > 0) return nonIntro[0];
+      return modes.length > 0 ? modes[0] : null;
+    },
+    [getContentType]
+  );
+
+  // renderContent — no hooks inside
   const renderContent = useCallback(() => {
     if (!currentMode || !packData) return null;
+
     const items = getModeData(currentMode);
     const learningMethod = getLearningMethod(currentMode);
     const contentType = getContentType(currentMode);
     const initialItemIndex = getInitialItemIndex(currentMode);
+
     const onModeComplete = () => handleModeComplete(currentMode);
 
     const baseProps = {
@@ -547,37 +464,37 @@ export const StudyInterface: React.FC = () => {
       onSettingsChange: handleSettingsChange,
       onAutoProgressChange: handleAutoProgressChange,
       onStudyModeChange: handleStudyModeChange,
-      // 자동 진행은 도움 모드에서만
-      autoAdvance,
     };
 
-    const key = `${currentMode}-${packData.id}-${currentDay}`;
+    const componentKey = `${currentMode}-${packData.id}-${currentDay}`;
 
     switch (contentType) {
       case "introduction":
         return (
           <LearningMethodIntro
-            key={`intro-${key}`}
+            key={componentKey}
             methods={packData.learningMethods}
             packId={packData.id}
             onComplete={onModeComplete}
           />
         );
       case "vocab":
-        return <VocabularyMode key={key} items={items} {...baseProps} />;
+        return (
+          <VocabularyMode key={componentKey} items={items} {...baseProps} />
+        );
       case "sentence":
         return (
           <SentenceMode
-            key={key}
+            key={componentKey}
             items={items}
             learningMethod={learningMethod}
             {...baseProps}
           />
         );
       case "workbook":
-        return <WorkbookMode key={key} items={items} {...baseProps} />;
+        return <WorkbookMode key={componentKey} items={items} {...baseProps} />;
       default:
-        return null;
+        return <div>Unknown content type: {contentType}</div>;
     }
   }, [
     currentMode,
@@ -585,7 +502,6 @@ export const StudyInterface: React.FC = () => {
     currentDay,
     settings,
     isSettingOpen,
-    autoAdvance,
     getModeData,
     getLearningMethod,
     getContentType,
@@ -598,7 +514,7 @@ export const StudyInterface: React.FC = () => {
     handleStudyModeChange,
   ]);
 
-  // initial mode
+  // initial mode (FIX: choose first non-introduction)
   useEffect(() => {
     if (isInitializedRef.current) return;
     if (!availableModeKeys.length || !packData || !dayPlan) return;
@@ -607,7 +523,11 @@ export const StudyInterface: React.FC = () => {
     isInitializedRef.current = true;
   }, [availableModeKeys, packData, dayPlan, selectInitialMode]);
 
-  // guards
+  // derived
+  const completedModeCount = studyModes.filter((m) => m.completed).length;
+  const totalModeCount = studyModes.length;
+
+  // guards (디자인 그대로 유지)
   if (!isDayAccessible) {
     const previousDay = currentDay - 1;
     return (
@@ -687,9 +607,6 @@ export const StudyInterface: React.FC = () => {
     );
   }
 
-  const completedModeCount = studyModes.filter((m) => m.completed).length;
-  const totalModeCount = studyModes.length;
-
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50">
@@ -697,7 +614,7 @@ export const StudyInterface: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => navigate("/calendar")}
+                onClick={handleBack}
                 className="p-2 rounded-full hover:bg-gray-100 transition-colors -ml-2"
               >
                 <ChevronLeft className="w-5 h-5 text-gray-600" />
@@ -709,6 +626,7 @@ export const StudyInterface: React.FC = () => {
                 <p className="text-xs text-gray-500">{dayPlan.title}</p>
               </div>
             </div>
+
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1">
                 <Clock className="w-4 h-4 text-gray-400" />
@@ -763,6 +681,7 @@ export const StudyInterface: React.FC = () => {
         <div className="flex-1">{renderContent()}</div>
 
         <CompletionModal
+          key={`${completion.completed}-${currentDay}`}
           open={completion.open}
           title={
             completion.completed
@@ -788,8 +707,8 @@ export const StudyInterface: React.FC = () => {
           open={isSettingOpen}
           onClose={() => setIsSettingOpen(false)}
           settings={settings}
-          onModeChange={handleStudyModeChange}
-          onAutoChange={handleAutoProgressChange}
+          onModeChange={(m) => handleStudyModeChange(m)}
+          onAutoChange={(v) => handleAutoProgressChange(v)}
           onAutoPlayChange={(v) =>
             handleSettingsChange({ autoPlayOnSelect: v })
           }
@@ -798,5 +717,3 @@ export const StudyInterface: React.FC = () => {
     </ErrorBoundary>
   );
 };
-
-export default StudyInterface;

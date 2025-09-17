@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 export function LandingPage() {
   const navigate = useNavigate();
-  const { login, isAuthenticated, loading } = useAppStore();
+  const { loginWithProvider, isAuthenticated, loading } = useAppStore();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [hasNavigated, setHasNavigated] = useState(false); // [추가] 네비게이션 방지 플래그
 
@@ -41,11 +41,11 @@ export function LandingPage() {
   const handleLogin = async () => {
     try {
       setIsLoggingIn(true);
-      await login();
-      // 로그인 성공 후 자동 이동은 useEffect에서 처리
+      // 구글 OAuth 시작 (redirect 방식)
+      await loginWithProvider("google");
+      // 리다이렉트가 발생하므로 이후 복원은 appStore.initialize/onAuthStateChange에서 처리됩니다.
     } catch (error) {
-      console.error("Login failed:", error);
-      setHasNavigated(false); // 실패 시 네비게이션 플래그 리셋
+      console.error("OAuth login failed:", error);
     } finally {
       setIsLoggingIn(false);
     }
@@ -67,7 +67,7 @@ export function LandingPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Real VOCA</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">English App</h1>
           <p className="text-gray-600 text-sm leading-relaxed">
             암기가 아닌 패턴과 어휘를 함께
             <br />
@@ -86,16 +86,16 @@ export function LandingPage() {
             ) : (
               <LogIn className="w-5 h-5" />
             )}
-            {isLoggingIn ? "로그인 중..." : "데모 로그인"}
+            {isLoggingIn ? "로그인 중..." : "구글로 계속하기"}
           </button>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          {/* <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
             <p className="text-amber-800 text-sm text-center">
               <strong>현재는 데모 버전입니다.</strong>
               <br />
               나중에 구글 OAuth 로그인이 추가될 예정입니다.
             </p>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

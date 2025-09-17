@@ -1,6 +1,7 @@
 import React from "react";
 import { CheckCircle2, XCircle, CheckCircle } from "lucide-react";
 import { SpeakButton } from "@/shared/components/SpeakButton";
+import ActionButtons from "@/shared/components/ActionButtons";
 
 export interface WorkbookCardProps {
   // 문제 데이터
@@ -34,7 +35,11 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
   isAnswered = false,
   onAnswerSelect,
   onSpeak,
+  onCheck,
+  onRetry,
   onToggleExplanation,
+  isCurrentAnswered,
+  currentIndex,
 }) => {
   const isCorrect = selectedAnswer === correctAnswer;
 
@@ -106,20 +111,26 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
 
         {/* 질문 영역 */}
         <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 mb-6 border border-indigo-100">
-          {/* 🔥 빈칸이 채워진 문제 문장 */}
           <h2 className="text-xl font-bold text-gray-900">
             {renderQuestionWithAnswer()}
           </h2>
 
-          {/* 🔥 공통 발음 듣기 버튼 (완성된 문장으로 TTS) */}
-          {selectedAnswer && (
-            <SpeakButton
-              text={getCompleteTextForTTS()}
-              onSpeak={onSpeak}
-              isSpeaking={isSpeaking}
-              className="mt-4 bg-white/70"
+          <div className="flex justify-center gap-x-2">
+            {selectedAnswer && (
+              <SpeakButton
+                text={getCompleteTextForTTS()}
+                onSpeak={onSpeak}
+                isSpeaking={isSpeaking}
+                className="mt-4 bg-white/70"
+              />
+            )}
+            <ActionButtons
+              isAnswered={isAnswered}
+              canCheck={!!selectedAnswer}
+              onCheck={onCheck}
+              onRetry={onRetry}
             />
-          )}
+          </div>
         </div>
 
         {/* 선택지 */}
