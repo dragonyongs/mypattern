@@ -98,7 +98,7 @@ export const StudyCard: React.FC<StudyCardProps> = ({
       {isMastered && (
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium mb-4">
           <CheckCircle2 className="w-4 h-4" />
-          <span className="hidden sm:inline">학습 완료</span>
+          <span className="inline">학습 완료</span>
         </div>
       )}
 

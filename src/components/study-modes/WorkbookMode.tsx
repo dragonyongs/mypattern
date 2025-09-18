@@ -464,7 +464,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
         saveProgress(idx, isCorrect);
       });
       pendingSaveRef.current.clear();
-      markModeCompleted(packId, "workbook");
+      markModeCompleted("workbook");
       onComplete?.();
     }, [saveProgress, markModeCompleted, packId, onComplete]);
 

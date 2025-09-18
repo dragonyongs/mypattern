@@ -480,6 +480,20 @@ export const StudyInterface: React.FC = () => {
     []
   );
 
+  useEffect(() => {
+    const onOpen = () => setIsSettingOpen(true);
+    const onClose = () => setIsSettingOpen(false);
+
+    // App.tsx에서 window.dispatchEvent(new Event('open-study-settings'))를 보낸다고 가정
+    window.addEventListener("open-study-settings" as any, onOpen);
+    window.addEventListener("close-study-settings" as any, onClose);
+
+    return () => {
+      window.removeEventListener("open-study-settings" as any, onOpen);
+      window.removeEventListener("close-study-settings" as any, onClose);
+    };
+  }, []);
+
   // 모드 완료 처리: 반드시 core 타입으로 저장
   const handleModeComplete = useCallback(
     (completedMode: StudyMode) => {

@@ -223,7 +223,7 @@ const VocabularyMode: React.FC<Props> = ({
   );
 
   const handleComplete = useCallback(() => {
-    markModeCompleted(packId, "vocab");
+    markModeCompleted("vocab");
     onComplete?.();
   }, [markModeCompleted, packId, onComplete]);
 

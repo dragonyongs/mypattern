@@ -20,7 +20,7 @@ export const RetryButton: React.FC<RetryButtonProps> = ({
     title="다시 학습"
   >
     <RefreshCw className="w-4 h-4" />
-    <span className="hidden sm:inline">다시학습</span>
+    <span className="inline">다시학습</span>
   </button>
 );
 

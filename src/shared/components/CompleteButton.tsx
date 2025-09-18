@@ -21,7 +21,7 @@ export const CompleteButton: React.FC<CompleteButtonProps> = ({
     title="학습 완료"
   >
     <CheckSquare className="w-4 h-4" />
-    <span className="hidden sm:inline">학습완료</span>
+    <span className="inline">학습완료</span>
   </button>
 );
 

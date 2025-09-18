@@ -363,9 +363,9 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   }, [items, packId, dayNumber, onItemCompleted, setItemCompleted]);
 
   const handleComplete = useCallback(() => {
-    markModeCompleted(packId, "sentence");
+    markModeCompleted("sentence"); // ✅ packId 제거
     onComplete?.();
-  }, [markModeCompleted, packId, onComplete]);
+  }, [markModeCompleted, onComplete]);
 
   // 문장 하이라이트
   // const renderHighlightedSentence = useCallback(
