@@ -86,6 +86,10 @@ export const StudyInterface: React.FC = () => {
     )
   );
 
+  useEffect(() => {
+    setCurrentMode(null);
+  }, [packData?.id, currentDay]);
+
   // 현재 Day의 저장된 누적시간으로 초기화
   useEffect(() => {
     if (!packData) return;
@@ -255,18 +259,24 @@ export const StudyInterface: React.FC = () => {
     [packData?.id, currentDay]
   );
 
+  const normalizePlanMode = (t: string): StudyMode | null => {
+    const v = String(t).toLowerCase().trim();
+    if (v === "introduction" || v === "intro") return "introduction";
+    if (v === "workbook" || v === "quiz") return "workbook";
+    if (v.includes("vocab")) return "vocab";
+    if (v.includes("sentence") || v.includes("sent")) return "sentence";
+    return null;
+  };
+
   // dayPlan.modes[].type을 그대로 core StudyMode로 사용
   const availableModeKeys = useMemo<StudyMode[]>(() => {
     if (!dayPlan) return [];
-    return dayPlan.modes
-      .map((m) => m.type as StudyMode)
-      .filter(
-        (t) =>
-          t === "introduction" ||
-          t === "vocab" ||
-          t === "sentence" ||
-          t === "workbook"
-      );
+    const seq: StudyMode[] = [];
+    for (const m of dayPlan.modes || []) {
+      const core = normalizePlanMode(m.type as string);
+      if (core && !seq.includes(core)) seq.push(core);
+    }
+    return seq;
   }, [dayPlan]);
 
   // 접근 제어: 이전 Day 완료 여부
@@ -282,12 +292,30 @@ export const StudyInterface: React.FC = () => {
   const getModeData = useCallback(
     (mode: StudyMode) => {
       if (!dayPlan || !packData) return [];
-      const cfg = dayPlan.modes.find((m) => m.type === mode);
-      if (!cfg) return [];
-      return packDataService.getContentsByIds(packData, cfg.contentIds);
+      const groups = (dayPlan.modes || []).filter(
+        (m) => normalizePlanMode(m.type as string) === mode
+      );
+      if (groups.length === 0) return [];
+      const allIds = groups.flatMap((g) => g.contentIds || []);
+      // 중복 제거(순서 유지)
+      const seen = new Set<string>();
+      const uniqIds = allIds.filter((id) =>
+        seen.has(id) ? false : (seen.add(id), true)
+      );
+      return packDataService.getContentsByIds(packData, uniqIds);
     },
     [packData, dayPlan]
   );
+
+  useEffect(() => {
+    if (!packData || !dayPlan) return;
+    const seq = availableModeKeys;
+    if (seq.length === 0) return;
+    if (!currentMode || !seq.includes(currentMode)) {
+      const first = seq.find((m) => m !== "introduction") ?? seq[0];
+      setCurrentMode(first);
+    }
+  }, [packData?.id, currentDay, dayPlan, availableModeKeys, currentMode]);
 
   const getItemProgress = useCallback(
     (itemId: string) => {
@@ -607,15 +635,6 @@ export const StudyInterface: React.FC = () => {
     handleStudyModeChange,
   ]);
 
-  // initial mode
-  useEffect(() => {
-    if (isInitializedRef.current) return;
-    if (!availableModeKeys.length || !packData || !dayPlan) return;
-    const first = selectInitialMode(availableModeKeys);
-    if (first) setCurrentMode(first);
-    isInitializedRef.current = true;
-  }, [availableModeKeys, packData, dayPlan, selectInitialMode]);
-
   // guards
   if (!isDayAccessible) {
     const previousDay = currentDay - 1;
@@ -680,6 +699,25 @@ export const StudyInterface: React.FC = () => {
         <button
           onClick={() => navigate("/calendar")}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          달력으로 돌아가기
+        </button>
+      </div>
+    );
+  }
+
+  if (availableModeKeys.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">
+          표시할 학습 모드가 없습니다
+        </h2>
+        <p className="text-gray-600">
+          해당 Day의 플랜에 유효한 모드가 없거나 콘텐츠가 비어있습니다.
+        </p>
+        <button
+          onClick={() => navigate("/calendar")}
+          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg"
         >
           달력으로 돌아가기
         </button>
