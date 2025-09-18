@@ -14,8 +14,8 @@ export const useWorkbookLogic = (
     clearItemProgress: clearItemProgressInStore,
   } = useStudyProgressStore();
 
-  const getCorrectAnswer = useCallback((question: WorkbookItem) => {
-    return (question as any).correctAnswer || (question as any).answer || "";
+  const getCorrectAnswer = useCallback((q: WorkbookItem) => {
+    return (q as any).correctAnswer || (q as any).answer || "";
   }, []);
 
   const saveProgress = useCallback(
@@ -37,26 +37,23 @@ export const useWorkbookLogic = (
     const answered = new Set<number>();
     const correct = new Set<number>();
     const results: Record<number, boolean> = {};
+    const selected: Record<number, string> = {};
 
     workbook.forEach((item, index) => {
       const p = getItemProgress(packId, dayNumber, item.id);
+      if (p === null) return; // 미시도 [그대로 패스]
 
-      // p가 null이면 기록 자체가 없으므로 "미시도" 상태. 아무것도 하지 않음.
-      if (p === null) {
-        return;
-      }
-
-      // p가 객체면 시도한 것으로 간주
       answered.add(index);
       const isCorrect = p.isCompleted === true;
       results[index] = isCorrect;
       if (isCorrect) {
+        selected[index] = getCorrectAnswer(item); // ✅ 정답 선택 복원
         correct.add(index);
       }
     });
 
-    return { answered, correct, results };
-  }, [workbook, getItemProgress, packId, dayNumber]);
+    return { answered, correct, results, selected }; // ✅ selected 포함
+  }, [workbook, getItemProgress, packId, dayNumber, getCorrectAnswer]);
 
   // 🔥 개별 아이템 삭제 함수 추가 (다시 풀기용)
   const clearItemProgress = useCallback(

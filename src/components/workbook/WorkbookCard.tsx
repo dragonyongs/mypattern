@@ -41,39 +41,26 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
   isCurrentAnswered,
   currentIndex,
 }) => {
-  const isCorrect = selectedAnswer === correctAnswer;
+  const isCorrect =
+    (selectedAnswer ?? "").trim() === (correctAnswer ?? "").trim();
 
   // 🔥 빈칸을 선택한 답으로 교체하는 함수
   const renderQuestionWithAnswer = () => {
     if (!question) return "";
-
     const blankPattern = /_{2,}/g;
 
     if (!selectedAnswer) {
-      return <span>{question}</span>;
+      return question; // 수정
     }
 
-    // 빈칸을 선택한 답으로 교체하고 하이라이트
     const parts = question.split(blankPattern);
     if (parts.length <= 1) {
-      return <span>{question}</span>;
+      return question; // 수정
     }
 
-    const result = [];
-    for (let i = 0; i < parts.length - 1; i++) {
-      result.push(<span key={`text-${i}`}>{parts[i]}</span>);
-      result.push(
-        <span
-          key={`answer-${i}`}
-          className="font-bold text-blue-600 underline decoration-2"
-        >
-          {selectedAnswer}
-        </span>
-      );
-    }
-    result.push(<span key="final">{parts[parts.length - 1]}</span>);
-
-    return <>{result}</>;
+    // 하이라이트는 단순화: 선택어를 굵게 또는 밑줄 등으로 표시해도 됨
+    const filled = question.replace(blankPattern, selectedAnswer);
+    return filled; // 간단 문자열 반환(스타일링은 CSS로)
   };
 
   // 🔥 TTS용 완성된 텍스트 생성

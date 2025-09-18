@@ -435,7 +435,7 @@ export const StudyInterface: React.FC = () => {
   );
 
   const handleItemCompleted = useCallback(
-    (itemId: string, completed: boolean = true) => {
+    (itemId: string, completed = true) => {
       if (!packData || !currentMode) return;
       const cur = storeActions.getItemProgress(packData.id, currentDay, itemId);
       if (cur?.isCompleted !== completed) {
@@ -445,6 +445,9 @@ export const StudyInterface: React.FC = () => {
           itemId,
           completed
         );
+        if (!completed) {
+          completionProcessingRef.current = false; // ✅ 완료 해제되면 다시 허용
+        }
       }
     },
     [
@@ -483,20 +486,25 @@ export const StudyInterface: React.FC = () => {
       if (!packData || !dayPlan) return;
       if (completionProcessingRef.current) return;
       if (completion.open) return;
+
       const coreType = getContentType(completedMode);
+
       if (coreType === "unknown" || coreType === "introduction") {
-        // 소개는 완료 모드 저장 없이 다음으로
+        completionProcessingRef.current = true; // ✅ 추가
         setCompletion({ open: true, completed: completedMode });
         return;
       }
+
       const already = dayProgress?.completedModes?.[coreType];
+
       if (already) {
+        completionProcessingRef.current = true; // ✅ 추가
         setCompletion({ open: true, completed: completedMode });
         return;
       }
-      completionProcessingRef.current = true;
+
+      completionProcessingRef.current = true; // 기존 유지
       try {
-        // store: setModeCompleted(packId, day, modeType, packData)
         storeActions.setModeCompleted(
           packData.id,
           currentDay,
@@ -522,9 +530,10 @@ export const StudyInterface: React.FC = () => {
   const handleModeChange = useCallback(
     (mode: StudyMode) => {
       if (!packData || currentMode === mode) return;
-      completionProcessingRef.current = false;
+      // completionProcessingRef.current = false;
       if (completion.open) setCompletion({ open: false, completed: null });
       setCurrentMode(mode);
+      completionProcessingRef.current = false; // ✅ 전환 시 해제
     },
     [packData, currentMode, completion.open]
   );
@@ -563,7 +572,7 @@ export const StudyInterface: React.FC = () => {
 
   const handleCloseModal = useCallback(() => {
     setCompletion({ open: false, completed: null });
-    completionProcessingRef.current = false;
+    // completionProcessingRef.current = false;
   }, []);
 
   const renderContent = useCallback(() => {

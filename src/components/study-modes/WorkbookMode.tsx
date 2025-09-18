@@ -17,7 +17,7 @@ import { useWorkbookLogic } from "@/hooks/useWorkbookLogic";
 import StudyPagination from "@/shared/components/StudyPagination";
 import { StudySidebar } from "@/shared/components/StudySidebar";
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
-import ActionButtons from "@/shared/components/ActionButtons";
+import { buildWorkbookForDay } from "@/shared/services/workbook.builder";
 import { WorkbookCard } from "@/components/workbook/WorkbookCard";
 
 import { shuffleWithSeed } from "@/utils/workbook.utils"; // PRNG + Fisher–Yates
@@ -27,6 +27,13 @@ import {
 } from "@/utils/workbook.shuffle.runtime";
 
 import type { WorkbookModeProps } from "@/types/workbook.types";
+
+const getItemCorrectText = (it?: any) => {
+  if (!it) return "";
+  return it.correctAnswer ?? it.answer ?? "";
+};
+
+const normalize = (s = "") => s.toLowerCase().replace(/\s+/g, " ").trim();
 
 export const WorkbookMode = React.memo<WorkbookModeProps>(
   ({
@@ -39,11 +46,30 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     settings = {},
     onSettingsChange,
   }) => {
+    const [workbook, setWorkbook] = useState<WorkbookItem[]>([]);
+
     // 1) 원본 유지: 전역 일괄 셔플 제거
-    const workbook = useMemo(() => {
-      if (!Array.isArray(rawWorkbook) || rawWorkbook.length === 0) return [];
-      return rawWorkbook;
-    }, [rawWorkbook]);
+    // const workbook = useMemo(() => {
+    //   if (Array.isArray(rawWorkbook) && rawWorkbook.length > 0) {
+    //     return rawWorkbook; // 이미 안전하게 생성된 경우 그대로 사용
+    //   }
+    //   return buildWorkbookForDay(dayNumber); // 없음 → 자동 생성 fallback
+    // }, [rawWorkbook, dayNumber]);
+
+    useEffect(() => {
+      let cancelled = false;
+      if (Array.isArray(rawWorkbook) && rawWorkbook.length > 0) {
+        setWorkbook(rawWorkbook);
+        return;
+      }
+      (async () => {
+        const items = await buildWorkbookForDay(packId, dayNumber, 4); // packId 포함
+        if (!cancelled) setWorkbook(items);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [rawWorkbook, packId, dayNumber]);
 
     const {
       getCorrectAnswer,
@@ -262,49 +288,40 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     // 13) 정답 확인
     const handleCheckAnswer = useCallback(() => {
       const idx = currentIndexRef.current;
-      if (answeredRef.current.has(idx)) return;
+      const q = workbook[idx] as any | undefined;
+      if (!q) return; // 경계 보호
 
+      if (showResult[idx]) return;
       const selected = selectedAnswers[idx];
-      console.log("[wb] check start", {
-        idx,
-        selected,
-        wasAnswered: answeredRef.current.has(idx),
-      });
-      if (answeredRef.current.has(idx)) {
-        console.log("[wb] early return: already checked");
-        return;
-      }
-      if (!selected) {
-        console.log("[wb] early return: no selection");
+      if (!selected) return;
+
+      const correct = getItemCorrectText(q);
+      if (!correct) {
+        // 정답 텍스트가 비어있으면 채점하지 않음
+        console.warn("[wb] empty correct answer for item", q?.id);
         return;
       }
 
-      // if (!selected) return;
+      const isCorrect = normalize(selected) === normalize(correct);
 
-      const correct = getCorrectAnswer(currentQuestion!);
-      const isCorrect = selected === correct;
-
+      // 상태 + ref 동기화
       setAnsweredQuestions((prev) => {
         const n = new Set(prev);
         n.add(idx);
         return n;
       });
-      console.log("[wb] check done", {
-        idx,
-        isCorrect,
-        answeredSize: answeredRef.current.size + 1 /* 예상 */,
-        correctSize: correctRef.current.size + (isCorrect ? 1 : 0),
-      });
+      answeredRef.current.add(idx); // 🔥 동기화 [attached_file:11]
+
       if (isCorrect) {
         setCorrectAnswers((prev) => {
           const n = new Set(prev);
           n.add(idx);
           return n;
         });
+        correctRef.current.add(idx); // 🔥 동기화 [attached_file:11]
       }
-      setShowResult((prev) => ({ ...prev, [idx]: true }));
-
-      saveProgress(idx, isCorrect);
+      setShowResult((prev) => ({ ...prev, [idx]: true })); // [attached_file:11]
+      saveProgress(idx, isCorrect); // [attached_file:11]
 
       if (localSettings.autoProgressEnabled) {
         if (autoProgressTimeoutRef.current) {
@@ -334,28 +351,27 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       }
     }, [
       selectedAnswers,
-      getCorrectAnswer,
-      currentQuestion,
+      showResult,
+      workbook,
       setAnsweredQuestions,
       setCorrectAnswers,
       setShowResult,
       saveProgress,
-      navigateTo,
-      workbook.length,
-      localSettings.autoProgressEnabled,
     ]);
 
     //const { clearItemProgress } = useWorkbookLogic(packId, dayNumber, workbook);
 
     // 14) 다시 풀기
     // WorkbookMode.tsx 내부 - handleRetry 함수만 교체
+    // 1) Retry 시 ref도 함께 초기화
     const handleRetry = useCallback(() => {
       const idx = currentIndexRef.current;
 
-      // 🔥 저장소에서도 완전히 삭제
-      clearItemProgress(idx);
+      clearItemProgress(idx); // 저장소 초기화 [attached_file:11]
+      pendingSaveRef.current.delete(idx); // 보류 저장 초기화 [attached_file:11]
 
-      pendingSaveRef.current.delete(idx);
+      answeredRef.current.delete(idx); // 🔥 ref 동기화
+      correctRef.current.delete(idx); // 🔥 ref 동기화
 
       setAnsweredQuestions((prev) => {
         const n = new Set(prev);
@@ -368,24 +384,24 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
         return n;
       });
       setShowResult((prev) => {
-        const copy = { ...prev };
-        delete copy[idx];
-        return copy;
+        const c = { ...prev };
+        delete c[idx];
+        return c;
       });
       setShowExplanation((prev) => {
-        const copy = { ...prev };
-        delete copy[idx];
-        return copy;
+        const c = { ...prev };
+        delete c[idx];
+        return c;
       });
       setSelectedAnswers((prev) => {
-        const copy = { ...prev };
-        delete copy[idx];
-        return copy;
+        const c = { ...prev };
+        delete c[idx];
+        return c;
       });
 
       console.log(`🔄 [RETRY] Reset state for index ${idx}`);
     }, [
-      clearItemProgress, // 🔥 추가
+      clearItemProgress,
       setAnsweredQuestions,
       setCorrectAnswers,
       setShowResult,
@@ -461,6 +477,10 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       [componentKey, answeredCount, correctCount, currentIndex]
     );
 
+    const itemAtIndex = workbook[currentIndex] as any | undefined;
+    const cardCorrect =
+      getItemCorrectText(shownItem) || getItemCorrectText(itemAtIndex);
+
     // 경계 처리
     if (!workbook.length) {
       return (
@@ -504,7 +524,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
                     currentIndex={currentIndex}
                     question={shownItem.question || shownItem.sentence}
                     options={shownItem.options || []} // 셔플된 옵션
-                    correctAnswer={shownItem.correctAnswer} // 결정적 정답
+                    correctAnswer={cardCorrect} // 결정적 정답
                     explanation={shownItem.explanation}
                     selectedAnswer={selectedAnswers[currentIndex]}
                     showResult={showResult[currentIndex]}

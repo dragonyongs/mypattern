@@ -11,6 +11,7 @@ export const useWorkbookState = (
     answered: Set<number>;
     correct: Set<number>;
     results: Record<number, boolean>;
+    selected?: Record<number, string>;
   }
 ) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -60,51 +61,30 @@ export const useWorkbookState = (
   // 🔥 하이드레이션 대기 후 복원 실행
   useEffect(() => {
     let cancelled = false;
-
     if (!workbook.length || isRestored) return;
 
     const performRestore = async () => {
       try {
-        console.log(
-          "🔄 WorkbookState 복원 시작 - 하이드레이션 대기 중...",
-          componentKey
-        );
-
-        // 하이드레이션이 완료될 때까지 대기
-        if (!progressHydrated) {
-          await waitForHydration();
-        }
-
+        if (!progressHydrated) await waitForHydration();
         if (cancelled) return;
 
-        console.log(
-          "🔄 WorkbookState 하이드레이션 완료 - 복원 진행...",
-          componentKey
-        );
-
-        const { answered, correct, results } = restoreProgress();
+        // ✅ 선택값 포함 복원
+        const { answered, correct, results, selected } = restoreProgress();
 
         if (!cancelled) {
           setAnsweredQuestions(answered);
           setCorrectAnswers(correct);
           setShowResult(results);
+          if (selected) setSelectedAnswers(selected); // ✅ 추가
           setIsRestored(true);
-
-          console.log("✅ WorkbookState 복원 완료:", {
-            answered: answered.size,
-            correct: correct.size,
-          });
         }
-      } catch (error) {
-        console.warn("⚠️ WorkbookState 복원 실패:", error);
-        if (!cancelled) {
-          setIsRestored(true); // 실패해도 다시 시도하지 않음
-        }
+      } catch (e) {
+        console.warn("⚠️ WorkbookState 복원 실패:", e);
+        if (!cancelled) setIsRestored(true);
       }
     };
 
-    performRestore();
-
+    void performRestore();
     return () => {
       cancelled = true;
     };
