@@ -94,7 +94,7 @@ export const StudyCard: React.FC<StudyCardProps> = ({
   );
 
   return (
-    <div className="relative bg-white rounded-2xl shadow-lg p-6 sm:p-8 text-center cursor-pointer transition-transform active:scale-95">
+    <div className="relative bg-white rounded-2xl shadow-lg p-6 sm:p-8 text-center cursor-pointer transition-transform active:scale-95 min-h-72 flex justify-center items-center">
       {isMastered && (
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium mb-4">
           <CheckCircle2 className="w-4 h-4" />

@@ -43,29 +43,28 @@ export function buildWorkbookForDayFromPack(
   const prioritized = sentences.filter((s: any) => s.category === "directions");
   const picked = (prioritized.length ? prioritized : sentences).slice(0, 12);
 
+  // workbook.builder.ts에서
   return picked.map((raw: any) => {
-    const tags = (raw.targetWords || []).map(tagOf);
+    const tags = raw.targetWords?.map(tagOf) || [];
     const pool = directionsPoolFrom(data);
 
-    // 표시용 정답(태그 -> 자연스러운 표현)
-    const displayAnswer =
-      (tags.length ? surfaceForTag(tags[0], pool) : null) ||
-      raw.targetWords?.[0] ||
-      "";
+    const displayAnswer = tags.length
+      ? surfaceForTag(tags[0], pool) ?? raw.targetWords?.[0]
+      : raw.targetWords?.[0];
 
-    // 질문은 영문 원문에 빈칸(_____) 처리
     const questionBlank = makeBlank(raw.text, tags);
 
     const base: WorkbookItem = {
-      id: raw.id,
-      sentence: raw.text, // 원문(영문)
-      blank: questionBlank, // 빈칸 처리된 원문
-      question: questionBlank, // 카드에 노출할 질문
+      id: `wb-${raw.id}`, // ← 수정: 워크북 전용 ID로 변경
+      sentence: raw.text,
+      blank: questionBlank,
+      question: questionBlank,
       options: [],
-      answer: displayAnswer, // 표시/채점용 정답 표현
-      explanation: raw.translation || "", // 번역은 해설로
+      answer: displayAnswer,
+      explanation: raw.translation ?? "",
       correctAnswers: tags,
-      evaluation: { mode: "single", tags },
+      evaluation: { mode: "single" },
+      tags,
     };
 
     const opts = generateSafeOptions(base, pool, tags, optionCount - 1);

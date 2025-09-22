@@ -291,18 +291,24 @@ export const StudyInterface: React.FC = () => {
   // helpers
   const getModeData = useCallback(
     (mode: StudyMode) => {
-      if (!dayPlan || !packData) return [];
-      const groups = (dayPlan.modes || []).filter(
+      if (!dayPlan || !packData) return;
+
+      const groups = dayPlan.modes.filter(
         (m) => normalizePlanMode(m.type as string) === mode
       );
-      if (groups.length === 0) return [];
-      const allIds = groups.flatMap((g) => g.contentIds || []);
-      // 중복 제거(순서 유지)
+
+      if (groups.length === 0) return;
+
+      const allIds = groups.flatMap((g) => g.contentIds);
+
       const seen = new Set<string>();
       const uniqIds = allIds.filter((id) =>
-        seen.has(id) ? false : (seen.add(id), true)
+        seen.has(id) ? false : seen.add(id)
       );
-      return packDataService.getContentsByIds(packData, uniqIds);
+
+      const items = packDataService.getContentsByIds(packData, uniqIds);
+
+      return items;
     },
     [packData, dayPlan]
   );

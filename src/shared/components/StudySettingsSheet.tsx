@@ -85,7 +85,7 @@ export const StudySettingsSheet: React.FC<Props> = ({
         onClick={onClose}
       />
       <div
-        className="absolute inset-x-0 bottom-0 z- bg-white rounded-t-2xl shadow-2xl
+        className="absolute inset-x-0 bottom-16 z- bg-white rounded-t-2xl shadow-2xl
                    p-6 max-h-[80vh] overflow-y-auto pointer-events-auto"
         onClick={stopBubble}
         onTouchEnd={stopBubble}

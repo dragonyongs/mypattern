@@ -127,25 +127,26 @@ class PackDataService {
       if (items.length === 0) continue;
 
       // contents에 유형화된 workbook 컨텐츠로 주입 + generatedWorkbooks 유지
+      // packDataService.ts에서
       for (const it of items) {
         const gen: GeneratedWorkbook = {
-          id: it.id,
-          question: it.question ?? it.sentence ?? "",
+          id: `wb-${it.id}`, // ← 여기도 동일하게 수정
+          question: it.question ?? (it as any).sentence ?? "",
           options: it.options ?? [],
           correctAnswer: (it as any).correctAnswer ?? it.answer ?? "",
           explanation: it.explanation ?? "",
-          relatedSentenceId: (it as any).relatedSentenceId, // 있으면 사용
+          relatedSentenceId: (it as any).relatedSentenceId,
         };
         generated.push(gen);
 
         const content: any = {
-          id: gen.id,
+          id: gen.id, // ← wb- 프리픽스가 적용된 ID 사용
           type: "workbook",
           category: "auto-generated",
           question: gen.question,
           options: gen.options,
           correctAnswer: gen.correctAnswer,
-          answer: gen.correctAnswer, // 호환성
+          answer: gen.correctAnswer,
           explanation: gen.explanation,
           relatedSentenceId: gen.relatedSentenceId,
         };
@@ -344,8 +345,22 @@ class PackDataService {
     const genMap = new Map(
       (packData.generatedWorkbooks || []).map((g) => [g.id, g])
     );
+
     return ids
-      .map((id) => contentMap.get(id) ?? genMap.get(id))
+      .map((id, index) => {
+        // 원본 컨텐츠 우선 검색
+        const originalContent = contentMap.get(id);
+        if (originalContent) {
+          return originalContent;
+        }
+
+        // 원본이 없을 경우만 생성된 워크북에서 검색
+        const generatedContent = genMap.get(id);
+        if (!generatedContent) {
+          console.log(`❌ Missing content for ID: ${id} at index ${index}`);
+        }
+        return generatedContent;
+      })
       .filter(Boolean) as ContentItem[];
   }
 

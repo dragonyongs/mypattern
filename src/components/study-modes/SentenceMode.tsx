@@ -408,7 +408,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   }
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-217px)] lg:min-h-[calc(100vh-130px)] bg-gray-50 font-sans pb-20 lg:pb-0">
+    <div className="flex h-full min-h-[calc(100vh-192px)] lg:min-h-[calc(100vh-130px)] bg-gray-50 font-sans lg:pb-0">
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Main */}
         <main
