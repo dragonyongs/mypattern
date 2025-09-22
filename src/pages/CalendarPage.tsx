@@ -59,14 +59,17 @@ type StudyModeIndicatorProps = {
   modes: Array<{
     type: "vocab" | "sentence" | "workbook";
     count: number;
-    completed: boolean;
+    completed: number; // ✅ 완료된 개수
+    total: number; // ✅ 전체 개수
   }>;
   isCompleted?: boolean;
+  isCurrent?: boolean; // ✅ 현재 진행중인지
 };
 
 const StudyModeIndicator: React.FC<StudyModeIndicatorProps> = ({
   modes,
   isCompleted = false,
+  isCurrent = false, // ✅ 추가
 }) => {
   if (modes.length === 0) return null;
 
@@ -76,7 +79,9 @@ const StudyModeIndicator: React.FC<StudyModeIndicatorProps> = ({
     workbook: "문제",
   };
 
-  const completedCount = modes.filter((mode) => mode.completed).length;
+  const completedModeCount = modes.filter(
+    (mode) => mode.completed === mode.total
+  ).length;
 
   return (
     <div className="space-y-3">
@@ -86,55 +91,73 @@ const StudyModeIndicator: React.FC<StudyModeIndicatorProps> = ({
         </span>
         <span
           className={`font-medium ${
-            isCompleted ? "text-green-700" : "text-slate-700"
+            isCompleted
+              ? "text-green-700"
+              : isCurrent
+              ? "text-blue-700" // ✅ 현재 진행중이면 블루
+              : "text-slate-700"
           }`}
         >
-          {completedCount}/{modes.length}
+          {completedModeCount}/{modes.length}
         </span>
       </div>
-      <div>
-        {modes.map((mode, idx) => (
-          <div
-            key={idx}
-            className={`flex items-center justify-between py-1.5 px-2 rounded text-xs ${
-              isCompleted ? "bg-white/10" : "bg-slate-50"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-1.5 h-1.5 rounded-full ${
-                  mode.completed
-                    ? isCompleted
-                      ? "bg-emerald-300"
-                      : "bg-slate-300"
-                    : isCompleted
-                    ? "bg-slate-400"
-                    : "bg-slate-300"
-                }`}
-              />
-              <span
-                className={`font-medium ${
-                  mode.completed
-                    ? isCompleted
-                      ? "text-emerald-500"
-                      : "text-slate-700"
-                    : isCompleted
-                    ? "text-slate-400"
-                    : "text-slate-300"
-                }`}
-              >
-                {modeLabels[mode.type]}
-              </span>
-            </div>
-            <span
-              className={`font-medium ${
-                isCompleted ? "text-slate-400" : "text-slate-500"
+      <div className="space-y-1">
+        {modes.map((mode, idx) => {
+          const isFullyCompleted = mode.completed === mode.total;
+          const hasProgress = mode.completed > 0;
+
+          return (
+            <div
+              key={idx}
+              className={`flex items-center justify-between py-1.5 px-2 rounded text-xs ${
+                isCompleted ? "bg-white/10" : "bg-slate-50"
               }`}
             >
-              {mode.count}
-            </span>
-          </div>
-        ))}
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isFullyCompleted
+                      ? isCompleted
+                        ? "bg-emerald-300"
+                        : "bg-green-500" // ✅ 완료된 모드는 초록색
+                      : hasProgress && isCurrent
+                      ? "bg-blue-400" // ✅ 진행중인 모드는 파란색
+                      : "bg-slate-300" // ✅ 시작 안한 모드는 회색
+                  }`}
+                />
+                <span
+                  className={`font-medium ${
+                    isFullyCompleted
+                      ? isCompleted
+                        ? "text-emerald-500"
+                        : "text-green-700"
+                      : hasProgress && isCurrent
+                      ? "text-blue-700"
+                      : isCompleted
+                      ? "text-slate-400"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {modeLabels[mode.type]}
+                </span>
+              </div>
+              <span
+                className={`font-medium ${
+                  isCompleted
+                    ? "text-slate-400"
+                    : hasProgress && isCurrent
+                    ? "text-blue-600" // ✅ 진행중이면 파란색
+                    : "text-slate-500"
+                }`}
+              >
+                {/* ✅ 진행 상황 표시: 완료/전체 또는 전체만 */}
+                {hasProgress && !isFullyCompleted
+                  ? `${mode.completed}/${mode.total}`
+                  : mode.total}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -157,45 +180,64 @@ const DayCardInner: React.FC<DayCardProps> = ({
     packId ? state.progress[packId]?.progressByDay[day.day] : null
   );
 
-  const vocabCompleted = dayProgress?.completedModes
-    ? Object.keys(dayProgress.completedModes).some(
-        (mode) => mode.includes("vocab") && dayProgress.completedModes[mode]
-      )
-    : false;
-  const sentenceCompleted = dayProgress?.completedModes
-    ? Object.keys(dayProgress.completedModes).some(
-        (mode) => mode.includes("sentence") && dayProgress.completedModes[mode]
-      )
-    : false;
-  const workbookCompleted = dayProgress?.completedModes
-    ? Object.keys(dayProgress.completedModes).some(
-        (mode) => mode.includes("workbook") && dayProgress.completedModes[mode]
-      )
-    : false;
+  // ✅ 각 모드별 진행 상황 계산
+  const getModeProgress = (modeType: "vocab" | "sentence" | "workbook") => {
+    const items = dayProgress?.items || {};
+    const total = day[`${modeType}Count`] || 0;
 
-  // [수정] DayCard는 전달받은 day.type을 기준으로 렌더링하므로, 이 로직은 그대로 유지합니다.
+    if (total === 0) return { completed: 0, total: 0 };
+
+    // 해당 모드의 아이템들 중 완료된 것들 계산
+    const completedCount = Object.keys(items).filter((itemId) => {
+      const item = items[itemId];
+      if (!item?.isCompleted) return false;
+
+      // itemId 패턴으로 모드 구분 (예: v-greet-01, s-greet-01, wb-greet-01)
+      if (modeType === "vocab") return itemId.startsWith("v-");
+      if (modeType === "sentence") return itemId.startsWith("s-");
+      if (modeType === "workbook")
+        return itemId.startsWith("wb-") || itemId.startsWith("w-");
+      return false;
+    }).length;
+
+    return { completed: completedCount, total };
+  };
+
+  const vocabProgress = getModeProgress("vocab");
+  const sentenceProgress = getModeProgress("sentence");
+  const workbookProgress = getModeProgress("workbook");
+
+  // ✅ 모드별 완료 상태 (기존 로직 유지)
+  const vocabCompleted = dayProgress?.completedModes?.vocab || false;
+  const sentenceCompleted = dayProgress?.completedModes?.sentence || false;
+  const workbookCompleted = dayProgress?.completedModes?.workbook || false;
+
   const isDay1Introduction = day.type === "introduction";
+  const isCurrent = status === "current";
 
   const studyModes = [];
   if (day.showVocab && day.vocabCount > 0) {
     studyModes.push({
       type: "vocab" as const,
       count: day.vocabCount,
-      completed: vocabCompleted,
+      completed: vocabProgress.completed,
+      total: vocabProgress.total,
     });
   }
   if (day.showSentence && day.sentenceCount > 0) {
     studyModes.push({
       type: "sentence" as const,
       count: day.sentenceCount,
-      completed: sentenceCompleted,
+      completed: sentenceProgress.completed,
+      total: sentenceProgress.total,
     });
   }
   if (day.showWorkbook && day.workbookCount > 0) {
     studyModes.push({
       type: "workbook" as const,
       count: day.workbookCount,
-      completed: workbookCompleted,
+      completed: workbookProgress.completed,
+      total: workbookProgress.total,
     });
   }
 
@@ -211,7 +253,7 @@ const DayCardInner: React.FC<DayCardProps> = ({
       case "completed":
         return "border-green-500 bg-white text-green-600 hover:bg-green-50";
       case "current":
-        return "border-blue-500 bg-white hover:bg-blue-50 ring-2 ring-blue-100";
+        return "border-blue-500 bg-white hover:bg-blue-50 ring-2 ring-blue-100"; // ✅ 현재 진행중 스타일
       default:
         return "border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300";
     }
@@ -231,9 +273,18 @@ const DayCardInner: React.FC<DayCardProps> = ({
   };
 
   const textColor =
-    status === "completed" ? "text-green-600" : "text-slate-900";
+    status === "completed"
+      ? "text-green-600"
+      : status === "current"
+      ? "text-blue-600" // ✅ 현재 진행중이면 블루
+      : "text-slate-900";
+
   const subtextColor =
-    status === "completed" ? "text-slate-800" : "text-slate-500";
+    status === "completed"
+      ? "text-slate-800"
+      : status === "current"
+      ? "text-blue-500" // ✅ 현재 진행중이면 블루
+      : "text-slate-500";
 
   return (
     <div
@@ -268,6 +319,8 @@ const DayCardInner: React.FC<DayCardProps> = ({
           className={`px-2 py-1 rounded text-xs font-medium ${
             status === "completed"
               ? "bg-white/20 text-white"
+              : status === "current"
+              ? "bg-blue-100 text-blue-700" // ✅ 현재 진행중이면 파란색
               : "bg-slate-100 text-slate-700"
           }`}
         >
@@ -277,6 +330,7 @@ const DayCardInner: React.FC<DayCardProps> = ({
         <StudyModeIndicator
           modes={studyModes}
           isCompleted={status === "completed"}
+          isCurrent={status === "current"} // ✅ 현재 진행중 상태 전달
         />
       )}
     </div>
@@ -308,6 +362,7 @@ export default function CalendarPage(): JSX.Element {
     }
   }, [packId]);
 
+  // ✅ 수정된 getDayStatus - 현재 진행중인 날을 정확히 판단
   const getDayStatus = useCallback(
     (dayNumber: number): "current" | "completed" | "locked" | "available" => {
       if (!packId || packId === "undefined") {
@@ -315,30 +370,43 @@ export default function CalendarPage(): JSX.Element {
       }
 
       const progress = getPackProgress(packId);
+      const dayProgress = progress?.progressByDay?.[dayNumber];
 
-      if (!progress) {
-        return dayNumber === 1 ? "available" : "locked";
-      }
-
-      const dayProgress = progress.progressByDay?.[dayNumber];
-
+      // 완료된 경우
       if (dayProgress?.isCompleted) {
         return "completed";
       }
 
-      if (dayNumber === 1) return "available";
+      // Day 1은 항상 사용 가능
+      if (dayNumber === 1) {
+        // Day 1이 진행중이면 current, 아니면 available
+        return currentDay === 1 || (dayProgress && !dayProgress.isCompleted)
+          ? "available"
+          : "available";
+      }
 
-      const prevDayProgress = progress.progressByDay?.[dayNumber - 1];
+      // 이전 날이 완료되었는지 확인
+      const prevDayProgress = progress?.progressByDay?.[dayNumber - 1];
       if (prevDayProgress?.isCompleted) {
-        return "available";
+        // 현재 설정된 currentDay와 같거나, 실제로 진행중인 경우 current
+        const hasAnyProgress =
+          dayProgress &&
+          (Object.keys(dayProgress.items || {}).length > 0 ||
+            Object.keys(dayProgress.completedModes || {}).some(
+              (mode) => dayProgress.completedModes[mode]
+            ));
+
+        return currentDay === dayNumber || hasAnyProgress
+          ? "current"
+          : "available";
       }
 
       return "locked";
     },
-    [packId, getPackProgress]
+    [packId, getPackProgress, currentDay] // ✅ currentDay 의존성 추가
   );
 
-  // [핵심 수정] calendarData 생성 로직을 데이터 중심으로 변경
+  // 나머지 코드는 동일...
   const calendarData = useMemo(() => {
     if (!selectedPackData) return null;
 
@@ -377,7 +445,6 @@ export default function CalendarPage(): JSX.Element {
         const { vocabCount, sentenceCount, workbookCount } =
           getContentCounts(dayPlan);
 
-        // [수정] dayPlan의 mode type을 직접 확인하여 '학습 안내' 여부 결정
         const isIntroDay =
           dayPlan.modes?.some((mode: any) => mode.type === "introduction") ??
           false;
@@ -394,7 +461,6 @@ export default function CalendarPage(): JSX.Element {
         allDays.push({
           day: dayNum,
           title: dayPlan.title,
-          // [수정] DayCard가 참조할 type을 isIntroDay 값에 따라 동적으로 설정
           type: isIntroDay ? "introduction" : dayPlan.learningMethod || "study",
           pageRange: dayPlan.pageRange || null,
           hasContent:
@@ -454,6 +520,7 @@ export default function CalendarPage(): JSX.Element {
 
   const handleBack = useCallback(() => navigate("/"), [navigate]);
 
+  // 나머지 렌더링 로직은 동일...
   if (!hasHydrated) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -622,6 +689,11 @@ export default function CalendarPage(): JSX.Element {
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-white border-2 border-slate-300"></div>
               <span className="text-slate-600">학습 가능</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500"></div>{" "}
+              {/* ✅ 현재 진행중 */}
+              <span className="text-slate-600">현재 진행중</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
