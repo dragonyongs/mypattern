@@ -2,6 +2,7 @@ import React from "react";
 import { CheckCircle2, XCircle, CheckCircle } from "lucide-react";
 import { SpeakButton } from "@/shared/components/SpeakButton";
 import ActionButtons from "@/shared/components/ActionButtons";
+import type { StudyModeType } from "@/types";
 
 export interface WorkbookCardProps {
   // 문제 데이터
@@ -17,17 +18,22 @@ export interface WorkbookCardProps {
   isSpeaking?: boolean;
   isAnswered?: boolean;
 
+  studyMode: StudyModeType;
+
   // 이벤트
   onAnswerSelect: (answer: string) => void;
   onSpeak: (text: string) => void;
   onCheck?: () => void;
   onRetry?: () => void;
   onToggleExplanation?: () => void;
+
+  // ✅ 여러 정답 지원
+  acceptableAnswers?: string[];
 }
 
 export const WorkbookCard: React.FC<WorkbookCardProps> = ({
   question,
-  options = [], // ✅ 기본값 설정
+  options = [],
   correctAnswer,
   explanation,
   selectedAnswer,
@@ -40,26 +46,41 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
   onCheck,
   onRetry,
   onToggleExplanation,
+  studyMode,
+  acceptableAnswers = [],
 }) => {
-  const isCorrect =
-    (selectedAnswer ?? "").trim() === (correctAnswer ?? "").trim();
+  // ✅ 정답 여부 계산 (여러 정답 지원)
+  const isCorrect = React.useMemo(() => {
+    if (!selectedAnswer) return false;
 
-  // ✅ 수정된 함수
-  const renderQuestionWithAnswer = () => {
+    const validAnswers =
+      acceptableAnswers.length > 0 ? acceptableAnswers : [correctAnswer];
+
+    return validAnswers.some(
+      (answer) =>
+        answer.toLowerCase().trim() === selectedAnswer.toLowerCase().trim()
+    );
+  }, [selectedAnswer, correctAnswer, acceptableAnswers]);
+
+  // ✅ 하이라이트된 문장 생성
+  const renderQuestionWithHighlight = () => {
     if (!question) return "";
     const blankPattern = /_{2,}/g;
 
     if (!selectedAnswer) {
-      return question;
+      return question; // 선택하지 않았으면 빈칸 그대로
     }
 
-    const parts = question.split(blankPattern);
-    if (parts.length <= 1) {
-      return question;
-    }
+    // 빈칸을 선택한 답안으로 교체하면서 하이라이트 적용
+    const highlightClass = showResult
+      ? isCorrect
+        ? "text-green-600"
+        : "text-red-600"
+      : "text-violet-600";
 
-    const filled = question.replace(blankPattern, selectedAnswer);
-    return filled;
+    const highlightedText = `<span class="${highlightClass} underline">${selectedAnswer}</span>`;
+
+    return question.replace(blankPattern, highlightedText);
   };
 
   // 🔥 TTS용 완성된 텍스트 생성
@@ -98,11 +119,12 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
           </div>
         )}
 
-        {/* 질문 영역 */}
+        {/* ✅ 질문 영역 - HTML로 렌더링하여 하이라이트 표시 */}
         <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 mb-6 border border-indigo-100">
-          <h2 className="text-xl font-bold text-gray-900">
-            {renderQuestionWithAnswer()}
-          </h2>
+          <h2
+            className="text-xl font-bold text-gray-900"
+            dangerouslySetInnerHTML={{ __html: renderQuestionWithHighlight() }}
+          />
 
           <div className="flex justify-center gap-x-2">
             {selectedAnswer && (
@@ -124,42 +146,55 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
 
         {/* 선택지 */}
         <div className="space-y-3 mb-4">
-          {safeOptions.map((option, index) => (
-            <button
-              key={index}
-              onClick={() => !isAnswered && onAnswerSelect(option)}
-              disabled={isAnswered}
-              className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-300 hover:shadow-md disabled:cursor-not-allowed ${
-                selectedAnswer === option
-                  ? showResult && isCorrect
-                    ? "border-green-500 bg-green-50 shadow-lg"
-                    : showResult && !isCorrect
+          {safeOptions.map((option, index) => {
+            // ✅ 선택지 상태 계산
+            const isSelected = selectedAnswer === option;
+            const isCorrectOption =
+              showResult &&
+              (acceptableAnswers.length > 0
+                ? acceptableAnswers.some(
+                    (ans) => ans.toLowerCase() === option.toLowerCase()
+                  )
+                : option.toLowerCase() === correctAnswer.toLowerCase());
+            const isWrongSelected = showResult && isSelected && !isCorrect;
+
+            return (
+              <button
+                key={index}
+                onClick={() => !isAnswered && onAnswerSelect(option)}
+                disabled={isAnswered}
+                className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-300 hover:shadow-md disabled:cursor-not-allowed ${
+                  isWrongSelected
                     ? "border-red-500 bg-red-50 shadow-lg"
-                    : "border-blue-500 bg-blue-50 shadow-md"
-                  : "border-gray-200 bg-white hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{option}</span>
+                    : isCorrectOption && showResult
+                    ? "border-green-500 bg-green-50 shadow-lg"
+                    : isSelected
+                    ? "border-blue-500 bg-blue-50 shadow-md"
+                    : "border-gray-200 bg-white hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{option}</span>
 
-                {/* 결과 아이콘 */}
-                {showResult &&
-                  selectedAnswer === option &&
-                  (isCorrect ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-600" />
-                  ))}
+                  {/* 결과 아이콘 */}
+                  {showResult &&
+                    isSelected &&
+                    (isCorrect ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-600" />
+                    ))}
 
-                {/* 정답 표시 (오답 선택시 정답 강조) */}
-                {showResult &&
-                  option === correctAnswer &&
-                  selectedAnswer !== option && (
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  )}
-              </div>
-            </button>
-          ))}
+                  {/* 정답 표시 (오답 선택시 정답 강조) */}
+                  {showResult &&
+                    isCorrectOption &&
+                    selectedAnswer !== option && (
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    )}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {/* 힌트 텍스트 */}
@@ -171,7 +206,7 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
       </div>
 
       {/* 해설 영역 */}
-      {showResult && explanation && (
+      {studyMode === "assisted" && showResult && explanation && (
         <div
           className={`mt-6 p-4 rounded-xl border transition-all duration-500 ${
             isCorrect

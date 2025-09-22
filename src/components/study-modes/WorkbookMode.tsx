@@ -6,8 +6,6 @@ import React, {
   useState,
   useRef,
 } from "react";
-import { useShallow } from "zustand/react/shallow";
-import { PenTool } from "lucide-react";
 import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
@@ -56,11 +54,12 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
     onSettingsChange,
     isSettingOpen,
   }) => {
-    // ✅ 모든 useState 먼저 선언
+    // ✅ 상태 선언
     const [workbook, setWorkbook] = useState<WorkbookItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadedKey, setLoadedKey] = useState<string>(""); // ✅ 로딩 추적용
 
-    // ✅ 모든 Hook들을 무조건 호출 (early return 전에)
+    // ✅ 안정한 설정 메모이제이션
     const currentSettings = useMemo(
       () => ({
         studyMode: "immersive" as const,
@@ -99,13 +98,34 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
     const currentIndexRef = useRef(initialItemIndex);
     const warmupRef = useRef<{ cancel: () => void } | null>(null);
 
-    // ✅ 워크북 데이터 로드
+    // ✅ 워크북 데이터 로드 키 생성 (안정적)
+    const workbookDataKey = useMemo(() => {
+      if (Array.isArray(rawWorkbook) && rawWorkbook.length > 0) {
+        return `provided-${rawWorkbook.length}-${rawWorkbook
+          .map((w) => w.id)
+          .join(",")}`;
+      }
+      return `build-${packId}-${dayNumber}`;
+    }, [rawWorkbook, packId, dayNumber]);
+
+    // ✅ 워크북 데이터 로드 (중복 로딩 방지)
     useEffect(() => {
+      // ✅ 이미 로드된 데이터와 같으면 스킵
+      if (loadedKey === workbookDataKey) {
+        console.log(
+          "🔥 Skipping workbook load, already loaded:",
+          workbookDataKey
+        );
+        return;
+      }
+
       let cancelled = false;
       setIsLoading(true);
 
       const loadWorkbook = async () => {
         try {
+          console.log("🔥 Loading workbook with key:", workbookDataKey);
+
           if (Array.isArray(rawWorkbook) && rawWorkbook.length > 0) {
             console.log(
               "🔥 Using provided workbook items:",
@@ -123,6 +143,7 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
 
             if (!cancelled) {
               setWorkbook(validatedItems);
+              setLoadedKey(workbookDataKey); // ✅ 로딩 완료 표시
               setIsLoading(false);
             }
             return;
@@ -142,11 +163,13 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
             }));
 
             setWorkbook(validatedItems);
+            setLoadedKey(workbookDataKey); // ✅ 로딩 완료 표시
           }
         } catch (error) {
           console.error("Failed to load workbook:", error);
           if (!cancelled) {
             setWorkbook([]);
+            setLoadedKey(""); // ✅ 실패 시 키 리셋
           }
         } finally {
           if (!cancelled) {
@@ -159,9 +182,9 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
       return () => {
         cancelled = true;
       };
-    }, [rawWorkbook, packId, dayNumber]);
+    }, [workbookDataKey]); // ✅ 의존성을 안정한 키 하나로 단순화
 
-    // ✅ workbookState destructuring
+    // workbookState destructuring
     const {
       currentIndex,
       selectedAnswers,
@@ -184,12 +207,12 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
       pendingSaveRef,
     } = workbookState;
 
-    // ✅ currentIndexRef 동기화
+    // currentIndexRef 동기화
     useEffect(() => {
       currentIndexRef.current = currentIndex;
     }, [currentIndex]);
 
-    // ✅ 정리 작업
+    // 정리 작업
     useEffect(() => {
       return () => {
         if (autoProgressTimeoutRef.current) {
@@ -200,7 +223,7 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
       };
     }, []);
 
-    // ✅ 현재 문제 셔플
+    // ✅ 현재 문제 셔플 (메모이제이션 개선)
     const shownItem = useMemo(() => {
       if (!workbook.length || currentIndex >= workbook.length) return null;
 
@@ -209,12 +232,6 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
 
       try {
         const shuffled = getShuffledItem(item, dayKey, shuffleWithSeed);
-
-        // console.log("🔥 Shuffled item data:", {
-        //   question: shuffled?.question || shuffled?.sentence,
-        //   optionsLength: shuffled?.options?.length,
-        //   correctAnswer: shuffled?.correctAnswer || shuffled?.answer,
-        // });
 
         return {
           ...shuffled,
@@ -235,7 +252,7 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
       }
     }, [workbook, currentIndex, dayKey]);
 
-    // ✅ 워밍업
+    // ✅ 워밍업 (workbook이 바뀔 때만)
     useEffect(() => {
       if (!workbook.length) return;
 
@@ -251,7 +268,7 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
       return () => warmupRef.current?.cancel();
     }, [workbook, dayKey, currentIndex]);
 
-    // ✅ 네비게이션 핸들러들
+    // ✅ 나머지 핸들러들은 useCallback으로 최적화
     const navigateTo = useCallback(
       (index: number) => {
         if (autoProgressTimeoutRef.current) {
@@ -284,7 +301,6 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
       [navigateTo, workbook.length]
     );
 
-    // ✅ 인터랙션 핸들러들
     const handleSpeak = useCallback(
       (text: string) => {
         const toSay = (text || "").trim();
@@ -339,7 +355,6 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
       setShowResult((prev) => ({ ...prev, [idx]: true }));
       workbookLogic.saveProgress(idx, isCorrect);
 
-      // 자동 진행
       const shouldAutoProgress =
         currentSettings.studyMode === "assisted" &&
         currentSettings.autoProgressEnabled;
@@ -412,7 +427,6 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
       setShowExplanation((prev) => ({ ...prev, [idx]: !prev[idx] }));
     }, [setShowExplanation]);
 
-    // ✅ 설정 핸들러들
     const handleModeChange = useCallback(
       (mode: StudyModeType) => onSettingsChange?.({ studyMode: mode }),
       [onSettingsChange]
@@ -434,13 +448,11 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
       onComplete?.();
     }, [markModeCompleted, onComplete]);
 
-    // ✅ 제스처 핸들러
     const swipeHandlers = useSwipeGesture({
       onSwipeLeft: goToNext,
       onSwipeRight: goToPrev,
     });
 
-    // ✅ 키보드 핸들러
     useEffect(() => {
       const onKey = (e: KeyboardEvent) => {
         if (e.key === "ArrowRight") goToNext();
@@ -452,7 +464,7 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
       return () => window.removeEventListener("keydown", onKey);
     }, [goToNext, goToPrev, handleCheckAnswer]);
 
-    // ✅ 모든 Hook 호출 후 조건부 렌더링
+    // ✅ 조건부 렌더링
     if (isLoading) {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
@@ -491,7 +503,6 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
       );
     }
 
-    // ✅ 정상 렌더링
     return (
       <div className="flex h-full min-h-[calc(100vh-217px)] lg:min-h-[calc(100vh-130px)] bg-gray-50 font-sans pb-20 lg:pb-0">
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -515,6 +526,8 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
                 onCheck={handleCheckAnswer}
                 onRetry={handleRetry}
                 onToggleExplanation={handleToggleExplanation}
+                studyMode={currentSettings.studyMode}
+                acceptableAnswers={shownItem.correctAnswers} // ✅ 여러 정답 전달
               />
 
               <StudyPagination
@@ -558,5 +571,17 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
   }
 );
 
+// ✅ 메모이제이션 최적화
 WorkbookMode.displayName = "WorkbookMode";
-export default WorkbookMode;
+
+export default React.memo(WorkbookMode, (prevProps, nextProps) => {
+  // ✅ 중요한 props만 비교하여 불필요한 리렌더링 방지
+  return (
+    prevProps.packId === nextProps.packId &&
+    prevProps.dayNumber === nextProps.dayNumber &&
+    prevProps.initialItemIndex === nextProps.initialItemIndex &&
+    prevProps.isSettingOpen === nextProps.isSettingOpen &&
+    JSON.stringify(prevProps.items) === JSON.stringify(nextProps.items) &&
+    JSON.stringify(prevProps.settings) === JSON.stringify(nextProps.settings)
+  );
+});
