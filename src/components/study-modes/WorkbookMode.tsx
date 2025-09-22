@@ -27,6 +27,7 @@ import {
 } from "@/utils/workbook.shuffle.runtime";
 
 import type { WorkbookModeProps } from "@/types/workbook.types";
+import type { WorkbookItem, StudySettings, StudyModeType } from "@/types";
 
 const getItemCorrectText = (it?: any) => {
   if (!it) return "";
@@ -47,14 +48,6 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     onSettingsChange,
   }) => {
     const [workbook, setWorkbook] = useState<WorkbookItem[]>([]);
-
-    // 1) 원본 유지: 전역 일괄 셔플 제거
-    // const workbook = useMemo(() => {
-    //   if (Array.isArray(rawWorkbook) && rawWorkbook.length > 0) {
-    //     return rawWorkbook; // 이미 안전하게 생성된 경우 그대로 사용
-    //   }
-    //   return buildWorkbookForDay(dayNumber); // 없음 → 자동 생성 fallback
-    // }, [rawWorkbook, dayNumber]);
 
     useEffect(() => {
       let cancelled = false;
@@ -92,15 +85,26 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
     }, [packId, dayNumber, workbook]);
 
     // 4) 로컬 설정
-    const [localSettings, setLocalSettings] = useState(() => ({
-      studyMode: "immersive" as const,
+    const [localSettings, setLocalSettings] = useState<StudySettings>(() => ({
+      studyMode: "immersive",
       showMeaningEnabled: false,
-      autoProgressEnabled: true,
+      autoProgressEnabled: false, // ✅ 기본값 false
       autoPlayOnSelect: false,
-      ...settings,
+      ...settings, // 외부 설정으로 덮어쓰기
     }));
+
     useEffect(() => {
-      setLocalSettings((prev) => ({ ...prev, ...settings }));
+      console.log("🔥 WorkbookMode settings changed:", settings);
+      setLocalSettings((prev) => {
+        const next = {
+          ...prev,
+          ...settings,
+          showMeaningEnabled:
+            settings?.studyMode === "assisted" || prev.showMeaningEnabled,
+        };
+        console.log("🔥 WorkbookMode localSettings updated:", next);
+        return next;
+      });
     }, [settings]);
 
     const handleModeChange = useCallback(
@@ -290,14 +294,13 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       const idx = currentIndexRef.current;
       const q = workbook[idx] as any | undefined;
       if (!q) return; // 경계 보호
-
       if (showResult[idx]) return;
+
       const selected = selectedAnswers[idx];
       if (!selected) return;
 
       const correct = getItemCorrectText(q);
       if (!correct) {
-        // 정답 텍스트가 비어있으면 채점하지 않음
         console.warn("[wb] empty correct answer for item", q?.id);
         return;
       }
@@ -310,7 +313,7 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
         n.add(idx);
         return n;
       });
-      answeredRef.current.add(idx); // 🔥 동기화 [attached_file:11]
+      answeredRef.current.add(idx);
 
       if (isCorrect) {
         setCorrectAnswers((prev) => {
@@ -318,16 +321,24 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
           n.add(idx);
           return n;
         });
-        correctRef.current.add(idx); // 🔥 동기화 [attached_file:11]
+        correctRef.current.add(idx);
       }
-      setShowResult((prev) => ({ ...prev, [idx]: true })); // [attached_file:11]
-      saveProgress(idx, isCorrect); // [attached_file:11]
+
+      setShowResult((prev) => ({ ...prev, [idx]: true }));
+      saveProgress(idx, isCorrect);
+
+      // ✅ 핵심 수정: 자동 진행 설정 확인
+      console.log(
+        "🔥 WorkbookMode autoProgressEnabled:",
+        localSettings.autoProgressEnabled
+      );
 
       if (localSettings.autoProgressEnabled) {
         if (autoProgressTimeoutRef.current) {
           window.clearTimeout(autoProgressTimeoutRef.current);
           autoProgressTimeoutRef.current = null;
         }
+
         let nextIdx = -1;
         for (let i = idx + 1; i < workbook.length; i++) {
           if (!answeredRef.current.has(i)) {
@@ -335,14 +346,8 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
             break;
           }
         }
-        if (nextIdx === -1) nextIdx = Math.min(idx + 1, workbook.length - 1);
 
-        console.log("[wb] after check", {
-          idx,
-          isCorrect,
-          answeredSize: answeredRef.current.size,
-          correctSize: correctRef.current.size,
-        });
+        if (nextIdx === -1) nextIdx = Math.min(idx + 1, workbook.length - 1);
 
         autoProgressTimeoutRef.current = window.setTimeout(() => {
           navigateTo(nextIdx);
@@ -357,6 +362,8 @@ export const WorkbookMode = React.memo<WorkbookModeProps>(
       setCorrectAnswers,
       setShowResult,
       saveProgress,
+      localSettings.autoProgressEnabled, // ✅ 의존성 추가
+      navigateTo,
     ]);
 
     //const { clearItemProgress } = useWorkbookLogic(packId, dayNumber, workbook);

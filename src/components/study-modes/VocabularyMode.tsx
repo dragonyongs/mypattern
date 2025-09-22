@@ -11,8 +11,7 @@ import { StudySidebar } from "@/shared/components/StudySidebar";
 import StudyCard from "@/shared/components/StudyCard";
 import StudyPagination from "@/shared/components/StudyPagination";
 import StudyCompleteButton from "@/shared/components/StudyCompleteButton";
-
-export type StudyModeType = "immersive" | "assisted";
+import type { StudySettings, StudyModeType } from "@/types";
 
 interface VocabularyItem {
   id: string;
@@ -21,12 +20,6 @@ interface VocabularyItem {
   pronunciation?: string;
   usage?: string;
   emoji?: string;
-}
-
-export interface StudySettings {
-  studyMode?: StudyModeType;
-  autoProgressEnabled?: boolean;
-  autoPlayOnSelect?: boolean;
 }
 
 interface Props {
@@ -63,10 +56,10 @@ const VocabularyMode: React.FC<Props> = ({
   const [studiedCards, setStudiedCards] = useState<Set<number>>(new Set());
   const [masteredCards, setMasteredCards] = useState<Set<number>>(new Set());
 
-  const currentSettings = useMemo<Required<StudySettings>>(
+  const currentSettings = useMemo<StudySettings>(
     () => ({
       studyMode: "immersive",
-      autoProgressEnabled: false, // 🔥 강제 비활성화
+      autoProgressEnabled: false,
       autoPlayOnSelect: false,
       ...settings,
     }),

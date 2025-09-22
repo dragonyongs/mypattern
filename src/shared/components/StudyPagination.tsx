@@ -84,7 +84,7 @@ const StudyPagination: React.FC<StudyPaginationProps> = React.memo(
       const start = Math.max(0, currentIndex - 5);
       const end = Math.min(totalItems, currentIndex + 6);
       const parts: React.ReactNode[] = [];
-
+      console.log(currentIndex, totalItems);
       if (start > 0) {
         parts.push(
           <span

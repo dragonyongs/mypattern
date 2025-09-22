@@ -3,18 +3,16 @@ import { useCallback, useMemo } from "react";
 import { Book, MessageSquare, PenTool } from "lucide-react"; // 🔥 실제 컴포넌트 import
 import { StudyMode } from "@/types";
 import { useDayProgress } from "./useAppHooks";
+import { StudySettings } from "@/types";
 
 export const useStudyModeManager = (
   packId: string,
   currentDay: number,
-  currentMode: StudyMode,
   onModeChange: (mode: StudyMode) => void,
-  packData?: any // 🔥 packData 추가
+  packData?: any,
+  settings?: StudySettings
 ) => {
-  const { dayProgress, markModeCompleted, isModeAccessible } = useDayProgress(
-    packId,
-    currentDay
-  );
+  const { dayProgress, markModeCompleted } = useDayProgress(packId, currentDay);
 
   // 🔥 현재 일자의 실제 모드들을 가져오기
   const currentDayModes = useMemo(() => {
@@ -25,25 +23,10 @@ export const useStudyModeManager = (
     return dayPlan?.modes || [];
   }, [packData, currentDay]);
 
-  // 🔥 공통 모드 전환 로직
-  const handleModeSwitch = useCallback(
-    (targetMode: StudyMode) => {
-      const isAccessible = isModeAccessible(targetMode);
-      if (!isAccessible) {
-        console.warn(`Mode ${targetMode} is not accessible`);
-        return false;
-      }
-      onModeChange(targetMode);
-      return true;
-    },
-    [dayProgress, isModeAccessible, onModeChange]
-  );
-
   // 🔥 모드별 상태 정보 - 아이콘을 실제 컴포넌트로 반환
   const studyModes = useMemo(() => {
     const availableModes = [];
 
-    // vocab 모드 확인
     const hasVocabMode = currentDayModes.some(
       (mode: any) => mode.type === "vocab" || mode.type?.includes("vocab")
     );
@@ -53,11 +36,10 @@ export const useStudyModeManager = (
         label: "단어",
         icon: Book,
         completed: dayProgress.vocab,
-        available: isModeAccessible("vocab"),
+        available: true,
       });
     }
 
-    // sentence 모드 확인
     const hasSentenceMode = currentDayModes.some(
       (mode: any) => mode.type === "sentence" || mode.type?.includes("sentence")
     );
@@ -67,11 +49,10 @@ export const useStudyModeManager = (
         label: "문장",
         icon: MessageSquare,
         completed: dayProgress.sentence,
-        available: isModeAccessible("sentence"),
+        available: true,
       });
     }
 
-    // workbook 모드 확인 (실제 존재하고 contentIds가 있는 경우만)
     const workbookMode = currentDayModes.find(
       (mode: any) => mode.type === "workbook"
     );
@@ -85,34 +66,50 @@ export const useStudyModeManager = (
         label: "워크북",
         icon: PenTool,
         completed: dayProgress.workbook,
-        available: isModeAccessible("workbook"),
+        available: true,
       });
     }
 
     return availableModes;
-  }, [currentDayModes, dayProgress, isModeAccessible]);
+  }, [currentDayModes, dayProgress]);
+
+  // ✅ 자동 진행 가능 여부 확인 로직
+  const shouldAutoProgress = useMemo(() => {
+    if (!settings) return false;
+    // 도움 모드이면서 자동 진행이 활성화된 경우만
+    return settings.studyMode === "assisted" && settings.autoProgressEnabled;
+  }, [settings?.studyMode, settings?.autoProgressEnabled]);
 
   // 🔥 모드 완료 처리
+
+  // 🔥 공통 모드 전환 로직
+  const handleModeSwitch = useCallback(
+    (targetMode: StudyMode) => {
+      onModeChange(targetMode);
+      return true;
+    },
+    [onModeChange]
+  );
+
+  // ✅ 수정된 모드 완료 처리
+  // ✅ 수정된 모드 완료 처리 (1개 매개변수만 전달)
   const handleModeCompletion = useCallback(
     (completedMode: StudyMode) => {
-      markModeCompleted(currentDay, completedMode);
+      // ✅ 1개 매개변수만 전달
+      markModeCompleted(completedMode as any);
 
-      // 다음 모드 자동 전환 로직 (실제 존재하는 모드만)
+      // ✅ 자동 진행 설정 확인 후에만 다음 모드로 전환
+      if (!shouldAutoProgress) return;
+
       const availableModeKeys = studyModes.map((m) => m.key);
       const currentIndex = availableModeKeys.indexOf(completedMode);
       const nextMode = availableModeKeys[currentIndex + 1];
 
-      if (nextMode && isModeAccessible(nextMode)) {
+      if (nextMode) {
         setTimeout(() => handleModeSwitch(nextMode), 500);
       }
     },
-    [
-      currentDay,
-      markModeCompleted,
-      handleModeSwitch,
-      isModeAccessible,
-      studyModes,
-    ]
+    [markModeCompleted, shouldAutoProgress, handleModeSwitch, studyModes]
   );
 
   return {

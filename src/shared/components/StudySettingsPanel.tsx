@@ -18,7 +18,6 @@ export interface StudySettingsPanelProps {
 
 export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
   settings,
-  isSettingOpen,
   handleModeChange,
   handleAutoProgressChange,
   handleAutoPlayChange,
@@ -48,8 +47,10 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
       e.preventDefault();
       e.stopPropagation();
       handleModeChange("assisted");
+      // ✅ 도움 모드 선택 시 자동 진행 활성화
+      handleAutoProgressChange(true);
     },
-    [handleModeChange]
+    [handleModeChange, handleAutoProgressChange]
   );
 
   const handleImmersiveClick = useCallback(
@@ -57,8 +58,10 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
       e.preventDefault();
       e.stopPropagation();
       handleModeChange("immersive");
+      // ✅ 몰입 모드로 변경할 때 자동 진행도 false로 설정
+      handleAutoProgressChange(false);
     },
-    [handleModeChange]
+    [handleModeChange, handleAutoProgressChange]
   );
 
   // 자동 진행 토글

@@ -29,10 +29,7 @@ import { packDataService } from "@/shared/services/packDataService";
 import { CompletionModal } from "@/shared/components/CompletionModal";
 import StudySettingsSheet from "@/shared/components/StudySettingsSheet";
 import type { StudySettings } from "@/types";
-
-// Core 모드만 사용해 store의 completedModes 및 dayPlan.modes와 일치시킴
-type StudyMode = "introduction" | "vocab" | "sentence" | "workbook";
-export type StudyModeType = "immersive" | "assisted";
+import { StudyMode, StudyModeType } from "@/types";
 
 export const StudyInterface: React.FC = () => {
   // refs, router
@@ -248,10 +245,16 @@ export const StudyInterface: React.FC = () => {
     )
   );
 
-  const autoAdvance = useMemo(
-    () => settings.studyMode === "assisted" && !!settings.autoProgressEnabled,
-    [settings.studyMode, settings.autoProgressEnabled]
-  );
+  const autoAdvance = useMemo(() => {
+    const result =
+      settings.studyMode === "assisted" && !!settings.autoProgressEnabled;
+    console.log("🔥 autoAdvance calculation:", {
+      studyMode: settings.studyMode,
+      autoProgressEnabled: settings.autoProgressEnabled,
+      result,
+    });
+    return result;
+  }, [settings.studyMode, settings.autoProgressEnabled]);
 
   // plan / modes
   const dayPlan = useMemo(
@@ -477,14 +480,14 @@ export const StudyInterface: React.FC = () => {
   );
 
   // 초기 모드 선택: introduction 제외 우선
-  const selectInitialMode = useCallback(
-    (modes: StudyMode[]): StudyMode | null => {
-      const nonIntro = modes.filter((m) => m !== "introduction");
-      if (nonIntro.length > 0) return nonIntro[0];
-      return modes.length > 0 ? modes[0] : null;
-    },
-    []
-  );
+  // const selectInitialMode = useCallback(
+  //   (modes: StudyMode[]): StudyMode | null => {
+  //     const nonIntro = modes.filter((m) => m !== "introduction");
+  //     if (nonIntro.length > 0) return nonIntro[0];
+  //     return modes.length > 0 ? modes[0] : null;
+  //   },
+  //   []
+  // );
 
   useEffect(() => {
     const onOpen = () => setIsSettingOpen(true);
@@ -510,7 +513,7 @@ export const StudyInterface: React.FC = () => {
       const coreType = getContentType(completedMode);
 
       if (coreType === "unknown" || coreType === "introduction") {
-        completionProcessingRef.current = true; // ✅ 추가
+        completionProcessingRef.current = true;
         setCompletion({ open: true, completed: completedMode });
         return;
       }
@@ -518,12 +521,12 @@ export const StudyInterface: React.FC = () => {
       const already = dayProgress?.completedModes?.[coreType];
 
       if (already) {
-        completionProcessingRef.current = true; // ✅ 추가
+        completionProcessingRef.current = true;
         setCompletion({ open: true, completed: completedMode });
         return;
       }
 
-      completionProcessingRef.current = true; // 기존 유지
+      completionProcessingRef.current = true;
       try {
         storeActions.setModeCompleted(
           packData.id,
@@ -531,9 +534,32 @@ export const StudyInterface: React.FC = () => {
           coreType,
           packData
         );
+
+        // ✅ 자동 진행 로직 추가
+        const shouldAutoProgress =
+          settings.studyMode === "assisted" && settings.autoProgressEnabled;
+
+        if (shouldAutoProgress) {
+          // 자동 진행 시: 다음 모드로 바로 이동
+          const seq = availableModeKeys;
+          const idx = seq.indexOf(completedMode);
+          const nextMode =
+            idx >= 0 && idx < seq.length - 1 ? seq[idx + 1] : null;
+
+          if (nextMode) {
+            // 자동으로 다음 모드로 전환
+            setTimeout(() => {
+              setCurrentMode(nextMode);
+              completionProcessingRef.current = false;
+            }, 500);
+            return;
+          }
+        }
+
+        // 수동 진행이거나 마지막 모드인 경우: 완료 모달 표시
         setCompletion({ open: true, completed: completedMode });
       } finally {
-        // 유지
+        // 자동 진행이 아닌 경우는 여기서 처리됨
       }
     },
     [
@@ -544,6 +570,9 @@ export const StudyInterface: React.FC = () => {
       completion.open,
       storeActions,
       getContentType,
+      settings.studyMode, // ✅ 추가
+      settings.autoProgressEnabled, // ✅ 추가
+      availableModeKeys, // ✅ 추가
     ]
   );
 
@@ -564,12 +593,16 @@ export const StudyInterface: React.FC = () => {
       completionProcessingRef.current = false;
       return;
     }
+
     const seq = availableModeKeys;
     const idx = seq.indexOf(completion.completed);
     const next = idx >= 0 && idx < seq.length - 1 ? seq[idx + 1] : null;
+
+    // ✅ 원래대로: 모드 완료 후에는 설정과 관계없이 다음 모드로 이동
     if (next) {
       setCurrentMode(next);
     } else {
+      // 마지막 모드인 경우 다음 날짜로 이동
       const nextDay = currentDay + 1;
       const totalDays = packData?.learningPlan?.days?.length ?? 14;
       if (nextDay <= totalDays) {
@@ -579,6 +612,7 @@ export const StudyInterface: React.FC = () => {
         navigate("/calendar");
       }
     }
+
     setCompletion({ open: false, completed: null });
     completionProcessingRef.current = false;
   }, [
@@ -596,6 +630,8 @@ export const StudyInterface: React.FC = () => {
   }, []);
 
   const renderContent = useCallback(() => {
+    console.log("🔥 renderContent autoAdvance:", autoAdvance);
+    console.log("🔥 renderContent settings:", settings);
     if (!currentMode || !packData) return null;
     const items = getModeData(currentMode);
     const contentType = getContentType(currentMode);
@@ -854,7 +890,12 @@ export const StudyInterface: React.FC = () => {
                 } 학습을 완료했습니다.`
               : undefined
           }
-          confirmText="다음으로"
+          // ✅ 설정에 따라 버튼 텍스트 변경
+          confirmText={
+            settings.studyMode === "immersive" || !settings.autoProgressEnabled
+              ? "확인" // 몰입 모드나 자동 진행 OFF일 때
+              : "다음으로" // 도움 모드 + 자동 진행 ON일 때
+          }
           cancelText="다시 학습하기"
           onConfirm={handleConfirmNext}
           onClose={handleCloseModal}

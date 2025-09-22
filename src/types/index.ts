@@ -1,8 +1,5 @@
 // src/types/index.ts
 
-// =================================================================
-// 1. 기본 엔티티 타입
-// =================================================================
 export interface User {
   id: string;
   name: string | null;
@@ -11,20 +8,13 @@ export interface User {
 }
 
 export interface StudySettings {
-  ttsRate?: number;
-  autoAdvance?: boolean;
-  showMeaningEnabled: boolean;
-  autoProgressEnabled: boolean;
-  studyMode: "immersive" | "assisted";
-  autoPlayOnSelect?: boolean; // 🔥 새로 추가
+  studyMode?: "immersive" | "assisted";
+  showMeaningEnabled?: boolean;
+  autoProgressEnabled?: boolean;
+  autoPlayOnSelect?: boolean;
 }
 
-// =================================================================
-// 2. 새로운 Pack 데이터 구조 (핵심 개선 사항)
-// =================================================================
-
-// 2-1. 콘텐츠 아이템 타입
-// -----------------------------------------------------------------
+export type StudyModeType = "immersive" | "assisted";
 
 export interface BaseContent {
   id: string;
@@ -57,6 +47,7 @@ export interface SentenceItem extends BaseContent {
 
 export interface WorkbookItem extends BaseContent {
   type: "workbook";
+  //type: "fill-blank" | "multiple-choice";
   question: string;
   options: string[];
   correctAnswer: string;
@@ -64,10 +55,9 @@ export interface WorkbookItem extends BaseContent {
   relatedSentenceId?: string;
 }
 
-export type ContentItem = VocabularyItem | SentenceItem | WorkbookItem;
+export type StudyMode = "introduction" | "vocab" | "sentence" | "workbook";
 
-// 2-2. 학습 계획 타입
-// -----------------------------------------------------------------
+export type ContentItem = VocabularyItem | SentenceItem | WorkbookItem;
 
 export interface LearningMode {
   type: string;
@@ -95,9 +85,6 @@ export interface LearningMethod {
   days: string;
 }
 
-// 2-3. 학습 팩 전체 데이터 타입
-// -----------------------------------------------------------------
-
 export interface PackData {
   id: string;
   title: string;
@@ -108,10 +95,6 @@ export interface PackData {
   contents: ContentItem[];
   learningPlan: LearningPlan;
 }
-
-// =================================================================
-// 3. 학습 진행률 상태 타입 (Zustand Store용)
-// =================================================================
 
 interface DayProgress {
   day: number;
