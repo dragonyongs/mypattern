@@ -121,16 +121,14 @@ class PackDataService {
     for (const dayPlan of data.learningPlan.days) {
       if (!shouldGenerateWorkbook(dayPlan, dayPlan.day)) continue;
 
-      // 빌더가 PackData와 day를 받아 안전 옵션이 포함된 워크북 아이템을 생성
       const items = buildWorkbookForDayFromPack(data, dayPlan.day, 4);
-
       if (items.length === 0) continue;
 
-      // contents에 유형화된 workbook 컨텐츠로 주입 + generatedWorkbooks 유지
-      // packDataService.ts에서
+      const workbookIds: string[] = []; // ✅ 생성된 워크북 ID 저장
+
       for (const it of items) {
         const gen: GeneratedWorkbook = {
-          id: `wb-${it.id}`, // ← 여기도 동일하게 수정
+          id: `wb-${it.id}`,
           question: it.question ?? (it as any).sentence ?? "",
           options: it.options ?? [],
           correctAnswer: (it as any).correctAnswer ?? it.answer ?? "",
@@ -138,9 +136,10 @@ class PackDataService {
           relatedSentenceId: (it as any).relatedSentenceId,
         };
         generated.push(gen);
+        workbookIds.push(gen.id); // ✅ ID 수집
 
         const content: any = {
-          id: gen.id, // ← wb- 프리픽스가 적용된 ID 사용
+          id: gen.id,
           type: "workbook",
           category: "auto-generated",
           question: gen.question,
@@ -153,9 +152,27 @@ class PackDataService {
         data.contents.push(content);
       }
 
-      // dayPlan의 workbook 모드 contentIds 갱신
-      const wbMode = dayPlan.modes?.find((m: any) => m.type === "workbook");
-      if (wbMode?.contentIds) wbMode.contentIds.push(...items.map((w) => w.id));
+      // ✅ dayPlan의 workbook 모드 contentIds 업데이트
+      let wbMode = dayPlan.modes?.find((m: any) => m.type === "workbook");
+
+      if (!wbMode) {
+        // 워크북 모드가 없으면 생성
+        wbMode = {
+          type: "workbook",
+          displayName: "워크북",
+          contentIds: workbookIds,
+        };
+        dayPlan.modes = dayPlan.modes || [];
+        dayPlan.modes.push(wbMode);
+      } else {
+        // 기존 워크북 모드에 ID 추가
+        wbMode.contentIds = wbMode.contentIds || [];
+        wbMode.contentIds.push(...workbookIds);
+      }
+
+      console.log(
+        `🔥 Added ${workbookIds.length} workbook items to day ${dayPlan.day}`
+      );
     }
 
     data.generatedWorkbooks = generated;

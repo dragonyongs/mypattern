@@ -30,6 +30,7 @@ import { CompletionModal } from "@/shared/components/CompletionModal";
 import StudySettingsSheet from "@/shared/components/StudySettingsSheet";
 import type { StudySettings } from "@/types";
 import { StudyMode, StudyModeType } from "@/types";
+import { buildWorkbookForDayFromPack } from "@/shared/services/workbook.builder"; // 새 빌더
 
 export const StudyInterface: React.FC = () => {
   // refs, router
@@ -294,26 +295,54 @@ export const StudyInterface: React.FC = () => {
   // helpers
   const getModeData = useCallback(
     (mode: StudyMode) => {
-      if (!dayPlan || !packData) return;
+      if (!dayPlan || !packData) return [];
 
       const groups = dayPlan.modes.filter(
         (m) => normalizePlanMode(m.type as string) === mode
       );
 
-      if (groups.length === 0) return;
+      if (groups.length === 0) return [];
 
+      // ✅ 워크북 특별 처리
+      if (mode === "workbook") {
+        const allIds = groups.flatMap((g) => g.contentIds);
+
+        // contentIds가 비어있으면 동적 생성
+        if (allIds.length === 0) {
+          try {
+            console.log("🔥 Building workbook for day:", currentDay);
+            const workbookItems = buildWorkbookForDayFromPack(
+              packData,
+              currentDay,
+              4
+            );
+            console.log("🔥 Generated workbook items:", workbookItems.length);
+            return workbookItems;
+          } catch (error) {
+            console.error("Failed to build workbook:", error);
+            return [];
+          }
+        }
+
+        // contentIds가 있으면 기존 로직
+        const seen = new Set();
+        const uniqIds = allIds.filter((id) =>
+          seen.has(id) ? false : seen.add(id)
+        );
+        return packDataService.getContentsByIds(packData, uniqIds);
+      }
+
+      // 다른 모드는 기존 로직 유지
       const allIds = groups.flatMap((g) => g.contentIds);
-
-      const seen = new Set<string>();
+      const seen = new Set();
       const uniqIds = allIds.filter((id) =>
         seen.has(id) ? false : seen.add(id)
       );
 
       const items = packDataService.getContentsByIds(packData, uniqIds);
-
       return items;
     },
-    [packData, dayPlan]
+    [packData, dayPlan, currentDay] // ✅ currentDay 의존성 추가
   );
 
   useEffect(() => {
@@ -387,9 +416,12 @@ export const StudyInterface: React.FC = () => {
       .map((key) => {
         const Icon = iconMap[key] || Book;
         const completed = dayProgress?.completedModes?.[key] ?? false;
-        const hasContent =
-          key === "workbook" ? getModeData(key).length > 0 : true;
+
+        const modeData = getModeData(key);
+        const hasContent = Array.isArray(modeData) && modeData.length > 0;
+
         const progress = getModeProgress(key);
+
         return {
           key,
           label: labelMap[key] || key,
@@ -399,9 +431,7 @@ export const StudyInterface: React.FC = () => {
           progress,
         };
       })
-      .filter((m) =>
-        m.key === "workbook" ? getModeData(m.key).length > 0 : true
-      );
+      .filter((m) => m.available);
   }, [
     availableModeKeys,
     dayProgress,
@@ -630,8 +660,8 @@ export const StudyInterface: React.FC = () => {
   }, []);
 
   const renderContent = useCallback(() => {
-    console.log("🔥 renderContent autoAdvance:", autoAdvance);
-    console.log("🔥 renderContent settings:", settings);
+    // console.log("🔥 renderContent autoAdvance:", autoAdvance);
+    // console.log("🔥 renderContent settings:", settings);
     if (!currentMode || !packData) return null;
     const items = getModeData(currentMode);
     const contentType = getContentType(currentMode);

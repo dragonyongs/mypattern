@@ -20,12 +20,14 @@ export interface WorkbookCardProps {
   // 이벤트
   onAnswerSelect: (answer: string) => void;
   onSpeak: (text: string) => void;
+  onCheck?: () => void;
+  onRetry?: () => void;
   onToggleExplanation?: () => void;
 }
 
 export const WorkbookCard: React.FC<WorkbookCardProps> = ({
   question,
-  options,
+  options = [], // ✅ 기본값 설정
   correctAnswer,
   explanation,
   selectedAnswer,
@@ -38,29 +40,26 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
   onCheck,
   onRetry,
   onToggleExplanation,
-  isCurrentAnswered,
-  currentIndex,
 }) => {
   const isCorrect =
     (selectedAnswer ?? "").trim() === (correctAnswer ?? "").trim();
 
-  // 🔥 빈칸을 선택한 답으로 교체하는 함수
+  // ✅ 수정된 함수
   const renderQuestionWithAnswer = () => {
     if (!question) return "";
     const blankPattern = /_{2,}/g;
 
     if (!selectedAnswer) {
-      return question; // 수정
+      return question;
     }
 
     const parts = question.split(blankPattern);
     if (parts.length <= 1) {
-      return question; // 수정
+      return question;
     }
 
-    // 하이라이트는 단순화: 선택어를 굵게 또는 밑줄 등으로 표시해도 됨
     const filled = question.replace(blankPattern, selectedAnswer);
-    return filled; // 간단 문자열 반환(스타일링은 CSS로)
+    return filled;
   };
 
   // 🔥 TTS용 완성된 텍스트 생성
@@ -70,10 +69,13 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
     return question.replace(blankPattern, selectedAnswer);
   };
 
+  // ✅ options가 배열인지 확인
+  const safeOptions = Array.isArray(options) ? options : [];
+
   return (
     <div className="bg-white rounded-2xl shadow-lg p-4 lg:p-8 w-full">
       <div className="text-center">
-        {/* 🔥 학습 완료 뱃지 (기존 "문제 해결"에서 변경) */}
+        {/* 학습 완료 뱃지 */}
         {isAnswered && (
           <div
             className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium mb-4 ${
@@ -122,7 +124,7 @@ export const WorkbookCard: React.FC<WorkbookCardProps> = ({
 
         {/* 선택지 */}
         <div className="space-y-3 mb-4">
-          {options.map((option, index) => (
+          {safeOptions.map((option, index) => (
             <button
               key={index}
               onClick={() => !isAnswered && onAnswerSelect(option)}
