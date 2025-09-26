@@ -63,7 +63,6 @@ export const WorkbookMode = React.memo<WorkbookModePropsComplete>(
     const currentSettings = useMemo(
       () => ({
         studyMode: "immersive" as const,
-        showMeaningEnabled: false,
         autoProgressEnabled: false,
         autoPlayOnSelect: false,
         ...settings,

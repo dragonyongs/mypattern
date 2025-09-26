@@ -248,13 +248,13 @@ export function buildWorkbookForDayFromPack(
 
       workbookItems.push(workbookItem);
 
-      console.log(`🔥 Created workbook item:`, {
-        id: workbookItem.id,
-        question: questionText,
-        targetWord: targetWord,
-        options: workbookItem.options,
-        acceptableAnswers: acceptableAnswers,
-      });
+      // console.log(`🔥 Created workbook item:`, {
+      //   id: workbookItem.id,
+      //   question: questionText,
+      //   targetWord: targetWord,
+      //   options: workbookItem.options,
+      //   acceptableAnswers: acceptableAnswers,
+      // });
     });
   });
 

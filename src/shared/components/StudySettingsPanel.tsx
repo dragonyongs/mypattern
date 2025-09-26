@@ -47,7 +47,6 @@ export const StudySettingsPanel: React.FC<StudySettingsPanelProps> = ({
       e.preventDefault();
       e.stopPropagation();
       handleModeChange("assisted");
-      // ✅ 도움 모드 선택 시 자동 진행 활성화
       handleAutoProgressChange(true);
     },
     [handleModeChange, handleAutoProgressChange]

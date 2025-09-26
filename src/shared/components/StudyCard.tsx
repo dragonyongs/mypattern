@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useMemo, useCallback } from "react";
 import { CheckCircle2 } from "lucide-react";
 import SpeakButton from "./SpeakButton";
 import CompleteButton from "./CompleteButton";
@@ -16,6 +16,8 @@ export interface StudyCardProps {
   // 공통
   pronunciation?: string;
   meaning?: string;
+  translation?: string;
+
   usage?: string;
   emoji?: string;
 
@@ -42,6 +44,7 @@ export const StudyCard: React.FC<StudyCardProps> = ({
   sentence,
   pronunciation,
   meaning,
+  translation,
   usage,
   emoji,
   targetWords,
@@ -56,6 +59,14 @@ export const StudyCard: React.FC<StudyCardProps> = ({
   onMarkAsMastered,
   onMarkAsNotMastered,
 }) => {
+  const meaningText = useMemo(() => {
+    if (mode === "vocabulary") {
+      return meaning || ""; // 단어 모드는 meaning 사용
+    } else {
+      return translation || meaning || ""; // 문장 모드는 translation 우선, 없으면 meaning
+    }
+  }, [mode, meaning, translation]);
+
   // 표시할 주요 텍스트 결정
   const mainText = mode === "vocabulary" ? word : sentence;
   const speakText = mode === "vocabulary" ? word : sentence;
@@ -146,12 +157,12 @@ export const StudyCard: React.FC<StudyCardProps> = ({
         </div>
 
         {/* 의미/번역 영역 */}
-        {showMeaningEnabled && showMeaning ? (
-          <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-lg text-gray-600">{meaning}</p>
-            {usage && (
-              <p className="text-sm text-gray-500 mt-2 italic">"{usage}"</p>
-            )}
+        {studyMode === "assisted" || (showMeaningEnabled && showMeaning) ? (
+          <div className="space-y-3 text-center">
+            <p className="text-gray-700 text-lg leading-relaxed">
+              {meaningText}
+            </p>
+            {usage && <p className="text-gray-500 text-sm italic">"{usage}"</p>}
           </div>
         ) : (
           <div className="text-gray-400 text-sm py-2">

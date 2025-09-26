@@ -229,20 +229,14 @@ export const StudyInterface: React.FC = () => {
 
   // settings
   const settings = useStudyProgressStore(
-    useShallow((state) =>
-      packData
-        ? state.progress[packData.id]?.settings || {
-            showMeaningEnabled: false,
-            autoProgressEnabled: false,
-            studyMode: "immersive" as const,
-            autoPlayOnSelect: false,
-          }
-        : {
-            showMeaningEnabled: false,
-            autoProgressEnabled: false,
-            studyMode: "immersive" as const,
-            autoPlayOnSelect: false,
-          }
+    useShallow(
+      (state) =>
+        state.progress[packData?.id]?.settings || {
+          showMeaningEnabled: false,
+          autoProgressEnabled: false,
+          studyMode: "immersive" as const,
+          autoPlayOnSelect: false,
+        }
     )
   );
 

@@ -66,6 +66,13 @@ const VocabularyMode: React.FC<Props> = ({
     [settings]
   );
 
+  // console.log("🔍 VocabularyMode Debug:", {
+  //   showMeaningEnabled: currentSettings.showMeaningEnabled,
+  //   showTranslation: showMeaning,
+  //   studyMode: currentSettings.studyMode,
+  //   receivedSettings: settings,
+  // });
+
   const { speak, isSpeaking } = useTTS();
   const { markModeCompleted } = useDayProgress(packId, dayNumber);
 

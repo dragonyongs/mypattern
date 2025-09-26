@@ -1,7 +1,7 @@
 // src/components/study-modes/SentenceMode.tsx
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
+// import { useSwipeGesture } from "@/shared/hooks/useSwipeGesture";
 import { useTTS } from "@/shared/hooks/useTTS";
 import { useDayProgress } from "@/shared/hooks/useAppHooks";
 import { StudySidebar } from "@/shared/components/StudySidebar";
@@ -60,13 +60,20 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
   const currentSettings = useMemo(
     () => ({
       studyMode: "immersive" as const,
-      showMeaningEnabled: false,
       autoProgressEnabled: false,
       autoPlayOnSelect: false,
+      showMeaningEnabled: false,
       ...settings,
     }),
     [settings]
   );
+
+  // console.log("🔍 SentenceMode Debug:", {
+  //   showMeaningEnabled: currentSettings.showMeaningEnabled,
+  //   showTranslation: showTranslation,
+  //   studyMode: currentSettings.studyMode,
+  //   receivedSettings: settings,
+  // });
 
   // hooks
   const { speak, isSpeaking } = useTTS();
