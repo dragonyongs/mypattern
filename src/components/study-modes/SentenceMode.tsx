@@ -11,7 +11,7 @@ import StudyPagination from "@/shared/components/StudyPagination";
 import StudyCard from "@/shared/components/StudyCard";
 import useStudyNavigation from "@/shared/hooks/useStudyNavigation"; // ✅ 추가
 import type { StudySettings, StudyModeType } from "@/types";
-
+import { useAppStore } from "@/stores/appStore";
 interface SentenceItem {
   id: string;
   text: string;
@@ -67,7 +67,11 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
     }),
     [settings]
   );
-
+  const { packData } = useAppStore(
+    useShallow((state) => ({
+      packData: state.selectedPackData,
+    }))
+  );
   // console.log("🔍 SentenceMode Debug:", {
   //   showMeaningEnabled: currentSettings.showMeaningEnabled,
   //   showTranslation: showTranslation,
@@ -240,6 +244,35 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
     onComplete?.();
   }, [markModeCompleted, onComplete]);
 
+  const getRelatedEmojis = useCallback(
+    (relatedVocabIds: string[] = []) => {
+      if (!relatedVocabIds.length) return [];
+
+      // packData에서 모든 contents 검색하여 연관 단어들의 이모지 추출
+      const allContents = packData?.contents || [];
+      const emojis: string[] = [];
+
+      relatedVocabIds.forEach((vocabId) => {
+        const vocab = allContents.find(
+          (item) => item.id === vocabId && item.type === "vocabulary"
+        );
+        if (vocab?.emoji) {
+          emojis.push(vocab.emoji);
+        }
+      });
+
+      return emojis;
+    },
+    [packData]
+  );
+
+  // 현재 아이템의 이모지들 계산
+  const currentEmojis = useMemo(() => {
+    return currentItem?.relatedVocabIds
+      ? getRelatedEmojis(currentItem.relatedVocabIds)
+      : [];
+  }, [currentItem, getRelatedEmojis]);
+
   // 로딩 처리
   if (!items.length) {
     return (
@@ -276,6 +309,7 @@ export const SentenceMode: React.FC<SentenceModeProps> = ({
               onSpeak={(text) => speak(text, { lang: "en-US", rate: 0.8 })}
               onMarkAsMastered={handleMarkAsMastered}
               onMarkAsNotMastered={handleMarkAsNotMastered}
+              emoji={currentEmojis.join(" ")}
             />
 
             {/* StudyPagination */}

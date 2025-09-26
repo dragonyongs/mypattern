@@ -115,9 +115,7 @@ export const StudyCard: React.FC<StudyCardProps> = ({
 
       <div className="text-center flex flex-col gap-y-3">
         {/* 이모지 (단어 모드에만) */}
-        {mode === "vocabulary" && emoji && (
-          <div className="text-6xl my-6">{emoji}</div>
-        )}
+        {emoji && <div className="text-6xl my-6">{emoji}</div>}
 
         {/* 메인 텍스트 */}
         <h2
