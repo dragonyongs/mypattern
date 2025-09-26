@@ -18,6 +18,8 @@ import CalendarPage from "@/pages/CalendarPage";
 import { StudyInterface } from "@/components/StudyInterface";
 import { useHydration } from "@/hooks/useHydration";
 import BottomAppBar from "@/shared/components/BottomAppBar";
+import DrawingTestPage from "@/pages/DrawingTestPage";
+import DrawingErrorBoundary from "@/features/drawing/components/DrawingErrorBoundary";
 
 // 학습 상세 라우트 가드 (기존 유지)
 function StudyPage() {
@@ -148,6 +150,7 @@ function App() {
           <Route path="/pack-select" element={<PackSelectPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/study/:day" element={<StudyPage />} />
+          <Route path="/drawing-test" element={<DrawingTestPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
